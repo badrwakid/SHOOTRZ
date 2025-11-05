@@ -1,0 +1,14 @@
+# IDE files
+.cursor/
+
+# Archive files
+*.zip
+
+# Model files at root
+*.pt
+*.pth
+
+# SHOOTRZ project (if it should be tracked separately)
+# Uncomment if SHOOTRZ should be ignored
+# SHOOTRZ/
+
