@@ -1,0 +1,29 @@
+flask==3.0.0
+flask-cors==4.0.0
+mediapipe>=0.10.13    # Updated to available version
+# Use a version available for Python 3.12 on Windows
+opencv-python==4.10.0.84
+# Python 3.12 compatible NumPy
+numpy==1.26.4
+pillow==10.1.0
+requests==2.31.0
+python-dotenv==1.0.0
+
+# FastAPI stack
+fastapi>=0.110.0
+uvicorn[standard]>=0.24.0
+python-multipart>=0.0.9
+pydantic>=2.6.0
+supabase>=2.3.0
+
+# Advanced AI dependencies
+ultralytics>=8.0.0    # YOLOv8 for ball detection AND pose estimation
+lightgbm>=4.0.0       # Fast ML model for shot prediction
+filterpy>=1.4.5       # Kalman filtering for temporal smoothing
+scikit-learn>=1.3.0   # ML utilities and validation
+scipy>=1.11.0         # Scientific computing and signal processing
+onnxruntime>=1.16.0   # Optimized model inference
+joblib>=1.3.0         # Model serialization
+torch>=2.0.0          # PyTorch for ML refinement model (Phase 3)
+pytest>=7.0.0         # Testing framework
+pytest-cov>=4.0.0     # Coverage reporting

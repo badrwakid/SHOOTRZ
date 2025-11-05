@@ -1,0 +1,102 @@
+{
+  "test_date": "\"2025-10-19T12:05:36\"",
+  "video_tested": "uploads/shot.mp4",
+  "bug_fixes_applied": [
+    "Removed duplicate angle appends",
+    "Fixed body alignment calculation",
+    "Updated app.py to use EnhancedVideoProcessor"
+  ],
+  "original": {
+    "metrics": {
+      "elbow_angle": 44.67,
+      "knee_angle": 176.47,
+      "release_angle": 30.0,
+      "body_alignment": 71.63,
+      "elbow_confidence": 72.0,
+      "knee_confidence": 71.0,
+      "release_confidence": 80.5,
+      "alignment_confidence": 74.8
+    },
+    "scores": {
+      "elbow": 0,
+      "balance": 6.41,
+      "release": 7.4,
+      "alignment": 17.91,
+      "total": 31.72
+    }
+  },
+  "enhanced": {
+    "metrics": {
+      "elbow_angle": 67.62,
+      "knee_angle": 173.13,
+      "release_angle": 54.25,
+      "body_alignment": 0.0,
+      "elbow_confidence": 66.6,
+      "knee_confidence": 71.0,
+      "release_confidence": 75.6,
+      "alignment_confidence": 0.0,
+      "elbow_angle_confidence": 0.95,
+      "knee_angle_confidence": 0.95,
+      "release_angle_confidence": 1.0,
+      "body_alignment_confidence": 0.7
+    },
+    "scores": {
+      "elbow": 10,
+      "balance": 10,
+      "release": 25,
+      "alignment": 0.0,
+      "total": 45.0
+    },
+    "camera_analysis": {
+      "success": true,
+      "camera_angle": "side",
+      "angle_degrees": 90,
+      "camera_distance": "too_far",
+      "distance_meters": 8.0,
+      "reliability_score": 67.8,
+      "recommendations": [
+        "\ud83d\udca1 Good side angle! For optimal results, try 45\u00b0 angle for both form and shot arc",
+        "\u26a0\ufe0f Camera is too far. Move closer by 2-3 meters for better detail",
+        "\ud83d\udca1 Decent setup, but improvements recommended for better accuracy",
+        "\ud83d\udcf9 Recommended: 720p or higher, 30+ fps, good lighting",
+        "\ud83d\udcd0 Camera height: Chest level, 10-15 feet away"
+      ],
+      "metric_adjustments": {
+        "elbow_angle": 0.95,
+        "knee_angle": 0.95,
+        "release_angle": 1.0,
+        "body_alignment": 0.7,
+        "follow_through": 0.95,
+        "shot_arc": 1.0
+      },
+      "is_optimal": false
+    },
+    "ml_prediction": {
+      "success": true,
+      "method": "rule_based",
+      "probability_make": 42.0,
+      "probability_miss": 58.0,
+      "confidence": 70.0,
+      "prediction": "miss",
+      "ml_prediction": 42.0,
+      "rule_prediction": 42.0,
+      "feature_contributions": {}
+    },
+    "trajectory": null,
+    "temporal_stats": {
+      "total_frames": 104,
+      "outlier_frames": 0,
+      "outlier_rate": 0.0,
+      "window_size": 5,
+      "outlier_threshold": 3.0
+    }
+  },
+  "differences": {
+    "elbow_diff": 22.950000000000003,
+    "knee_diff": 3.3400000000000034,
+    "release_diff": 24.25,
+    "alignment_diff": 71.63,
+    "score_diff": 13.280000000000001,
+    "avg_difference": 27.089999999999996
+  }
+}

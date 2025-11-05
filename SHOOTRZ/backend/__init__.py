@@ -1,0 +1,7 @@
+"""SHOOTRZ Backend - FastAPI application"""
+
+
+
+
+
+

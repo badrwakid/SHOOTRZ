@@ -1,0 +1,260 @@
+import cv2
+import os
+import uuid
+import time
+from pose_detector import PoseDetector
+from angle_calculator import AngleAnalyzer
+from tip_generator import generate_tips, calculate_scores, get_performance_level
+
+class VideoProcessor:
+    def __init__(self):
+        """Initialize video processor with pose detection and angle analysis"""
+        self.pose_detector = PoseDetector()
+        self.angle_analyzer = AngleAnalyzer()
+        
+    def process_video(self, video_path, output_dir='processed'):
+        """
+        Process video and generate analysis with annotated output
+        
+        Args:
+            video_path: Path to input video file
+            output_dir: Directory to save processed video
+            
+        Returns:
+            dict: Analysis results with metrics, scores, tips, and annotated video path
+        """
+        try:
+            # Generate unique video ID
+            video_id = str(uuid.uuid4())
+            output_path = os.join(output_dir, f'{video_id}.mp4')
+            
+            # Ensure output directory exists
+            os.makedirs(output_dir, exist_ok=True)
+            
+            # Open video
+            cap = cv2.VideoCapture(video_path)
+            if not cap.isOpened():
+                raise Exception(f"Could not open video file: {video_path}")
+            
+            # Get video properties
+            fps = int(cap.get(cv2.CAP_PROP_FPS))
+            width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+            height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+            total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            
+            # Check for rotation metadata
+            rotation = 0
+            try:
+                # Try to get rotation from video metadata
+                rotation = cap.get(cv2.CAP_PROP_ORIENTATION_META)
+                if rotation == -1:  # Not available
+                    rotation = 0
+            except:
+                rotation = 0
+                
+            print(f"Processing video: {width}x{height} @ {fps}fps, {total_frames} frames, rotation: {rotation}°")
+            
+            # Determine output dimensions based on rotation
+            if rotation == 90 or rotation == 270:
+                output_width, output_height = height, width
+            else:
+                output_width, output_height = width, height
+                
+            print(f"Output video dimensions: {output_width}x{output_height}")
+            
+            # Video writer for annotated output
+            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+            out = cv2.VideoWriter(output_path, fourcc, fps, (output_width, output_height))
+            
+            if not out.isOpened():
+                raise Exception(f"Could not create output video: {output_path}")
+            
+            frame_count = 0
+            processed_frames = 0
+            start_time = time.time()
+            
+            # Reset angle analyzer for new video
+            self.angle_analyzer.reset()
+            
+            while cap.isOpened():
+                ret, frame = cap.read()
+                if not ret:
+                    break
+                
+                frame_count += 1
+                
+                # Handle video rotation if needed
+                if rotation == 90:
+                    frame = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
+                elif rotation == 180:
+                    frame = cv2.rotate(frame, cv2.ROTATE_180)
+                elif rotation == 270:
+                    frame = cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
+                
+                # Detect pose in frame
+                landmarks = self.pose_detector.detect_poses(frame)
+                
+                if landmarks and self.pose_detector.is_pose_visible(landmarks):
+                    # Draw pose skeleton on frame
+                    annotated_frame = self.pose_detector.draw_pose(frame.copy(), landmarks)
+                    
+                    # Extract basketball keypoints
+                    keypoints = self.pose_detector.get_basketball_keypoints(landmarks, frame.shape)
+                    
+                    if keypoints:
+                        # Analyze angles for this frame with timing information
+                        self.angle_analyzer.analyze_frame(keypoints, frame_count, total_frames)
+                        processed_frames += 1
+                    
+                    # Write annotated frame
+                    out.write(annotated_frame)
+                else:
+                    # Write original frame if no pose detected
+                    out.write(frame)
+                
+                # Progress update every 30 frames
+                if frame_count % 30 == 0:
+                    elapsed = time.time() - start_time
+                    print(f"Processed {frame_count}/{total_frames} frames ({elapsed:.1f}s)")
+            
+            # Release resources
+            cap.release()
+            out.release()
+            
+            processing_time = time.time() - start_time
+            print(f"Video processing completed in {processing_time:.2f}s")
+            print(f"Processed {processed_frames}/{frame_count} frames with pose detection")
+            
+            # Get analysis results
+            metrics = self.angle_analyzer.get_average_metrics()
+            scores = calculate_scores(metrics)
+            
+            # Generate tips
+            tip_result = generate_tips(metrics)
+            
+            # Extract tips array for response
+            if isinstance(tip_result, dict):
+                tips = tip_result.get('tips', [])
+                if tips and isinstance(tips, list) and len(tips) > 0:
+                    # Extract just the tip text from the dict structure
+                    tips = [tip.get('tip', tip) if isinstance(tip, dict) else str(tip) for tip in tips]
+            else:
+                tips = tip_result if isinstance(tip_result, list) else []
+            
+            performance_level = get_performance_level(scores['total'])
+            
+            # Calculate processing statistics
+            processing_fps = frame_count / processing_time if processing_time > 0 else 0
+            pose_detection_rate = (processed_frames / frame_count) * 100 if frame_count > 0 else 0
+            
+            result = {
+                'success': True,
+                'video_id': video_id,
+                'metrics': metrics,
+                'scores': scores,
+                'tips': tips,
+                'performance_level': performance_level,
+                'annotated_video_path': output_path,
+                'total_frames': frame_count,
+                'processed_frames': processed_frames,
+                'processing_time': round(processing_time, 2),
+                'processing_fps': round(processing_fps, 2),
+                'pose_detection_rate': round(pose_detection_rate, 2),
+                'video_properties': {
+                    'width': width,
+                    'height': height,
+                    'fps': fps,
+                    'duration': frame_count / fps if fps > 0 else 0
+                }
+            }
+            
+            return result
+            
+        except Exception as e:
+            print(f"Error processing video: {e}")
+            return {
+                'success': False,
+                'error': str(e),
+                'video_id': None,
+                'metrics': {},
+                'scores': {},
+                'tips': ["Error processing video. Please try again."],
+                'annotated_video_path': None
+            }
+    
+    def validate_video(self, video_path):
+        """
+        Validate video file before processing
+        
+        Args:
+            video_path: Path to video file
+            
+        Returns:
+            dict: Validation results
+        """
+        try:
+            if not os.path.exists(video_path):
+                return {'valid': False, 'error': 'Video file does not exist'}
+            
+            # Check file size (max 100MB)
+            file_size = os.path.getsize(video_path)
+            max_size = 100 * 1024 * 1024  # 100MB
+            if file_size > max_size:
+                return {'valid': False, 'error': 'Video file too large (max 100MB)'}
+            
+            # Check video properties
+            cap = cv2.VideoCapture(video_path)
+            if not cap.isOpened():
+                return {'valid': False, 'error': 'Invalid video format'}
+            
+            fps = cap.get(cv2.CAP_PROP_FPS)
+            frame_count = cap.get(cv2.CAP_PROP_FRAME_COUNT)
+            duration = frame_count / fps if fps > 0 else 0
+            
+            cap.release()
+            
+            # Check duration (max 30 seconds)
+            if duration > 30:
+                return {'valid': False, 'error': 'Video too long (max 30 seconds)'}
+            
+            # Check minimum requirements
+            if duration < 1:
+                return {'valid': False, 'error': 'Video too short (min 1 second)'}
+            
+            if fps < 15:
+                return {'valid': False, 'error': 'Video frame rate too low (min 15fps)'}
+            
+            return {
+                'valid': True,
+                'duration': duration,
+                'fps': fps,
+                'frame_count': int(frame_count),
+                'file_size': file_size
+            }
+            
+        except Exception as e:
+            return {'valid': False, 'error': f'Validation error: {str(e)}'}
+    
+    def get_processing_stats(self):
+        """
+        Get processing statistics
+        
+        Returns:
+            dict: Processing statistics
+        """
+        try:
+            return {
+                'total_frames_processed': self.angle_analyzer.frame_count,
+                'elbow_angles_count': len(self.angle_analyzer.elbow_angles),
+                'knee_angles_count': len(self.angle_analyzer.knee_angles),
+                'release_angles_count': len(self.angle_analyzer.release_angles),
+                'body_alignments_count': len(self.angle_analyzer.body_alignments),
+            }
+        except Exception as e:
+            print(f"Error getting processing stats: {e}")
+            return {}
+
+
+
+
+

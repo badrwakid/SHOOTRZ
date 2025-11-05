@@ -1,0 +1,21 @@
+{
+  "timestamp": "2025-10-20T21:22:00Z",
+  "python_version": "3.12.1",
+  "node_version": "20.17.0",
+  "project": "SHOOTRZ Basketball Training App",
+  "stats": {
+    "documentation_files": 26,
+    "test_files": 11,
+    "video_processors": 3,
+    "active_processor": "video_processor.py (basic)",
+    "python_venv_committed": true,
+    "gitignore_exists": false,
+    "eslint_config": false,
+    "prettier_config": false
+  },
+  "pass_0_complete": true
+}
+
+
+
+

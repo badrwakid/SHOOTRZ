@@ -1,0 +1,18 @@
+SHOOTRZ LOGO PLACEHOLDER
+
+Please replace this file with your actual SHOOTRZ logo image.
+
+Requirements:
+- File name: shootrz-logo.png
+- Format: PNG with transparent background
+- Size: At least 400x200px (or similar aspect ratio)
+- Content: SHOOTRZ text with basketball emojis and "PERFECT THE GAME" tagline
+- Style: Orange and blue accents on dark background
+
+The logo should match your original design with:
+- SHOOTRZ text with basketball replacing "OO"
+- "PERFECT THE GAME" tagline below
+- Orange and blue color scheme
+- Modern, tech-sporty aesthetic
+
+Once you place your logo file as "shootrz-logo.png" in this folder, the app will display it automatically in the Home screen header.

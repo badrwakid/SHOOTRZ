@@ -1,0 +1,59 @@
+{
+  "metrics": {
+    "elbow_angle": 0,
+    "knee_angle": 0,
+    "release_angle": 0,
+    "body_alignment": 0
+  },
+  "scores": {
+    "elbow": 0,
+    "balance": 0,
+    "release": 0,
+    "alignment": 0.0,
+    "total": 0.0
+  },
+  "validation": {
+    "is_valid": true,
+    "confidence": 75.0,
+    "checks": {
+      "wrist_pattern": {
+        "passed": true,
+        "reason": "Characteristic dip\u2192rise pattern detected",
+        "details": {
+          "vertical_range": 795.4829171597958,
+          "dip_frame": 20,
+          "peak_frame": 77
+        }
+      },
+      "body_stability": {
+        "passed": false,
+        "reason": "Body moving too much (x_var=976, y_var=3117)"
+      },
+      "duration": {
+        "passed": true,
+        "reason": "Long duration (3.1s) - may include extra movement",
+        "warning": true
+      },
+      "arm_extension": {
+        "passed": true,
+        "reason": "Arm extends 96\u00b0 (shooting motion)",
+        "details": {
+          "min_elbow": 79.83765950568473,
+          "max_elbow": 176.10348318269826,
+          "extension": 96.26582367701353
+        }
+      }
+    },
+    "passed_checks": "3/4"
+  },
+  "phase_detection": {
+    "key_frames": {
+      "dip_start": 15,
+      "dip_bottom": 19,
+      "release": 85,
+      "peak": 85,
+      "follow_through_end": 92
+    }
+  },
+  "research_comparison": {}
+}

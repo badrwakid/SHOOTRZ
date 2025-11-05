@@ -1,0 +1,56 @@
+"""
+Constants and configuration values for the SHOOTRZ system.
+"""
+
+# MediaPipe configuration
+MEDIAPIPE_POSE_MODEL_COMPLEXITY = 1  # 0=fastest, 1=balanced, 2=most accurate
+MEDIAPIPE_MIN_DETECTION_CONFIDENCE = 0.5
+MEDIAPIPE_MIN_TRACKING_CONFIDENCE = 0.5
+
+# Ball tracking configuration
+BALL_DETECTION_CONFIDENCE_THRESHOLD = 0.5
+BALL_TRACKING_IOU_THRESHOLD = 0.7
+BALL_CLASS_ID = 37  # COCO class ID for "sports ball"
+
+# Phase detection thresholds
+BALL_VELOCITY_THRESHOLD = 2.0  # m/s or normalized
+KNEE_FLEXION_THRESHOLD = 100.0  # degrees
+MIN_PHASE_FRAMES = 5
+
+# Processing configuration
+DEFAULT_FRAME_SKIP = 1  # Process every frame
+MAX_VIDEO_DURATION_SECONDS = 30
+MIN_VIDEO_DURATION_SECONDS = 1
+MAX_VIDEO_SIZE_MB = 100
+
+# Video quality recommendations
+RECOMMENDED_RESOLUTION = "1080p"
+RECOMMENDED_FPS = 30
+MIN_RESOLUTION_WIDTH = 720
+
+# Metric computation
+TRAJECTORY_SMOOTHING_WINDOW = 11
+TRAJECTORY_SMOOTHING_POLYORDER = 2
+POSE_3D_SMOOTHING_WINDOW = 11
+POSE_3D_SMOOTHING_POLYORDER = 2
+
+# Confidence thresholds
+HIGH_CONFIDENCE_THRESHOLD = 0.7
+MEDIUM_CONFIDENCE_THRESHOLD = 0.5
+LOW_CONFIDENCE_THRESHOLD = 0.3
+
+# Rim and court dimensions
+RIM_HEIGHT_METERS = 3.05
+COURT_WIDTH_METERS = 15.0
+COURT_LENGTH_METERS = 28.0
+
+# Performance limits
+MAX_FRAMES_TO_PROCESS = 900  # 30 seconds at 30fps
+MAX_PROCESSING_TIME_SECONDS = 300  # 5 minutes timeout
+
+# API configuration
+MAX_UPLOAD_SIZE_MB = 100
+ALLOWED_VIDEO_FORMATS = ["mp4", "mov", "avi", "mkv", "webm"]
+
+
+

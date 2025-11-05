@@ -1,0 +1,48 @@
+====================================================================
+  SOCIAL AUTHENTICATION - MANUAL INSTALLATION COMMANDS
+====================================================================
+
+📍 Run these commands in your terminal from the basketball-training-app directory:
+
+--------------------------------------------------------------------
+STEP 1: Install Required Packages
+--------------------------------------------------------------------
+
+npx expo install expo-auth-session expo-crypto expo-web-browser
+
+npx expo install expo-apple-authentication
+
+
+--------------------------------------------------------------------
+STEP 2: What These Packages Do
+--------------------------------------------------------------------
+
+✅ expo-auth-session       - Handles OAuth flows for Google Sign-In
+✅ expo-crypto             - Generates secure nonces for Apple Sign-In
+✅ expo-web-browser        - Opens web browser for OAuth redirects
+✅ expo-apple-authentication - Native Apple Sign-In for iOS
+
+
+--------------------------------------------------------------------
+STEP 3: After Installation
+--------------------------------------------------------------------
+
+1. Follow the setup guide in SOCIAL_AUTH_QUICKSTART.md
+2. Get your OAuth credentials from Google Cloud Console
+3. Update the .env file with your credentials
+4. Uncomment the code in AuthContext.tsx
+5. Test the implementation!
+
+
+--------------------------------------------------------------------
+NOTES
+--------------------------------------------------------------------
+
+⚠️  Google Sign-In works on all platforms (iOS, Android, Web)
+⚠️  Apple Sign-In only works on iOS 13+ with a development build
+⚠️  You need a paid Apple Developer account for Apple Sign-In
+⚠️  Make sure to add .env to your .gitignore file
+
+
+====================================================================
+
