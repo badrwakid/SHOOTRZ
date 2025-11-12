@@ -45,7 +45,7 @@ Backend runs on `http://localhost:5000`
 ```bash
 # From project root
 npm install
-npm start
+npm start # automatically detects your local IP and updates EXPO_PUBLIC_API_URL
 ```
 
 This opens Expo Dev Tools. Scan QR code with Expo Go app to test.

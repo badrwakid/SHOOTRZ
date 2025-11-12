@@ -7,7 +7,7 @@ echo Starting backend on ALL network interfaces (0.0.0.0:8000)
 echo This allows connections from your iPhone at 192.168.1.4
 echo.
 cd /d "%~dp0"
-python -m uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
+"C:\Users\Badr\AppData\Local\Programs\Python\Python312\python.exe" -m uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
 pause
 
 
