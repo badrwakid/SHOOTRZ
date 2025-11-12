@@ -38,6 +38,7 @@
     "expo-media-library": "^18.2.0",
     "expo-notifications": "^0.32.12",
     "expo-status-bar": "~3.0.8",
+    "expo-video": "^3.0.14",
     "expo-web-browser": "~15.0.8",
     "firebase": "^12.4.0",
     "lodash": "^4.17.21",

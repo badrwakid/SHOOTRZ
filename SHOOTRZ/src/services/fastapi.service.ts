@@ -78,8 +78,9 @@ export async function checkHealth(): Promise<boolean> {
     });
     
     if (!res.ok) {
-      if (__DEV__) {
-        console.error(`❌ Health check failed: ${res.status} ${res.statusText}`);
+      // Only log server errors (4xx/5xx), not network errors
+      if (__DEV__ && res.status >= 500) {
+        console.warn(`⚠️ Health check failed (server error): ${res.status} ${res.statusText}`);
       }
       return false;
     }
@@ -91,13 +92,21 @@ export async function checkHealth(): Promise<boolean> {
     
     return data.status === 'healthy';
   } catch (error: any) {
-    if (__DEV__) {
-      console.error('❌ Health check failed:', {
+    // Suppress network errors - they're expected if backend is unavailable
+    const isNetworkError = 
+      error?.message?.includes('Network request failed') ||
+      error?.message?.includes('Network Error') ||
+      error?.message?.includes('Failed to fetch') ||
+      error?.name === 'TypeError';
+    
+    // Only log non-network errors
+    if (!isNetworkError && __DEV__) {
+      console.warn('⚠️ Health check failed (unexpected error):', {
         message: error?.message,
-        baseURL: BASE_URL,
-        fullUrl: `${BASE_URL}/health`,
+        name: error?.name,
       });
     }
+    
     return false;
   }
 }

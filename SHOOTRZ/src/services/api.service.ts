@@ -382,22 +382,23 @@ class ApiService {
       
       return response.status === 200 && response.data?.status === 'healthy';
     } catch (error: any) {
-      // Log detailed error information
-      if (__DEV__) {
-        console.error('❌ Health check failed:', {
+      // Suppress network errors - they're expected if backend is unavailable
+      // Only log server errors (5xx) or unexpected errors
+      const isNetworkError = 
+        error?.code === 'ECONNABORTED' || 
+        error?.code === 'ERR_NETWORK' ||
+        error?.message?.includes('Network request failed') ||
+        error?.message?.includes('Network Error') ||
+        !error?.response; // No response means network error
+      
+      if (!isNetworkError && __DEV__) {
+        // Log server errors or unexpected errors
+        console.warn('⚠️ Health check failed (server error):', {
+          status: error?.response?.status,
           message: error?.message,
-          code: error?.code,
-          baseURL: this.baseURL,
-          fullUrl: `${this.baseURL}/health`,
-          response: error?.response?.status,
-          data: error?.response?.data,
         });
       }
       
-      // Only log if it's a real network error, not just timeout
-      if (error.code !== 'ECONNABORTED') {
-        console.error('Health check failed:', error?.message || error);
-      }
       return false;
     }
   }

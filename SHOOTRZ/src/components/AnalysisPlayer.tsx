@@ -8,7 +8,7 @@ import {
 	Animated,
 	ActivityIndicator,
 } from 'react-native'
-import { Video, ResizeMode, AVPlaybackStatus } from 'expo-av'
+import { VideoView, useVideoPlayer } from 'expo-video'
 import { LinearGradient } from 'expo-linear-gradient'
 import { Ionicons } from '@expo/vector-icons'
 import { SHOOTRZ_THEME } from '../constants/theme'
@@ -55,7 +55,6 @@ export function AnalysisPlayer({
 	phases = [],
 	onFrameChange,
 }: AnalysisPlayerProps) {
-	const videoRef = useRef<Video>(null)
 	const [isPlaying, setIsPlaying] = useState(false)
 	const [currentTime, setCurrentTime] = useState(0)
 	const [duration, setDuration] = useState(0)
@@ -65,7 +64,12 @@ export function AnalysisPlayer({
 	const [videoDimensions, setVideoDimensions] = useState({ width: 0, height: 0 })
 	const [isLoading, setIsLoading] = useState(true)
 	const [error, setError] = useState<string | null>(null)
-	const playbackStatusRef = useRef<AVPlaybackStatus | null>(null)
+
+	// Create video player with expo-video
+	const player = useVideoPlayer(videoUri, (player) => {
+		player.loop = false
+		player.muted = false
+	})
 
 	// Get current frame index based on time
 	const getCurrentFrame = (timeMs: number): number => {
@@ -220,15 +224,13 @@ export function AnalysisPlayer({
 		)
 	}
 
-	const handlePlayPause = async () => {
-		if (videoRef.current) {
-			if (isPlaying) {
-				await videoRef.current.pauseAsync()
-			} else {
-				await videoRef.current.playAsync()
-			}
-			setIsPlaying(!isPlaying)
+	const handlePlayPause = () => {
+		if (isPlaying) {
+			player.pause()
+		} else {
+			player.play()
 		}
+		setIsPlaying(!isPlaying)
 	}
 
 	const formatTime = (ms: number): string => {
@@ -238,61 +240,48 @@ export function AnalysisPlayer({
 		return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`
 	}
 
-	const seekToFrame = async (frameIdx: number) => {
-		if (videoRef.current && duration > 0) {
+	const seekToFrame = (frameIdx: number) => {
+		if (duration > 0) {
 			const fps = 30
-			const timeMs = (frameIdx / fps) * 1000
-			await videoRef.current.setPositionAsync(timeMs)
+			const timeSeconds = (frameIdx / fps)
+			player.currentTime = timeSeconds
 			onFrameChange?.(frameIdx)
 		}
 	}
+
+	// Set up player event listeners
+	useEffect(() => {
+		const updateTime = () => {
+			setCurrentTime(player.currentTime * 1000) // Convert to milliseconds
+			setIsPlaying(player.playing)
+			if (player.currentTime) {
+				const frame = getCurrentFrame(player.currentTime * 1000)
+				onFrameChange?.(frame)
+			}
+		}
+
+		const interval = setInterval(updateTime, 100) // Update every 100ms
+		return () => clearInterval(interval)
+	}, [player, onFrameChange])
+
+	// Get video dimensions and duration when loaded
+	useEffect(() => {
+		if (player.duration > 0) {
+			setDuration(player.duration * 1000) // Convert to milliseconds
+			setIsLoading(false)
+		}
+	}, [player.duration])
 
 	return (
 		<View style={styles.container}>
 			{/* Video Player */}
 			<View style={styles.videoContainer}>
-				<Video
-					ref={videoRef}
-					source={{ uri: videoUri }}
+				<VideoView
+					player={player}
 					style={styles.video}
-					resizeMode={ResizeMode.CONTAIN}
-					useNativeControls={false}
-					onLoad={(data) => {
-						setDuration(data.durationMillis || 0)
-						if (data.naturalSize) {
-							setVideoDimensions({
-								width: data.naturalSize.width,
-								height: data.naturalSize.height,
-							})
-						}
-					}}
-					onLoadStart={() => setIsLoading(true)}
-					onLoad={(data) => {
-						setIsLoading(false)
-						setDuration(data.durationMillis || 0)
-						if (data.naturalSize) {
-							setVideoDimensions({
-								width: data.naturalSize.width,
-								height: data.naturalSize.height,
-							})
-						}
-					}}
-					onError={(error) => {
-						setIsLoading(false)
-						setError(error?.message || 'Failed to load video')
-						console.error('Video playback error:', error)
-					}}
-					onPlaybackStatusUpdate={(status) => {
-						playbackStatusRef.current = status
-						if (status.isLoaded) {
-							setCurrentTime(status.positionMillis || 0)
-							setIsPlaying(status.isPlaying)
-							if (status.positionMillis) {
-								const frame = getCurrentFrame(status.positionMillis)
-								onFrameChange?.(frame)
-							}
-						}
-					}}
+					contentFit="contain"
+					nativeControls={false}
+					fullscreenOptions={{ enterFullscreenButton: false, exitFullscreenButton: false }}
 				/>
 
 				{/* Overlays */}

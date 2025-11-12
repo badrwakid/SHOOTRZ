@@ -154,18 +154,51 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   // Load user data on app start (Supabase)
   useEffect(() => {
     const initializeAuth = async () => {
-      const { data } = await supabase.auth.getSession();
-      if (data.session?.user) {
-        const u = data.session.user;
-        const userData = await createUserDataFromSession(u);
-        await storageService.saveUserData(userData);
-        setUser(userData);
-        setIsNewUser(false);
-      } else {
+      try {
+        const { data, error } = await supabase.auth.getSession();
+        
+        // Handle network errors gracefully
+        if (error) {
+          const isNetworkError = 
+            error.message?.includes('Network request failed') ||
+            error.message?.includes('Network Error') ||
+            error.message?.includes('Failed to fetch');
+          
+          if (isNetworkError) {
+            // Network error - fail silently, user is not authenticated
+            await storageService.clearAllData();
+            setUser(null);
+            setIsLoading(false);
+            return;
+          }
+        }
+        
+        if (data?.session?.user) {
+          const u = data.session.user;
+          const userData = await createUserDataFromSession(u);
+          await storageService.saveUserData(userData);
+          setUser(userData);
+          setIsNewUser(false);
+        } else {
+          await storageService.clearAllData();
+          setUser(null);
+        }
+        setIsLoading(false);
+      } catch (error: any) {
+        // Catch any unexpected errors
+        const isNetworkError = 
+          error?.message?.includes('Network request failed') ||
+          error?.message?.includes('Network Error') ||
+          error?.message?.includes('Failed to fetch');
+        
+        if (!isNetworkError && __DEV__) {
+          console.warn('⚠️ Auth initialization error:', error);
+        }
+        
         await storageService.clearAllData();
         setUser(null);
+        setIsLoading(false);
       }
-      setIsLoading(false);
     };
     
     const sub = supabase.auth.onAuthStateChange(async (event, session) => {

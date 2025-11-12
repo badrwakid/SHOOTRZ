@@ -2,54 +2,31 @@
   "expo": {
     "name": "SHOOTRZ",
     "slug": "shootrz-basketball-training",
+    "scheme": "shootrz",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/shootrz-logo.png",
-    "userInterfaceStyle": "dark",
-    "newArchEnabled": true,
+    "userInterfaceStyle": "automatic",
     "splash": {
-      "image": "./assets/shootrz-logo.png",
+      "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#000000"
     },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.shootrz.app",
-      "infoPlist": {
-        "CFBundleURLTypes": [
-          {
-            "CFBundleURLSchemes": ["shootrz"]
-          }
-        ]
-      }
+      "supportsTablet": false
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/shootrz-logo.png",
+        "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#000000"
-      },
-      "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false,
-      "intentFilters": [
-        {
-          "action": "VIEW",
-          "autoVerify": true,
-          "data": [
-            {
-              "scheme": "shootrz"
-            }
-          ],
-          "category": ["BROWSABLE", "DEFAULT"]
-        }
-      ]
+      }
     },
     "web": {
-      "favicon": "./assets/shootrz-logo.png"
-    },
-    "plugins": [
-      "expo-web-browser"
-    ],
-    "scheme": "shootrz",
-    "associatedDomains": ["applinks:shootrz.com"]
+      "favicon": "./assets/favicon.png"
+    }
   }
 }
+

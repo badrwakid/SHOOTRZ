@@ -12,7 +12,6 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Video, ResizeMode } from 'expo-av';
 import * as ImagePicker from 'expo-image-picker';
 import { ProgressRing } from '../components/ProgressRing';
 import { LoadingBasketball } from '../components/LoadingBasketball';
@@ -61,10 +60,9 @@ export const AnalyzeScreen: React.FC = () => {
         }
       } catch (error: any) {
         // Fail silently - health check is optional
+        // Network errors are expected and already handled in the service
         setApiHealth(false);
-        if (__DEV__ && error?.message) {
-          console.log('⚠️ Backend unavailable:', error.message);
-        }
+        // Don't log network errors - they're expected if backend is unavailable
       }
     };
 

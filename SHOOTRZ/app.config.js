@@ -1,5 +1,10 @@
+const fs = require('fs');
+const path = require('path');
+
 require('dotenv').config();
-const config = require('./app.json');
+
+const appJsonPath = path.resolve(__dirname, 'app.json');
+const config = JSON.parse(fs.readFileSync(appJsonPath, 'utf8'));
 
 // Add environment variables to Expo config
 module.exports = {
