@@ -4,7 +4,7 @@ from datetime import datetime
 import time
 
 from .routers import analyze, results, history, feedback, db_test, db_integration_test, sessions
-
+from .routers.recommendation_routes import router as recommendation_router
 # Track server start time for health endpoint
 _start_time = time.time()
 
@@ -28,6 +28,7 @@ def create_app() -> FastAPI:
     app.include_router(sessions.router)
     app.include_router(db_test.router)  # Database test endpoint
     app.include_router(db_integration_test.router)  # Integration test endpoint
+    app.include_router(recommendation_router, prefix="/api")
     
     # Root endpoint - redirect to docs
     @app.get("/", tags=["root"])
