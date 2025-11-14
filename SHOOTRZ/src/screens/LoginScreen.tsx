@@ -251,33 +251,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
         setLoading(false);
         return;
       }
-      
-      // OAuth completed successfully - session is created
-      // onAuthStateChange will fire and set user, making isAuthenticated true
-      // The useEffect above will detect this and call onLogin()
-      
-      // Polling fallback: Check isAuthenticated state for up to 3 seconds
-      // This catches edge cases where useEffect doesn't fire
-      let pollCount = 0;
-      const maxPolls = 15; // 15 polls * 200ms = 3 seconds
-      const pollInterval = setInterval(() => {
-        pollCount++;
-        
-        if (isAuthenticated) {
-          console.log(`✅ Authentication confirmed via polling (attempt ${pollCount})`);
-          clearInterval(pollInterval);
-          if (!navigationAttemptedRef.current) {
-            navigationAttemptedRef.current = true;
-            setLoading(false);
-            onLogin();
-          }
-        } else if (pollCount >= maxPolls) {
-          console.warn('⚠️ Authentication polling timeout - resetting loading state');
-          clearInterval(pollInterval);
-          setLoading(false);
-        }
-      }, 200); // Poll every 200ms
-      
+      // Successful sign-in: wait for AuthContext to update isAuthenticated,
+      // which triggers navigation and stops the loading spinner.
     } catch (error: any) {
       console.error('❌ Google Sign-In error:', error);
       Alert.alert('Google Sign-In Failed', error.message || 'Please try again');
