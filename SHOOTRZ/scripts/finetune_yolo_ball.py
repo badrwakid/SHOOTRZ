@@ -18,13 +18,14 @@ def prepare_dataset_config(dataset_path: Path, output_path: Path):
 		dataset_path: Path to dataset directory
 		output_path: Path to save data.yaml
 	"""
+	# DeepSport dataset has: ball (0), player (1)
 	config = {
 		"path": str(dataset_path.absolute()),
-		"train": "images/train",
-		"val": "images/val",
-		"test": "images/test",
-		"nc": 2,  # Number of classes: ball, hoop
-		"names": ["ball", "hoop"],
+		"train": "train/images",
+		"val": "val/images",
+		"test": "test/images",
+		"nc": 2,  # Number of classes: ball, player
+		"names": ["ball", "player"],
 	}
 	
 	with open(output_path, "w") as f:
@@ -40,9 +41,10 @@ def finetune_yolo(
 	image_size: int = 640,
 	model_name: str = "yolov8n",
 	output_dir: str = "models",
+	device: str = "cpu",
 ):
 	"""
-	Fine-tune YOLOv8 model on basketball dataset.
+	Fine-tune YOLOv8 model on DeepSport basketball dataset.
 	
 	Args:
 		dataset_config: Path to dataset YAML config
@@ -51,10 +53,11 @@ def finetune_yolo(
 		image_size: Input image size
 		model_name: Base model name (yolov8n, yolov8s, etc.)
 		output_dir: Directory to save trained model
+		device: Device to use ("cpu", "0" for GPU, etc.)
 	"""
-	print(f"Fine-tuning {model_name} on basketball dataset...")
+	print(f"Fine-tuning {model_name} on DeepSport basketball dataset...")
 	print(f"Dataset config: {dataset_config}")
-	print(f"Epochs: {epochs}, Batch size: {batch_size}, Image size: {image_size}")
+	print(f"Epochs: {epochs}, Batch size: {batch_size}, Image size: {image_size}, Device: {device}")
 	
 	# Load pretrained model
 	model = YOLO(f"{model_name}.pt")
@@ -65,10 +68,10 @@ def finetune_yolo(
 		epochs=epochs,
 		imgsz=image_size,
 		batch=batch_size,
-		name=f"{model_name}_basketball",
+		name=f"{model_name}_basketball_deepsport",
 		patience=10,  # Early stopping
 		save=True,
-		device=0,  # GPU (use "cpu" for CPU-only)
+		device=device,
 		project=output_dir,
 	)
 	
@@ -79,24 +82,25 @@ def finetune_yolo(
 	print(f"mAP@0.5:0.95: {metrics.box.map}")
 	
 	# Export trained model
-	model_path = Path(output_dir) / f"{model_name}_basketball" / "weights" / "best.pt"
+	model_path = Path(output_dir) / f"{model_name}_basketball_deepsport" / "weights" / "best.pt"
 	if model_path.exists():
 		# Copy to models directory
 		import shutil
-		final_path = Path(output_dir) / f"{model_name}_basketball.pt"
+		final_path = Path(output_dir) / f"{model_name}_basketball_deepsport.pt"
 		shutil.copy(model_path, final_path)
 		print(f"\nTrained model saved to: {final_path}")
+		return str(final_path)
 	
 	return results
 
 
 def main():
-	parser = argparse.ArgumentParser(description="Fine-tune YOLOv8 for basketball detection")
+	parser = argparse.ArgumentParser(description="Fine-tune YOLOv8 for basketball detection on DeepSport dataset")
 	parser.add_argument(
 		"--dataset",
 		type=str,
-		required=True,
-		help="Path to dataset YAML config file",
+		default="data/ball/deepsport_yolo/data.yaml",
+		help="Path to dataset YAML config file (default: data/ball/deepsport_yolo/data.yaml)",
 	)
 	parser.add_argument(
 		"--epochs",
@@ -129,20 +133,34 @@ def main():
 		default="models",
 		help="Output directory for trained model",
 	)
+	parser.add_argument(
+		"--device",
+		type=str,
+		default="cpu",
+		help="Device to use: 'cpu' or '0' for GPU",
+	)
 	
 	args = parser.parse_args()
+	
+	# Check if dataset config exists
+	dataset_config_path = Path(args.dataset)
+	if not dataset_config_path.exists():
+		print(f"Error: Dataset config not found: {dataset_config_path}")
+		print("Please run convert_deepsport_to_yolo.py first to create the dataset.")
+		return
 	
 	# Create output directory
 	Path(args.output_dir).mkdir(parents=True, exist_ok=True)
 	
 	# Fine-tune
 	finetune_yolo(
-		dataset_config=args.dataset,
+		dataset_config=str(dataset_config_path),
 		epochs=args.epochs,
 		batch_size=args.batch_size,
 		image_size=args.image_size,
 		model_name=args.model,
 		output_dir=args.output_dir,
+		device=args.device,
 	)
 
 

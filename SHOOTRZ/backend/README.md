@@ -327,6 +327,28 @@ If video output fails, install ffmpeg:
 - Mac: `brew install ffmpeg`
 - Linux: `sudo apt install ffmpeg`
 
+## Model Training
+
+### Fine-tuning YOLOv8 for Ball Detection
+
+The system supports fine-tuned YOLOv8 models for improved ball/player detection:
+
+1. **Prepare Dataset**:
+   ```bash
+   python scripts/convert_deepsport_to_yolo.py
+   ```
+
+2. **Train Model**:
+   ```bash
+   python scripts/finetune_yolo_ball.py --dataset data/ball/deepsport_yolo/data.yaml
+   ```
+
+3. **Model Location**: Trained model saved to `models/yolov8n_basketball_deepsport.pt`
+
+4. **Automatic Loading**: The pipeline automatically loads fine-tuned models if available, falls back to pretrained YOLOv8n otherwise.
+
+See `docs/TRAINING_GUIDE.md` for detailed training instructions.
+
 ## License
 
 Proprietary - SHOOTRZ Basketball Training App

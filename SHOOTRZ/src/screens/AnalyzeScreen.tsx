@@ -598,7 +598,7 @@ export const AnalyzeScreen: React.FC = () => {
             </View>
 
             {/* Section 2: Annotated Video Display */}
-            {selectedVideoUri && (
+            {latestResultResponse?.annotated_video_url && (
               <View style={styles.videoSection}>
                 <View style={styles.sectionHeader}>
                   <View style={styles.sectionHeaderLeft}>
@@ -609,8 +609,8 @@ export const AnalyzeScreen: React.FC = () => {
                   </View>
                 </View>
                 <AnnotatedVideoPlayer
-                  videoUri={selectedVideoUri}
-                  annotatedVideoUri={latestResultResponse?.annotated_video_url || null}
+                  videoUri={latestResultResponse.annotated_video_url}
+                  annotatedVideoUri={latestResultResponse.annotated_video_url}
                   poseResults={undefined} // Will be populated when backend returns full pose data
                   ballTrajectory={undefined} // Will be populated when backend returns trajectory data
                   phases={analysisResult.phases}

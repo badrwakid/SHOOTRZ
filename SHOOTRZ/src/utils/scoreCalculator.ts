@@ -237,11 +237,16 @@ export function calculateKneeAlignmentScore(metrics: any[]): number {
 export function calculateArcHeightScore(metrics: any[], shotDistance?: number): number {
 	const metric = metrics.find((m: any) => m.metric_name === 'arc_height')
 
-	if (!metric || !metric.value) {
+	if (!metric || !metric.value || metric.confidence === 0) {
 		return 0
 	}
 
 	const value = metric.value // in meters
+	
+	// If value is negative or 0, return 0 (invalid measurement)
+	if (value <= 0) {
+		return 0
+	}
 
 	// Context-aware: adjust optimal range based on shot distance
 	let targetRange: [number, number] = [3.6, 4.1]

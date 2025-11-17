@@ -70,6 +70,14 @@ def _process_job(
 		pipeline.cleanup()
 
 		# Update job store with results
+		annotated_video_path = result.get("annotated_video_path")
+		annotated_video_url = None
+		
+		# Convert local path to URL if available
+		if annotated_video_path:
+			# For now, use file:// URL (can be enhanced to serve via HTTP)
+			annotated_video_url = f"file://{annotated_video_path}"
+		
 		job_store[job_id] = {
 			"status": "completed",
 			"metrics": result.get("metrics", []),
@@ -79,6 +87,7 @@ def _process_job(
 			"pose_results": result.get("pose_results", 0),
 			"hand_results": result.get("hand_results", 0),
 			"ball_trajectory_length": result.get("ball_trajectory_length", 0),
+			"annotated_video_url": annotated_video_url,
 		}
 
 	except Exception as e:

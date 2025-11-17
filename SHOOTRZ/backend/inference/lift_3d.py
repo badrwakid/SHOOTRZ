@@ -179,70 +179,51 @@ def lift_3d_pose(
 def lift_3d_posemagic(
 	normalized_series: List[np.ndarray],
 	sequence_length: int = 81,
+	model_path: Optional[str] = None,
 ) -> List[np.ndarray]:
 	"""
 	Lift 3D using PoseMagic causal variant.
 	
-	For MVP: Returns placeholder structure.
-	In production: Load PoseMagic model and run inference.
+	Uses actual PoseMagic implementation if available, otherwise falls back
+	to heuristic depth estimation.
 	
-	Note: Actual PoseMagic implementation requires model weights and PyTorch.
-	"""
-	# Placeholder implementation
-	# In production, this would:
-	# 1. Load PoseMagic causal model weights
-	# 2. Process in sliding windows of sequence_length
-	# 3. Convert normalized 2D to 3D joints [17 keypoints]
-	
-	num_frames = len(normalized_series)
-	if num_frames == 0:
-		return []
-
-	# Placeholder: Return 3D keypoints with zero depth
-	# This allows the system to work without PoseMagic model
-	keypoints_3d = []
-	for frame_lm in normalized_series:
-		# Convert 33 MediaPipe landmarks to 17 SMPL keypoints
-		# Simplified mapping for MVP
-		smpl_keypoints = np.zeros((17, 3))
+	Args:
+		normalized_series: List of [33, 2] MediaPipe landmarks (normalized)
+		sequence_length: Window length for temporal model
+		model_path: Path to PoseMagic model weights
 		
-		# Map key MediaPipe points to SMPL
-		if len(frame_lm) >= 33:
-			# Head (nose)
-			smpl_keypoints[0] = [frame_lm[0, 0], frame_lm[0, 1], 0.0]
-			# Shoulders
-			smpl_keypoints[1] = [frame_lm[11, 0], frame_lm[11, 1], 0.0]  # Left
-			smpl_keypoints[2] = [frame_lm[12, 0], frame_lm[12, 1], 0.0]  # Right
-			# Elbows
-			smpl_keypoints[3] = [frame_lm[13, 0], frame_lm[13, 1], 0.0]  # Left
-			smpl_keypoints[4] = [frame_lm[14, 0], frame_lm[14, 1], 0.0]  # Right
-			# Wrists
-			smpl_keypoints[5] = [frame_lm[15, 0], frame_lm[15, 1], 0.0]  # Left
-			smpl_keypoints[6] = [frame_lm[16, 0], frame_lm[16, 1], 0.0]  # Right
-			# Hips
-			smpl_keypoints[7] = [frame_lm[23, 0], frame_lm[23, 1], 0.0]  # Left
-			smpl_keypoints[8] = [frame_lm[24, 0], frame_lm[24, 1], 0.0]  # Right
-			# Knees
-			smpl_keypoints[9] = [frame_lm[25, 0], frame_lm[25, 1], 0.0]  # Left
-			smpl_keypoints[10] = [frame_lm[26, 0], frame_lm[26, 1], 0.0]  # Right
-			# Ankles
-			smpl_keypoints[11] = [frame_lm[27, 0], frame_lm[27, 1], 0.0]  # Left
-			smpl_keypoints[12] = [frame_lm[28, 0], frame_lm[28, 1], 0.0]  # Right
-
-		keypoints_3d.append(smpl_keypoints)
-
-	return keypoints_3d
+	Returns:
+		List of [17, 3] 3D keypoints
+	"""
+	from .posemagic_lifter import lift_3d_posemagic as posemagic_lift
+	
+	return posemagic_lift(
+		normalized_series=normalized_series,
+		sequence_length=sequence_length,
+		model_path=model_path,
+	)
 
 
 def lift_3d_hybrik(
 	normalized_series: List[np.ndarray],
+	model_path: Optional[str] = None,
 ) -> List[np.ndarray]:
 	"""
 	Lift 3D using HybrIK-Transformer (per-frame fallback).
 	
-	For MVP: Returns placeholder structure.
-	In production: Load HybrIK model and run per-frame inference.
+	Uses actual HybrIK implementation if available, otherwise falls back
+	to heuristic depth estimation.
+	
+	Args:
+		normalized_series: List of [33, 2] MediaPipe landmarks (normalized)
+		model_path: Path to HybrIK model weights
+		
+	Returns:
+		List of [24, 3] 3D SMPL joints
 	"""
-	# Similar placeholder to PoseMagic
-	# In production, this would run HybrIK-Transformer on each frame
-	return lift_3d_posemagic(normalized_series, sequence_length=1)
+	from .hybrik_lifter import lift_3d_hybrik as hybrik_lift
+	
+	return hybrik_lift(
+		normalized_series=normalized_series,
+		model_path=model_path,
+	)
