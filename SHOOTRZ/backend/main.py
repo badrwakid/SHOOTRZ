@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime
 import time
 
-from .routers import analyze, results, history, feedback, db_test, db_integration_test, sessions
+from .routers import history, feedback, db_test, db_integration_test, sessions, mvp
 from .routers.recommendation_routes import router as recommendation_router
 # Track server start time for health endpoint
 _start_time = time.time()
@@ -21,8 +21,6 @@ def create_app() -> FastAPI:
     )
 
     # Include routers first
-    app.include_router(analyze.router)
-    app.include_router(results.router)
     app.include_router(history.router)
     app.include_router(feedback.router)
     app.include_router(sessions.router)

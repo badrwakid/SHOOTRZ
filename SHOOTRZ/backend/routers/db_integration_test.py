@@ -9,7 +9,7 @@ router = APIRouter(prefix="/db", tags=["database"])
 
 @router.get("/integration-test")
 async def integration_test():
-    """Test full application flow: analyze endpoint -> database"""
+    """Test full application flow: database integration"""
     results = {
         "timestamp": datetime.now().isoformat(),
         "test_name": "Full Application Integration Test",
@@ -39,7 +39,7 @@ async def integration_test():
         results["status"] = "error"
         return results
     
-    # Step 2: Simulate analyze endpoint (what happens when user uploads video)
+    # Step 2: Simulate video record creation
     try:
         test_file_url = "https://example.com/test-integration-video.mp4"
         video_id = record_video(
@@ -50,13 +50,13 @@ async def integration_test():
             device="mobile"
         )
         
-        results["steps"]["analyze_video"] = {
+        results["steps"]["video_record"] = {
             "status": "success",
             "video_id": video_id[:8] + "...",
-            "message": "Video record created (simulates /analyze endpoint)"
+            "message": "Video record created"
         }
     except Exception as e:
-        results["steps"]["analyze_video"] = {"status": "error", "error": str(e)}
+        results["steps"]["video_record"] = {"status": "error", "error": str(e)}
         results["status"] = "error"
         return results
     

@@ -40,12 +40,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
   const quickActions = [
     {
-      title: 'Analyze Shot',
-      icon: 'videocam',
-      color: SHOOTRZ_THEME.colors.primary,
-      screen: 'Analyze',
-    },
-    {
       title: 'Browse Drills',
       icon: 'basketball',
       color: SHOOTRZ_THEME.colors.secondary,
@@ -444,11 +438,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
               icon="stats-chart"
               title="No Activity Yet"
               message="Start training to see your activity here!"
-              actionText="Analyze a Shot"
-              onAction={() => {
-                hapticFeedback.light();
-                navigation.navigate('Analyze');
-              }}
             />
           ) : (
             recentActivity.map((activity, index) => (

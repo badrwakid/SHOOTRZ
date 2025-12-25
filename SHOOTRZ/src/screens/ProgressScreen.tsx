@@ -53,8 +53,6 @@ export const ProgressScreen: React.FC = () => {
 
 		try {
 			// Fetch sessions from Supabase via API
-			const response = await apiService.getResult
-			// For now, use mock data structure - implement actual API call
 			// This would call backend/routers/history.py endpoint
 			
 			// Mock structure - replace with actual API call

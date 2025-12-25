@@ -22,40 +22,6 @@ if (__DEV__) {
 	console.log(`🔗 Environment variable EXPO_PUBLIC_API_URL: ${process.env.EXPO_PUBLIC_API_URL || 'NOT SET'}`);
 }
 
-export async function analyzeJson(payload: any) {
-  const res = await fetch(`${BASE_URL}/analyze`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  })
-  if (!res.ok) throw new Error(`analyze failed: ${res.status}`)
-  return res.json()
-}
-
-export async function analyzeVideoFile(file: File | { uri: string; name: string; type: string }) {
-  const formData = new FormData()
-  if (file instanceof File) {
-    formData.append('file', file)
-  } else {
-    // For React Native, convert URI to blob/file
-    const response = await fetch(file.uri)
-    const blob = await response.blob()
-    formData.append('file', blob, file.name)
-  }
-  
-  const res = await fetch(`${BASE_URL}/analyze`, {
-    method: 'POST',
-    body: formData,
-  })
-  if (!res.ok) throw new Error(`analyze failed: ${res.status}`)
-  return res.json()
-}
-
-export async function getResult(jobId: string) {
-  const res = await fetch(`${BASE_URL}/result/${jobId}`)
-  if (!res.ok) throw new Error(`result failed: ${res.status}`)
-  return res.json()
-}
 
 export async function getHistory(userId: string) {
   const res = await fetch(`${BASE_URL}/history/${userId}`)

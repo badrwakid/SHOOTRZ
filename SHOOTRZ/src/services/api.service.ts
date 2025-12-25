@@ -28,7 +28,7 @@ const getApiBaseUrl = () => {
 	return 'https://api.shootrz.com'; // Production
 };
 
-const API_BASE_URL = getApiBaseUrl();
+export const API_BASE_URL = getApiBaseUrl();
 
 export interface AnalysisResponse {
   success: boolean;
@@ -214,152 +214,7 @@ class ApiService {
     }
   }
 
-  /**
-   * Extract filename from video URI for proper FormData naming
-   */
-  private getFilenameFromUri(uri: string): string {
-    try {
-      // Extract filename from URI path
-      const parts = uri.split('/');
-      let filename = parts[parts.length - 1];
-      
-      // Remove query parameters if present
-      if (filename.includes('?')) {
-        filename = filename.split('?')[0];
-      }
-      
-      // Validate extension or use default
-      if (filename.endsWith('.mp4') || filename.endsWith('.mov') || filename.endsWith('.m4v')) {
-        return filename;
-      }
-      
-      // Default filename if no extension found
-      return 'shot.mp4';
-    } catch (error) {
-      console.warn('Error extracting filename from URI:', error);
-      return 'shot.mp4';
-    }
-  }
 
-  /**
-   * Analyze video for basketball shooting form with enhanced AI features
-   */
-  async analyzeVideo(videoUri: string): Promise<{ job_id: string; status: string }> {
-    try {
-      // Validate URI format
-      if (!videoUri || videoUri.trim() === '') {
-        throw new Error('Invalid video URI: URI is empty');
-      }
-
-      // Log URI format for debugging (in development)
-      if (__DEV__) {
-        console.log('📹 Uploading video:', {
-          uri: videoUri.substring(0, 50) + '...',
-          uriType: videoUri.startsWith('file://') ? 'file://' : 
-                   videoUri.startsWith('ph://') ? 'ph://' : 
-                   videoUri.startsWith('content://') ? 'content://' : 'unknown',
-        });
-      }
-
-      const formData = new FormData();
-
-      // Use React Native FormData format directly
-      // React Native file URIs (file://, ph://, content://) must be sent as objects
-      const filename = this.getFilenameFromUri(videoUri);
-      formData.append('file', {
-        uri: videoUri,
-        type: 'video/mp4',
-        name: filename,
-      } as any);
-
-      if (__DEV__) {
-        console.log('📤 Sending FormData with:', { filename, uri: videoUri.substring(0, 30) + '...' });
-      }
-
-      const response = await axios.post(
-        `${this.baseURL}/analyze`,
-        formData,
-        {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
-          timeout: this.timeout,
-        }
-      );
-
-      if (__DEV__) {
-        console.log('✅ Video upload successful:', response.data);
-      }
-
-      // FastAPI returns { job_id, status }
-      return { job_id: response.data.job_id, status: response.data.status };
-    } catch (error: any) {
-      // Enhanced error logging
-      if (__DEV__) {
-        console.error('❌ Error analyzing video:', {
-          message: error?.message,
-          response: error?.response?.data,
-          status: error?.response?.status,
-          videoUri: videoUri?.substring(0, 50) + '...',
-        });
-      }
-
-      if (error.response) {
-        // Server responded with error status
-        const errorDetail = error.response.data?.detail || error.response.data?.error || 'Analysis failed';
-        throw new Error(`Video upload failed: ${errorDetail}`);
-      } else if (error.request) {
-        // Request was made but no response received
-        throw new Error('Network error: Could not reach analysis server. Please check your connection.');
-      } else {
-        // Something else happened (validation error, etc.)
-        throw new Error(error.message || 'Unknown error occurred during video upload');
-      }
-    }
-  }
-
-  /**
-   * Get annotated video URL from result response
-   */
-  getAnnotatedVideoUrl(resultResponse: any): string | null {
-    // Check if annotated video URL is in the response
-    if (resultResponse?.annotated_video_url) {
-      return resultResponse.annotated_video_url
-    }
-    if (resultResponse?.video_id) {
-      // Future: construct URL from video_id when annotated videos are stored
-      return null
-    }
-    return null
-  }
-
-  /**
-   * Legacy endpoints - not implemented in FastAPI yet
-   */
-  async getProfessionalComparison(userMetrics: any): Promise<any> {
-    console.warn('getProfessionalComparison not implemented in FastAPI yet')
-    return null
-  }
-
-  async getPhaseAnalysis(videoId: string): Promise<any> {
-    console.warn('getPhaseAnalysis not implemented in FastAPI yet')
-    return null
-  }
-
-  async getFrameData(videoId: string): Promise<any> {
-    console.warn('getFrameData not implemented in FastAPI yet')
-    return null
-  }
-
-  async getAdvancedMetrics(videoId: string): Promise<any> {
-    console.warn('getAdvancedMetrics not implemented in FastAPI yet')
-    return null
-  }
-
-  async getImprovementRecommendations(userMetrics: any, professionalComparison: any): Promise<any> {
-    console.warn('getImprovementRecommendations not implemented in FastAPI yet')
-    return null
-  }
 
   /**
    * Check API health
@@ -403,17 +258,6 @@ class ApiService {
     }
   }
 
-  async getResult(jobId: string): Promise<any> {
-    try {
-      const response = await axios.get(`${this.baseURL}/result/${jobId}`, {
-        timeout: 30000,
-      });
-      return response.data;
-    } catch (error) {
-      console.error('Error getting result:', error);
-      return null;
-    }
-  }
 
   /**
    * Get detailed health information
@@ -476,30 +320,6 @@ class ApiService {
     }
   }
 
-  /**
-   * Validate video file before upload
-   */
-  validateVideoFile(videoUri: string, duration?: number): { valid: boolean; message: string } {
-    try {
-      // Check if URI is valid
-      if (!videoUri || videoUri.trim() === '') {
-        return { valid: false, message: 'No video file selected' };
-      }
-
-      // Check duration if provided
-      if (duration && duration > 30) {
-        return { valid: false, message: 'Video too long. Maximum 30 seconds allowed' };
-      }
-
-      if (duration && duration < 1) {
-        return { valid: false, message: 'Video too short. Minimum 1 second required' };
-      }
-
-      return { valid: true, message: 'Video file is valid' };
-    } catch (error) {
-      return { valid: false, message: 'Invalid video file' };
-    }
-  }
 
   /**
    * Get API configuration
