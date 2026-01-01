@@ -1,0 +1,11 @@
+{
+  "start_frame": 46,
+  "crouch_frame": 56,
+  "release_frame": 77,
+  "end_frame": 97,
+  "confidence": "high",
+  "confidence_score": 0.9475077,
+  "method": "knee_minimum_wrist_peak",
+  "crouch_confidence": 0.9475077,
+  "release_confidence": 0.9863384
+}

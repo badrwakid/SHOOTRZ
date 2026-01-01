@@ -1,0 +1,48 @@
+{
+  "overall_score": 38,
+  "feedback_summary": "Form needs improvement. Start by focusing on your knee bend.",
+  "metrics": [
+    {
+      "name": "elbow_extension",
+      "value": 170.89057444622023,
+      "unit": "degrees",
+      "verdict": "Good",
+      "explanation": "Elbow at 170.9\u00b0 provides optimal power transfer and release mechanics.",
+      "confidence": 0.8205550157142858,
+      "frame_range": [
+        74,
+        80
+      ]
+    },
+    {
+      "name": "knee_bend",
+      "value": 26.604699371311717,
+      "unit": "degrees",
+      "verdict": "Needs Work",
+      "explanation": "Knee bend at 26.6\u00b0 is too deep. May compromise balance and timing.",
+      "confidence": 0.9475077,
+      "frame_range": [
+        56,
+        56
+      ]
+    },
+    {
+      "name": "wrist_follow_through",
+      "value": 3.261241960990688,
+      "unit": "degrees",
+      "verdict": "Needs Work",
+      "explanation": "Wrist follow-through of 3.3\u00b0 is minimal. Snap through more for backspin.",
+      "confidence": 0.7521599,
+      "frame_range": [
+        77,
+        97
+      ]
+    }
+  ],
+  "scoring_method": "weighted_sum",
+  "weights": {
+    "elbow": 0.4,
+    "knee": 0.3,
+    "wrist": 0.3
+  }
+}

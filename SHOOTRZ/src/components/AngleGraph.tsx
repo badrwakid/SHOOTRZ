@@ -1,15 +1,15 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, LayoutChangeEvent } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { SHOOTRZ_THEME } from '../constants/theme';
 
 interface FrameData {
   frame_number: number;
-  elbow_angle: number;
-  knee_angle: number;
-  release_angle: number;
-  body_alignment: number;
+	elbow_angle: number;
+	knee_angle: number;
+	release_angle: number;
+	body_alignment: number;
 }
 
 interface AngleGraphProps {
@@ -27,6 +27,26 @@ export const AngleGraph: React.FC<AngleGraphProps> = ({
     'elbow'
   );
   const [showAllMetrics, setShowAllMetrics] = useState(false);
+  const [graphWidth, setGraphWidth] = useState<number>(0);
+  const yAxisWidth = 30;
+
+  // Determine which metrics are actually present (non-zero, finite)
+  const metricPresence = {
+    elbow: frameData.some((f) => Number.isFinite(f.elbow_angle)),
+    knee: frameData.some((f) => Number.isFinite(f.knee_angle)),
+    release: frameData.some((f) => Number.isFinite(f.release_angle)),
+    alignment: frameData.some((f) => Number.isFinite(f.body_alignment) && Math.abs(f.body_alignment) > 1e-3),
+  };
+  const availableMetrics = (['elbow', 'knee', 'release', 'alignment'] as const).filter(
+    (m) => metricPresence[m]
+  );
+
+  // Fallback selection to the first available metric
+  React.useEffect(() => {
+    if (!availableMetrics.includes(selectedMetric)) {
+      setSelectedMetric(availableMetrics[0] ?? 'elbow');
+    }
+  }, [availableMetrics.join(','), selectedMetric]);
 
   if (!frameData || frameData.length === 0) {
     return (
@@ -38,10 +58,22 @@ export const AngleGraph: React.FC<AngleGraphProps> = ({
   }
 
   const getMetricData = (metric: string) => {
-    return frameData.map((frame) => ({
-      frame: frame.frame_number,
-      value: frame[metric as keyof FrameData] as number,
-    }));
+		const keyMap: Record<string, keyof FrameData> = {
+			elbow: 'elbow_angle',
+			knee: 'knee_angle',
+			release: 'release_angle',
+			alignment: 'body_alignment',
+		};
+		const key = keyMap[metric] ?? 'elbow_angle';
+
+		return frameData.map((frame) => {
+			const rawValue = frame[key];
+      const value = Number.isFinite(rawValue) ? (rawValue as number) : 0;
+			return {
+				frame: frame.frame_number,
+				value,
+			};
+		});
   };
 
   const getMetricColor = (metric: string) => {
@@ -81,16 +113,29 @@ export const AngleGraph: React.FC<AngleGraphProps> = ({
 
     if (data.length === 0) return null;
 
-    const maxValue = Math.max(...data.map((d) => d.value));
-    const minValue = Math.min(...data.map((d) => d.value));
-    const valueRange = maxValue - minValue || 1;
+    const numericValues = data.map((d) => d.value).filter((v) => Number.isFinite(v));
+    const baseMax = numericValues.length > 0 ? Math.max(...numericValues) : optimalRange.max ?? 100;
+    const baseMin = numericValues.length > 0 ? Math.min(...numericValues) : optimalRange.min ?? 0;
+    const paddedMax = Math.max(baseMax, optimalRange.max ?? baseMax);
+    const paddedMin = Math.min(baseMin, optimalRange.min ?? baseMin);
+    const rawRange = Math.max(paddedMax - paddedMin, 1);
+    const padding = rawRange * 0.1;
+    const maxValue = paddedMax + padding;
+    const minValue = Math.max(0, paddedMin - padding);
+    const valueRange = Math.max(maxValue - minValue, 1);
 
-    const screenWidth = Dimensions.get('window').width - 40;
-    const graphWidth = screenWidth - 40;
+    // Use measured width from layout to fit container
+    const effectiveGraphWidth = Math.max(graphWidth - yAxisWidth - SHOOTRZ_THEME.spacing.sm, 200);
     const graphHeight = 200;
 
     return (
-      <View style={styles.graphContainer}>
+      <View
+        style={styles.graphContainer}
+        onLayout={(evt: LayoutChangeEvent) => {
+          const { width } = evt.nativeEvent.layout;
+          setGraphWidth(width);
+        }}
+      >
         {/* Y-axis labels */}
         <View style={styles.yAxisContainer}>
           <Text style={styles.yAxisLabel}>{maxValue.toFixed(0)}</Text>
@@ -99,14 +144,24 @@ export const AngleGraph: React.FC<AngleGraphProps> = ({
         </View>
 
         {/* Graph area */}
-        <View style={[styles.graphArea, { width: graphWidth, height: graphHeight }]}>
+        <View style={[styles.graphArea, { width: effectiveGraphWidth, height: graphHeight }]}>
           {/* Optimal range background */}
           <View
             style={[
               styles.optimalRange,
               {
-                top: ((maxValue - optimalRange.max) / valueRange) * graphHeight,
-                height: ((optimalRange.max - optimalRange.min) / valueRange) * graphHeight,
+                top: (() => {
+                  const visualMax = Math.min(Math.max(optimalRange.max, minValue), maxValue);
+                  return ((maxValue - visualMax) / valueRange) * graphHeight;
+                })(),
+                height: (() => {
+                  const visualMin = Math.min(Math.max(optimalRange.min, minValue), maxValue);
+                  const visualMax = Math.max(
+                    visualMin + 0.5,
+                    Math.min(optimalRange.max, maxValue)
+                  );
+                  return Math.max(((visualMax - visualMin) / valueRange) * graphHeight, 2);
+                })(),
               },
             ]}
           />
@@ -114,7 +169,7 @@ export const AngleGraph: React.FC<AngleGraphProps> = ({
           {/* Data line */}
           <View style={styles.dataLine}>
             {data.map((point, index) => {
-              const x = (index / (data.length - 1)) * graphWidth;
+              const x = (index / Math.max(data.length - 1, 1)) * effectiveGraphWidth;
               const y = ((maxValue - point.value) / valueRange) * graphHeight;
 
               return (
@@ -127,7 +182,7 @@ export const AngleGraph: React.FC<AngleGraphProps> = ({
                       top: y - 4,
                       backgroundColor: color,
                       borderColor:
-                        selectedFrame === point.frame ? SHOOTRZ_THEME.colors.text : 'transparent',
+                        selectedFrame === point.frame ? SHOOTRZ_THEME.colors.textPrimary : 'transparent',
                       borderWidth: selectedFrame === point.frame ? 2 : 0,
                     },
                   ]}
@@ -142,7 +197,10 @@ export const AngleGraph: React.FC<AngleGraphProps> = ({
             style={[
               styles.optimalLine,
               {
-                top: ((maxValue - optimalRange.ideal) / valueRange) * graphHeight,
+                top: (() => {
+                  const ideal = Math.min(Math.max(optimalRange.ideal, minValue), maxValue);
+                  return ((maxValue - ideal) / valueRange) * graphHeight;
+                })(),
                 backgroundColor: color,
               },
             ]}
@@ -178,9 +236,9 @@ export const AngleGraph: React.FC<AngleGraphProps> = ({
       </View>
 
       {/* Metric selector */}
-      {!showAllMetrics && (
+      {!showAllMetrics && availableMetrics.length > 0 && (
         <View style={styles.metricSelector}>
-          {(['elbow', 'knee', 'release', 'alignment'] as const).map((metric) => (
+          {availableMetrics.map((metric) => (
             <TouchableOpacity
               key={metric}
               style={[styles.metricButton, selectedMetric === metric && styles.metricButtonActive]}
@@ -226,12 +284,14 @@ export const AngleGraph: React.FC<AngleGraphProps> = ({
           <Text style={styles.statValue}>
             {(() => {
               const data = getMetricData(selectedMetric);
-              const values = data.map((d) => d.value);
-              const mean = values.reduce((a, b) => a + b, 0) / values.length;
+              const values = data.map((d) => d.value).filter((v) => Number.isFinite(v));
+              if (values.length === 0) return '--%';
+              const mean = values.reduce((a, b) => a + b, 0) / values.length || 1;
               const variance =
                 values.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / values.length;
               const stdDev = Math.sqrt(variance);
-              return (100 - (stdDev / mean) * 100).toFixed(1) + '%';
+              const consistency = Math.max(0, Math.min(100, 100 - (stdDev / mean) * 100));
+              return consistency.toFixed(1) + '%';
             })()}
           </Text>
         </View>
@@ -240,7 +300,9 @@ export const AngleGraph: React.FC<AngleGraphProps> = ({
           <Text style={styles.statValue}>
             {(() => {
               const data = getMetricData(selectedMetric);
-              const avg = data.reduce((a, b) => a + b.value, 0) / data.length;
+              const values = data.map((d) => d.value).filter((v) => Number.isFinite(v));
+              if (values.length === 0) return '--';
+              const avg = values.reduce((a, b) => a + b, 0) / values.length;
               return avg.toFixed(1) + '°';
             })()}
           </Text>
@@ -250,7 +312,8 @@ export const AngleGraph: React.FC<AngleGraphProps> = ({
           <Text style={styles.statValue}>
             {(() => {
               const data = getMetricData(selectedMetric);
-              const values = data.map((d) => d.value);
+              const values = data.map((d) => d.value).filter((v) => Number.isFinite(v));
+              if (values.length === 0) return '--';
               const min = Math.min(...values);
               const max = Math.max(...values);
               return (max - min).toFixed(1) + '°';
@@ -287,7 +350,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 18,
     fontWeight: '700',
-    color: SHOOTRZ_THEME.colors.text,
+    color: SHOOTRZ_THEME.colors.textPrimary,
   },
   toggleButton: {
     flexDirection: 'row',
@@ -348,6 +411,7 @@ const styles = StyleSheet.create({
     backgroundColor: SHOOTRZ_THEME.colors.surfaceElevated,
     borderRadius: SHOOTRZ_THEME.borderRadius.sm,
     marginLeft: SHOOTRZ_THEME.spacing.sm,
+    overflow: 'hidden',
   },
   optimalRange: {
     position: 'absolute',
@@ -425,6 +489,6 @@ const styles = StyleSheet.create({
   statValue: {
     fontSize: 16,
     fontWeight: '700',
-    color: SHOOTRZ_THEME.colors.text,
+    color: SHOOTRZ_THEME.colors.textPrimary,
   },
 });

@@ -6,6 +6,7 @@ import {
 	ScrollView,
 	TouchableOpacity,
 	FlatList,
+	ColorValue,
 } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import { Ionicons } from '@expo/vector-icons'
@@ -143,7 +144,7 @@ export function FeedbackPanel({
 					activeOpacity={collapsible ? 0.7 : 1}
 				>
 					<LinearGradient
-						colors={config.bgColor}
+						colors={config.bgColor as [ColorValue, ColorValue]}
 						style={styles.sectionHeaderGradient}
 					>
 						<View style={styles.sectionHeaderContent}>
@@ -221,7 +222,7 @@ const styles = StyleSheet.create({
 	headerTitle: {
 		fontSize: 20,
 		fontWeight: 'bold',
-		color: SHOOTRZ_THEME.colors.text,
+		color: SHOOTRZ_THEME.colors.textPrimary,
 	},
 	headerSubtitle: {
 		fontSize: 14,
@@ -285,7 +286,7 @@ const styles = StyleSheet.create({
 	messageText: {
 		fontSize: 15,
 		fontWeight: '600',
-		color: SHOOTRZ_THEME.colors.text,
+		color: SHOOTRZ_THEME.colors.textPrimary,
 		lineHeight: 20,
 	},
 	frameReference: {

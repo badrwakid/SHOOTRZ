@@ -105,14 +105,53 @@ class ShotDetector:
             middle_idx = len(angles_df) // 2
             return int(angles_df.iloc[middle_idx]["frame_id"]), 0.2
         
-        # Find minimum knee angle (maximum flexion)
-        min_idx = np.argmin(knee_angles)
-        crouch_frame = frame_ids[min_idx]
-        confidence = knee_confidence[min_idx]
+        # Use peak detection on inverted knee angle to avoid edge artifacts
+        inverted = -knee_angles
+        peaks, properties = find_peaks(
+            inverted,
+            prominence=2.0,
+            distance=max(5, self.pre_frames // 2)
+        )
         
-        # Check if minimum is below threshold
-        if knee_angles[min_idx] > self.knee_flexion_threshold:
-            # Not a clear crouch, reduce confidence
+        crouch_frame = None
+        confidence = 0.2
+        
+        if len(peaks) > 0:
+            # Select peak with highest prominence that is not at the extreme edges
+            peak_prom = properties.get("prominences", np.ones_like(peaks))
+            best_idx = int(np.argmax(peak_prom))
+            best_peak = peaks[best_idx]
+            
+            # Avoid using the first/last few frames as crouch
+            if best_peak <= 2 or best_peak >= len(frame_ids) - 2:
+                valid_peaks = [
+                    (i, p) for i, p in enumerate(peaks)
+                    if p > 2 and p < len(frame_ids) - 2
+                ]
+                if valid_peaks:
+                    best_idx, best_peak = max(
+                        valid_peaks,
+                        key=lambda ip: peak_prom[ip[0]]
+                    )
+            
+            crouch_frame = frame_ids[best_peak]
+            confidence = knee_confidence[best_peak]
+        else:
+            # Fallback to absolute minimum
+            min_idx = int(np.argmin(knee_angles))
+            crouch_frame = frame_ids[min_idx]
+            confidence = knee_confidence[min_idx]
+        
+        # If crouch detected at extreme edge, lower confidence
+        if crouch_frame <= frame_ids.min() + 2 or crouch_frame >= frame_ids.max() - 2:
+            confidence *= 0.5
+        
+        # Check threshold for sufficient flexion
+        if crouch_frame in frame_ids:
+            angle_at_crouch = knee_angles[list(frame_ids).index(crouch_frame)]
+        else:
+            angle_at_crouch = np.min(knee_angles)
+        if angle_at_crouch > self.knee_flexion_threshold:
             confidence *= 0.5
         
         return int(crouch_frame), float(confidence)

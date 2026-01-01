@@ -1,0 +1,64 @@
+# SHOOTRZ MVP Configuration
+# All tunable parameters for deterministic, reproducible analysis
+
+# Pose Detection
+pose_detection:
+  model_complexity: 1  # 0 (fastest), 1 (balanced), 2 (most accurate)
+  min_detection_confidence: 0.5
+  min_tracking_confidence: 0.5
+  smooth_landmarks: true
+  confidence_threshold: 0.3  # Joints below this are treated as missing
+
+# Video Processing
+video:
+  frame_skip: 1  # Process every Nth frame (1 = all frames)
+  max_frames: null  # Maximum frames to process (null = all)
+  min_duration: 1.0  # Minimum video duration in seconds
+  min_resolution: 480  # Minimum height in pixels
+
+# Signal Smoothing
+smoothing:
+  window_length: 5  # Savitzky-Golay window size (must be odd)
+  polyorder: 2  # Polynomial order for Savitzky-Golay
+  max_gap_frames: 10  # Maximum frames to interpolate across
+
+# Shot Detection
+shot_detection:
+  knee_flexion_threshold: 100.0  # Degrees - minimum for crouch detection
+  wrist_peak_window: 15  # Frames to search around peak
+  pre_frames: 10  # Frames before crouch to include in shot window
+  post_frames: 20  # Frames after release to include in shot window
+
+# Metrics - Three Core Metrics
+metrics:
+  # 1. Elbow Extension at Release
+  elbow_extension:
+    good_range: [150, 175]  # Degrees
+    optimal_range: [160, 170]
+    release_window: 3  # Frames ± release to average
+  
+  # 2. Knee Bend Depth
+  knee_bend:
+    good_range: [85, 120]  # Degrees
+    optimal_range: [95, 110]
+  
+  # 3. Wrist Follow-Through
+  wrist_follow_through:
+    min_angle_change: 10  # Degrees change from release to end
+    good_range: [10, 30]
+    optimal_range: [15, 25]
+
+# Scoring
+scoring:
+  weights:
+    elbow: 0.40  # 40% of total score
+    knee: 0.30   # 30% of total score
+    wrist: 0.30  # 30% of total score
+  confidence_penalty: 0.5  # Multiply score by this if confidence is low
+  low_confidence_threshold: 0.4
+
+# Output
+output:
+  save_overlay_video: true
+  save_diagnostic_plots: true
+  save_all_csvs: true

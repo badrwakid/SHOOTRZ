@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Animated, ColorValue } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { SHOOTRZ_THEME, COMPONENT_STYLES } from '../constants/theme';
@@ -77,7 +77,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
         {actionText && onAction && (
           <TouchableOpacity style={styles.actionButton} onPress={onAction}>
             <LinearGradient
-              colors={SHOOTRZ_THEME.gradients.primary}
+              colors={SHOOTRZ_THEME.gradients.primary as [ColorValue, ColorValue]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={styles.buttonGradient}

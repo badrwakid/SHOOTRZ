@@ -7,6 +7,7 @@ Coordinates all processing steps from video ingestion to final report.
 from pathlib import Path
 from typing import Dict, Any, Optional
 import sys
+import shutil
 
 # Add backend to path
 backend_path = Path(__file__).parent.parent.parent
@@ -67,6 +68,15 @@ class MVPPipeline:
         
         # Save config snapshot
         self.config.save_snapshot(self.run_tracker.get_run_dir())
+
+        # Save input video into run folder for reproducibility (and reliable overlay generation)
+        try:
+            input_video_path = self.run_tracker.get_output_path("input_video.mp4")
+            shutil.copy2(video_path, input_video_path)
+            self.run_tracker.add_metadata("input_video", str(input_video_path))
+        except Exception:
+            # Best-effort only; pipeline can still run without copying
+            pass
         
         # PHASE 1: Video Ingestion
         video_loader = VideoLoader(video_path, self.config.get("video", {}))

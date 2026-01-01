@@ -1,0 +1,15 @@
+{
+  "video_path": "C:\\Users\\Badr\\AppData\\Local\\Temp\\tmpd_7ikfpz.mp4",
+  "fps": 56.184276414621934,
+  "frame_count": 187,
+  "width": 1080,
+  "height": 1920,
+  "duration_seconds": 3.328333333333333,
+  "resolution": "1080x1920",
+  "quality_warnings": [],
+  "frame_sampling": {
+    "frame_skip": 1,
+    "max_frames": null,
+    "total_processed_frames": 187
+  }
+}

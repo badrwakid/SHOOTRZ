@@ -217,6 +217,122 @@ class ApiService {
 
 
   /**
+   * MVP Analysis - Analyze video with deterministic pipeline
+   */
+  async analyzeMVP(videoUri: string, shootingSide: string = 'auto'): Promise<{ job_id: string; status: string }> {
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/ab7e580c-562f-4fa3-bc63-01f120e7455b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api.service.ts:222',message:'analyzeMVP entry',data:{videoUri:videoUri?.substring(0,50),shootingSide,baseURL:this.baseURL,timeout:this.timeout},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,B,C'})}).catch(()=>{});
+    // #endregion
+    try {
+      if (!videoUri || videoUri.trim() === '') {
+        throw new Error('Invalid video URI: URI is empty');
+      }
+
+      const formData = new FormData();
+      const filename = this.getVideoFilename(videoUri);
+      const requestUrl = `${this.baseURL}/mvp/analyze`;
+      
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/ab7e580c-562f-4fa3-bc63-01f120e7455b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api.service.ts:232',message:'Before request',data:{requestUrl,filename,hasVideoUri:!!videoUri},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,B,C'})}).catch(()=>{});
+      // #endregion
+      
+      formData.append('file', {
+        uri: videoUri,
+        type: 'video/mp4',
+        name: filename,
+      } as any);
+
+      if (__DEV__) {
+        console.log('📹 MVP Analysis - Uploading video:', { filename, shootingSide });
+      }
+
+      const requestStartTime = Date.now();
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/ab7e580c-562f-4fa3-bc63-01f120e7455b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api.service.ts:245',message:'Request starting',data:{requestUrl,timeout:this.timeout},timestamp:requestStartTime,sessionId:'debug-session',runId:'run1',hypothesisId:'A,B,C'})}).catch(()=>{});
+      // #endregion
+
+      let response;
+      try {
+        response = await axios.post(
+          requestUrl,
+          formData,
+          {
+            headers: {
+              'Content-Type': 'multipart/form-data',
+            },
+            params: {
+              shooting_side: shootingSide
+            },
+            timeout: this.timeout,
+          }
+        );
+
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/ab7e580c-562f-4fa3-bc63-01f120e7455b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api.service.ts:260',message:'Request success',data:{status:response.status,data:response.data,elapsed:Date.now()-requestStartTime},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,B,C'})}).catch(()=>{});
+        // #endregion
+
+        if (__DEV__) {
+          console.log('✅ MVP Analysis queued:', response.data);
+        }
+
+        return { job_id: response.data.job_id, status: response.data.status };
+      } catch (axiosError: any) {
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/ab7e580c-562f-4fa3-bc63-01f120e7455b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api.service.ts:270',message:'Request error',data:{hasResponse:!!axiosError.response,hasRequest:!!axiosError.request,message:axiosError.message,code:axiosError.code,elapsed:Date.now()-requestStartTime},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,B,C,D'})}).catch(()=>{});
+        // #endregion
+        throw axiosError;
+      }
+    } catch (error: any) {
+
+      if (__DEV__) {
+        console.error('❌ MVP Analysis error:', error?.response?.data || error?.message);
+      }
+
+      if (error.response) {
+        throw new Error(`Upload failed: ${error.response.data?.detail || 'Unknown error'}`);
+      } else if (error.request) {
+        throw new Error('Network error: Could not reach server.');
+      } else {
+        throw new Error(error.message || 'Upload failed');
+      }
+    }
+  }
+
+  /**
+   * Get MVP analysis result
+   */
+  async getMVPResult(jobId: string): Promise<any> {
+    try {
+      const response = await axios.get(`${this.baseURL}/mvp/result/${jobId}`, {
+        timeout: 30000,
+      });
+      return response.data;
+    } catch (error: any) {
+      console.error('Error getting MVP result:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Helper to extract filename from URI
+   */
+  private getVideoFilename(uri: string): string {
+    try {
+      const parts = uri.split('/');
+      let filename = parts[parts.length - 1];
+      if (filename.includes('?')) {
+        filename = filename.split('?')[0];
+      }
+      if (filename.endsWith('.mp4') || filename.endsWith('.mov') || filename.endsWith('.m4v')) {
+        return filename;
+      }
+      return 'shot.mp4';
+    } catch (error) {
+      return 'shot.mp4';
+    }
+  }
+
+  /**
    * Check API health
    */
   async checkHealth(): Promise<boolean> {
@@ -388,12 +504,3 @@ class ApiService {
 
 // Export singleton instance
 export const apiService = new ApiService();
-
-// Export types for use in components
-export type {
-  AnalysisResponse,
-  HealthResponse,
-  PerformanceResponse,
-  SystemStatusResponse,
-  PhaseData,
-};

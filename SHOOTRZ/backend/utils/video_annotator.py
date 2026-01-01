@@ -60,37 +60,47 @@ def draw_skeleton(
 	else:
 		return frame
 	
+	def _is_valid(idx: int) -> bool:
+		if idx >= len(landmarks_px):
+			return False
+		x, y = landmarks_px[idx]
+		# skip obviously invalid points pinned to the origin or outside frame bounds
+		if x <= 1 or y <= 1 or x >= w - 1 or y >= h - 1:
+			return False
+		if confidence is not None and idx < len(confidence):
+			return confidence[idx] >= confidence_threshold
+		return True
+
 	# Draw connections
 	for connection in POSE_CONNECTIONS:
 		idx1, idx2 = connection
 		
-		# Check if both landmarks are valid
-		if idx1 >= len(landmarks_px) or idx2 >= len(landmarks_px):
+		if not _is_valid(idx1) or not _is_valid(idx2):
 			continue
-		
-		# Check confidence if provided
-		if confidence is not None:
-			if idx1 >= len(confidence) or idx2 >= len(confidence):
-				continue
-			if confidence[idx1] < confidence_threshold or confidence[idx2] < confidence_threshold:
-				continue
-		
+
 		pt1 = tuple(landmarks_px[idx1])
 		pt2 = tuple(landmarks_px[idx2])
-		
-		# Draw line
-		cv2.line(frame, pt1, pt2, (0, 255, 0), 2)
+
+		if confidence is not None and idx1 < len(confidence) and idx2 < len(confidence):
+			if confidence[idx1] >= confidence_threshold and confidence[idx2] >= confidence_threshold:
+				cv2.line(frame, pt1, pt2, (0, 255, 0), 2)
+			else:
+				# Draw faint line to indicate a low-confidence limb instead of hiding it
+				cv2.line(frame, pt1, pt2, (128, 128, 128), 1)
+		else:
+			cv2.line(frame, pt1, pt2, (0, 255, 0), 2)
 	
 	# Draw keypoints
 	for i, landmark in enumerate(landmarks_px):
-		# Check confidence if provided
-		if confidence is not None and i < len(confidence):
-			if confidence[i] < confidence_threshold:
-				continue
-		
 		pt = tuple(landmark)
-		# Draw circle for keypoint
-		cv2.circle(frame, pt, 4, (0, 0, 255), -1)
+		if confidence is not None and i < len(confidence):
+			if confidence[i] >= confidence_threshold and _is_valid(i):
+				cv2.circle(frame, pt, 4, (0, 0, 255), -1)
+			elif _is_valid(i):
+				cv2.circle(frame, pt, 3, (160, 160, 160), -1)
+		else:
+			if _is_valid(i):
+				cv2.circle(frame, pt, 4, (0, 0, 255), -1)
 	
 	return frame
 
@@ -234,6 +244,7 @@ def annotate_video(
 	video_fps = cap.get(cv2.CAP_PROP_FPS)
 	if video_fps > 0:
 		fps = video_fps
+	total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) if cap.get(cv2.CAP_PROP_FRAME_COUNT) else 0
 	
 	# Set output path
 	if output_path is None:
@@ -244,9 +255,19 @@ def annotate_video(
 	output_path_obj = Path(output_path)
 	output_path_obj.parent.mkdir(parents=True, exist_ok=True)
 	
-	# Create video writer
-	fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-	out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+	# Keep original resolution (no downscale)
+	target_width, target_height = width, height
+
+	# Create video writer with a codec order optimized for mobile playback (mp4/h264 friendly)
+	out = None
+	for codec in ['mp4v', 'avc1', 'H264']:
+		fourcc = cv2.VideoWriter_fourcc(*codec)
+		out = cv2.VideoWriter(str(output_path), fourcc, fps, (target_width, target_height))
+		if out.isOpened():
+			print(f"[overlay] using codec={codec}, size={target_width}x{target_height}, fps={fps}, output={output_path}")
+			break
+	if out is None or not out.isOpened():
+		raise RuntimeError("Failed to open video writer for overlay. Tried codecs: mp4v, avc1, H264")
 	
 	frame_idx = 0
 	
@@ -273,9 +294,6 @@ def annotate_video(
 		if not ret:
 			break
 		
-		# Convert BGR to RGB for processing
-		frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-		
 		# Get pose result for this frame
 		if frame_idx < len(pose_results):
 			pose_result = pose_results[frame_idx]
@@ -288,27 +306,27 @@ def annotate_video(
 					landmarks = np.array(landmarks)
 				
 				# Draw skeleton
-				frame_rgb = draw_skeleton(frame_rgb, landmarks, confidence)
+				frame = draw_skeleton(frame, landmarks, confidence)
 		
 		# Draw ball trajectory (if available and frame is in trajectory range)
 		if ball_trajectory:
 			# Draw full trajectory up to current frame
 			trajectory_up_to_frame = ball_trajectory[:frame_idx + 1] if frame_idx < len(ball_trajectory) else ball_trajectory
 			if trajectory_up_to_frame:
-				frame_rgb = draw_ball_trajectory(frame_rgb, trajectory_up_to_frame)
+				frame = draw_ball_trajectory(frame, trajectory_up_to_frame)
 		
 		# Draw phase label
 		current_phase = phase_map.get(frame_idx)
 		if current_phase:
-			frame_rgb = draw_phase_label(frame_rgb, current_phase)
-		
-		# Convert back to BGR for writing
-		frame_bgr = cv2.cvtColor(frame_rgb, cv2.COLOR_RGB2BGR)
+			frame = draw_phase_label(frame, current_phase)
 		
 		# Write frame
-		out.write(frame_bgr)
+		out.write(frame)
 		
 		frame_idx += 1
+		# Lightweight progress logging every ~10%
+		if total_frames > 0 and frame_idx % max(1, total_frames // 10) == 0:
+			print(f"Annotate progress: {frame_idx}/{total_frames} frames ({(frame_idx/total_frames)*100:.1f}%)")
 	
 	# Cleanup
 	cap.release()

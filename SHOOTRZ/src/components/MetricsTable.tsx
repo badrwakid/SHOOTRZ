@@ -222,7 +222,7 @@ const styles = StyleSheet.create({
 	headerTitle: {
 		fontSize: 20,
 		fontWeight: 'bold',
-		color: SHOOTRZ_THEME.colors.text,
+		color: SHOOTRZ_THEME.colors.textPrimary,
 	},
 	headerSubtitle: {
 		fontSize: 14,
@@ -258,7 +258,7 @@ const styles = StyleSheet.create({
 	metricName: {
 		fontSize: 15,
 		fontWeight: '600',
-		color: SHOOTRZ_THEME.colors.text,
+		color: SHOOTRZ_THEME.colors.textPrimary,
 	},
 	metricPhase: {
 		fontSize: 12,

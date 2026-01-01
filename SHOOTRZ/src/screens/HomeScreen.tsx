@@ -40,6 +40,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
   const quickActions = [
     {
+      title: 'Analyze Shot',
+      icon: 'analytics',
+      color: SHOOTRZ_THEME.colors.primary,
+      screen: 'Analyze',
+    },
+    {
       title: 'Browse Drills',
       icon: 'basketball',
       color: SHOOTRZ_THEME.colors.secondary,

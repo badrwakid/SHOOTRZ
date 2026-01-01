@@ -220,12 +220,13 @@ class MetricsDerivation:
     
     def _create_low_confidence_metric(self, name: str) -> Dict[str, Any]:
         """Create a low-confidence metric placeholder."""
+        reason = "Insufficient joint visibility or unstable tracking. Re-record with better lighting and full-body view."
         return {
             "name": name,
             "value": 0.0,
             "unit": "N/A",
             "verdict": "Low Confidence",
-            "explanation": "Insufficient data to compute this metric reliably.",
+            "explanation": reason,
             "confidence": 0.0,
             "frame_range": [0, 0]
         }
@@ -273,49 +274,85 @@ class MetricsDerivation:
         Returns:
             Tuple of (score 0-100, feedback_summary)
         """
-        weights = self.scoring_config.get("weights", {
-            "elbow": 0.40,
-            "knee": 0.30,
-            "wrist": 0.30
-        })
-        
-        confidence_penalty = self.scoring_config.get("confidence_penalty", 0.5)
-        
-        # Compute individual scores
-        metric_scores = {}
-        
+        weights = self.scoring_config.get(
+            "weights",
+            {"elbow": 0.40, "knee": 0.30, "wrist": 0.30},
+        )
+        low_conf_threshold = self.scoring_config.get("low_confidence_threshold", 0.4)
+        confidence_floor = self.scoring_config.get("confidence_penalty", 0.5)
+
+        def score_range(value: float, optimal: List[float], good: List[float]) -> float:
+            """
+            Continuous score 0-100:
+            - 100 inside optimal
+            - 70 at edges of good
+            - 40 at twice the good-range distance
+            - 0 far outside
+            """
+            opt_min, opt_max = optimal
+            good_min, good_max = good
+
+            # Inside optimal
+            if opt_min <= value <= opt_max:
+                return 100.0
+
+            # Inside good but outside optimal (linear fall to 70)
+            if good_min <= value <= good_max:
+                if value < opt_min:
+                    return 70 + 30 * (value - good_min) / (opt_min - good_min + 1e-6)
+                return 70 + 30 * (good_max - value) / (good_max - opt_max + 1e-6)
+
+            # Outside good: fall toward 40, then 0
+            if value < good_min:
+                distance = good_min - value
+                span = max(good_min - opt_min, 1.0)
+                return max(0.0, 70 - 30 * (distance / span))
+            else:
+                distance = value - good_max
+                span = max(opt_max - good_max, 1.0)
+                return max(0.0, 70 - 30 * (distance / span))
+
+        metric_scores: Dict[str, float] = {}
         for metric in metrics:
             name = metric["name"]
-            verdict = metric["verdict"]
-            confidence = metric["confidence"]
-            
-            # Base score
-            if verdict == "Good":
-                base_score = 33.33
-            elif verdict == "Needs Work":
-                base_score = 16.67
-            else:  # Low Confidence
-                base_score = 8.33
-            
-            # Apply confidence penalty
-            if confidence < self.scoring_config.get("low_confidence_threshold", 0.4):
-                base_score *= confidence_penalty
-            
-            metric_scores[name] = base_score
-        
-        # Weighted sum
-        total_score = (
-            metric_scores.get("elbow_extension", 0) * weights.get("elbow", 0.4) / 0.4 +
-            metric_scores.get("knee_bend", 0) * weights.get("knee", 0.3) / 0.3 +
-            metric_scores.get("wrist_follow_through", 0) * weights.get("wrist", 0.3) / 0.3
-        ) / 3
-        
-        # Normalize to 0-100
-        overall_score = int(min(100, max(0, total_score * 3)))
-        
-        # Generate feedback summary
+            confidence = float(metric.get("confidence", 0.0))
+            value = float(metric.get("value", 0.0))
+
+            if name == "elbow_extension":
+                good = self.metrics_config.get("elbow_extension", {}).get("good_range", [150, 175])
+                optimal = self.metrics_config.get("elbow_extension", {}).get("optimal_range", [160, 170])
+            elif name == "knee_bend":
+                good = self.metrics_config.get("knee_bend", {}).get("good_range", [85, 120])
+                optimal = self.metrics_config.get("knee_bend", {}).get("optimal_range", [95, 110])
+            elif name == "wrist_follow_through":
+                good = self.metrics_config.get("wrist_follow_through", {}).get("good_range", [10, 30])
+                optimal = self.metrics_config.get("wrist_follow_through", {}).get("optimal_range", [15, 25])
+            else:
+                # Unknown metric; give neutral score
+                metric_scores[name] = 0.0
+                continue
+
+            base = score_range(value, optimal, good)
+
+            # Apply confidence scaling: below threshold scales down toward confidence_floor
+            if confidence < low_conf_threshold:
+                scale = confidence_floor + (confidence / max(low_conf_threshold, 1e-6)) * (1 - confidence_floor)
+                base *= scale
+
+            metric_scores[name] = base
+
+        # Weighted average
+        total_weight = weights.get("elbow", 0.4) + weights.get("knee", 0.3) + weights.get("wrist", 0.3)
+        weighted_score = (
+            metric_scores.get("elbow_extension", 0.0) * weights.get("elbow", 0.4)
+            + metric_scores.get("knee_bend", 0.0) * weights.get("knee", 0.3)
+            + metric_scores.get("wrist_follow_through", 0.0) * weights.get("wrist", 0.3)
+        ) / max(total_weight, 1e-6)
+
+        overall_score = int(round(min(100.0, max(0.0, weighted_score))))
+
         feedback_summary = self._generate_feedback_summary(metrics, overall_score)
-        
+
         return overall_score, feedback_summary
     
     def _generate_feedback_summary(self, metrics: List[Dict[str, Any]], score: int) -> str:

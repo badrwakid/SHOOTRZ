@@ -115,7 +115,16 @@ export function getFeedbackMessage(
   if (score >= 23) return messages.excellent[Math.floor(Math.random() * messages.excellent.length)];
   if (score >= 18) return messages.good[Math.floor(Math.random() * messages.good.length)];
   if (score >= 12) return messages.needsWork[Math.floor(Math.random() * messages.needsWork.length)];
-  return messages.poor[Math.floor(Math.random() * messages.poor.length)];
+  
+  // Handle 'overall' category which uses 'average' instead of 'poor'
+  if (category === 'overall') {
+    const overallMessages = messages as typeof FEEDBACK_MESSAGES.overall;
+    return overallMessages.average[Math.floor(Math.random() * overallMessages.average.length)];
+  }
+  
+  // For other categories, use 'poor'
+  const categoryMessages = messages as { poor: string[] };
+  return categoryMessages.poor[Math.floor(Math.random() * categoryMessages.poor.length)];
 }
 
 export function getOverallFeedback(totalScore: number): string {

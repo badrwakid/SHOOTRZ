@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime
 import time
+import json
 
 from .routers import history, feedback, db_test, db_integration_test, sessions, mvp
 from .routers.recommendation_routes import router as recommendation_router
@@ -10,6 +11,23 @@ _start_time = time.time()
 
 
 def create_app() -> FastAPI:
+    # #region agent log
+    log_data = {
+        "location": "main.py:12",
+        "message": "create_app called",
+        "data": {},
+        "timestamp": int(time.time() * 1000),
+        "sessionId": "debug-session",
+        "runId": "run1",
+        "hypothesisId": "E"
+    }
+    try:
+        with open(r"d:\Users\Badr\myprojects\Grad\.cursor\debug.log", "a") as f:
+            f.write(json.dumps(log_data) + "\n")
+    except:
+        pass
+    # #endregion
+    
     app = FastAPI(title="SHOOTRZ API", version="0.1.0")
 
     app.add_middleware(
@@ -21,6 +39,23 @@ def create_app() -> FastAPI:
     )
 
     # Include routers first
+    # #region agent log
+    try:
+        log_data = {
+            "location": "main.py:24",
+            "message": "Registering mvp router",
+            "data": {"router_prefix": mvp.router.prefix if hasattr(mvp.router, 'prefix') else None},
+            "timestamp": int(time.time() * 1000),
+            "sessionId": "debug-session",
+            "runId": "run1",
+            "hypothesisId": "E"
+        }
+        with open(r"d:\Users\Badr\myprojects\Grad\.cursor\debug.log", "a") as f:
+            f.write(json.dumps(log_data) + "\n")
+    except:
+        pass
+    # #endregion
+    app.include_router(mvp.router)  # MVP analysis endpoints
     app.include_router(history.router)
     app.include_router(feedback.router)
     app.include_router(sessions.router)

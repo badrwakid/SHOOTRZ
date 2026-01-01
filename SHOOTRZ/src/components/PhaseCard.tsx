@@ -159,7 +159,7 @@ const styles = StyleSheet.create({
   card: {
     borderRadius: SHOOTRZ_THEME.borderRadius.lg,
     padding: SHOOTRZ_THEME.spacing.md,
-    shadowColor: SHOOTRZ_THEME.colors.shadow,
+    shadowColor: '#000000',
     shadowOffset: {
       width: 0,
       height: 2,
@@ -185,7 +185,7 @@ const styles = StyleSheet.create({
   phaseName: {
     fontSize: 18,
     fontWeight: '700',
-    color: SHOOTRZ_THEME.colors.text,
+    color: SHOOTRZ_THEME.colors.textPrimary,
     marginBottom: 2,
   },
   timestamp: {
@@ -223,7 +223,7 @@ const styles = StyleSheet.create({
   metricValue: {
     fontSize: 16,
     fontWeight: '700',
-    color: SHOOTRZ_THEME.colors.text,
+    color: SHOOTRZ_THEME.colors.textPrimary,
   },
   progressContainer: {
     marginBottom: SHOOTRZ_THEME.spacing.md,
@@ -254,7 +254,7 @@ const styles = StyleSheet.create({
   },
   feedbackText: {
     fontSize: 13,
-    color: SHOOTRZ_THEME.colors.text,
+    color: SHOOTRZ_THEME.colors.textPrimary,
     lineHeight: 18,
   },
   jumpIndicator: {

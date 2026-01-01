@@ -67,7 +67,7 @@ const styles = StyleSheet.create({
 	title: {
 		fontSize: 24,
 		fontWeight: 'bold',
-		color: SHOOTRZ_THEME.colors.text,
+		color: SHOOTRZ_THEME.colors.textPrimary,
 		marginTop: 16,
 		marginBottom: 8,
 	},

@@ -141,7 +141,7 @@ export function useDeepLinks(onHandled?: () => void) {
 							const codeHashMatch = url.match(/#code=([^&#]+)/);
 							
 							code = codeMatch ? decodeURIComponent(codeMatch[1]) : 
-							       codeHashMatch ? decodeURIComponent(codeHashMatch[1]) : null;
+							       codeHashMatch ? decodeURIComponent(codeHashMatch[1]) : undefined;
 							
 							if (code) {
 								console.log('✅ Code extracted directly from URL');

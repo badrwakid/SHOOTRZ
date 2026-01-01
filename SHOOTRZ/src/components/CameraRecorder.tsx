@@ -126,7 +126,7 @@ export function CameraRecorder({
 			})
 
 			// Wait for recording to complete (resolves when stopped or max duration reached)
-			recordingPromise.then((video) => {
+			recordingPromise.then((video: any) => {
 				if (__DEV__) {
 					console.log('✅ Recording completed:', video)
 				}
@@ -137,7 +137,7 @@ export function CameraRecorder({
 				} else {
 					throw new Error('No video URI returned')
 				}
-			}).catch((error) => {
+			}).catch((error: any) => {
 				console.error('❌ Recording error:', error)
 				Alert.alert('Recording Error', error.message || 'Failed to record video. Please try again.')
 				setIsRecording(false)

@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Linking from 'expo-linking';
 import { Ionicons } from '@expo/vector-icons';
 import { HomeScreen } from '../screens/HomeScreen';
+import { MVPAnalysisScreen } from '../screens/MVPAnalysisScreen';
 import { DrillsScreen } from '../screens/DrillsScreen';
 import { WorkoutsScreen } from '../screens/WorkoutsScreen';
 import { ProgressScreen } from '../screens/ProgressScreen';
@@ -64,6 +65,20 @@ export const AppNavigator: React.FC = () => {
           component={HomeScreen}
           options={{
             tabBarIcon: ({ color }) => <Ionicons name="home" size={20} color={color} />,
+          }}
+        />
+        <Tab.Screen
+          name="Analyze"
+          component={MVPAnalysisScreen}
+          options={{
+            tabBarIcon: ({ color, focused }) => (
+              <Ionicons 
+                name={focused ? "analytics" : "analytics-outline"} 
+                size={22} 
+                color={color} 
+              />
+            ),
+            tabBarLabel: "Analyze",
           }}
         />
         <Tab.Screen

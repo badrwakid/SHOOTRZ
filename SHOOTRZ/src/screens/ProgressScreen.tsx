@@ -453,7 +453,7 @@ const styles = StyleSheet.create({
 	headerTitle: {
 		fontSize: 28,
 		fontWeight: 'bold',
-		color: SHOOTRZ_THEME.colors.text,
+		color: SHOOTRZ_THEME.colors.textPrimary,
 	},
 	headerSubtitle: {
 		fontSize: 14,
@@ -492,7 +492,7 @@ const styles = StyleSheet.create({
 	sectionTitle: {
 		fontSize: 20,
 		fontWeight: 'bold',
-		color: SHOOTRZ_THEME.colors.text,
+		color: SHOOTRZ_THEME.colors.textPrimary,
 		marginBottom: 12,
 	},
 	chartContainer: {
@@ -510,7 +510,7 @@ const styles = StyleSheet.create({
 	chartTitle: {
 		fontSize: 18,
 		fontWeight: '600',
-		color: SHOOTRZ_THEME.colors.text,
+		color: SHOOTRZ_THEME.colors.textPrimary,
 	},
 	consistencyBadge: {
 		flexDirection: 'row',
@@ -580,7 +580,7 @@ const styles = StyleSheet.create({
 	sessionDate: {
 		fontSize: 16,
 		fontWeight: '600',
-		color: SHOOTRZ_THEME.colors.text,
+		color: SHOOTRZ_THEME.colors.textPrimary,
 	},
 	sessionTitle: {
 		fontSize: 14,
