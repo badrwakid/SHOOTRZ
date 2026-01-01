@@ -3,6 +3,18 @@ from typing import Any, Dict, List, Optional
 from .supabase_client import get_service_client
 
 
+def get_user_profile(user_id: str) -> Optional[Dict[str, Any]]:
+	sb = get_service_client()
+	resp = (
+		sb.table("users")
+		.select("id, email, username, name, skill_level, position, auth_provider, has_completed_onboarding, created_at")
+		.eq("id", user_id)
+		.maybe_single()
+		.execute()
+	)
+	return resp.data or None
+
+
 def record_video(user_id: str, file_url: str, angle: Optional[str], fps: Optional[int], device: Optional[str]) -> str:
     sb = get_service_client()
     resp = sb.table("videos").insert({

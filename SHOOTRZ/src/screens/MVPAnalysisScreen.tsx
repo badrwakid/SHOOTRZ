@@ -236,6 +236,7 @@ export const MVPAnalysisScreen: React.FC = () => {
 								id: `${Date.now()}`,
 								userId: user?.id || 'local',
 								timestamp: new Date().toISOString(),
+								runId: validatedResult.run_id || undefined,
 								scores: {
 									elbow: findMetricValue('elbow'),
 									balance: findMetricValue('balance'),

@@ -37,6 +37,7 @@ export interface AnalysisResult {
   id: string;
   userId: string;
   timestamp: string;
+  runId?: string; // Backend run_id for MVP analysis artifacts
   scores: {
     elbow: number;
     balance: number;

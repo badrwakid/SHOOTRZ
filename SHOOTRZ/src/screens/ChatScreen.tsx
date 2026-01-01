@@ -1,451 +1,504 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TextInput,
-  TouchableOpacity,
-  KeyboardAvoidingView,
-  Platform,
-  Animated,
-  ColorValue,
-} from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-import { SHOOTRZ_THEME, COMPONENT_STYLES } from '../constants/theme';
-import { hapticFeedback } from '../utils/hapticFeedback';
+	View,
+	Text,
+	StyleSheet,
+	TextInput,
+	TouchableOpacity,
+	KeyboardAvoidingView,
+	Platform,
+	FlatList,
+	Switch,
+	ActivityIndicator,
+	ColorValue,
+	ScrollView,
+} from 'react-native'
+import { LinearGradient } from 'expo-linear-gradient'
+import { SafeAreaView } from 'react-native-safe-area-context'
+import { Ionicons } from '@expo/vector-icons'
 
-interface Message {
-  id: string;
-  text: string;
-  isUser: boolean;
-  timestamp: string;
+import { SHOOTRZ_THEME, COMPONENT_STYLES } from '../constants/theme'
+import { hapticFeedback } from '../utils/hapticFeedback'
+import { chatService } from '../services/chat.service'
+import type { ChatMessageDto } from '../services/chat.service'
+import { chatStorageService } from '../services/chat-storage.service'
+
+type MessageStatus = 'sent' | 'sending' | 'failed'
+
+interface UiMessage {
+	id: string
+	role: 'user' | 'assistant'
+	content: string
+	createdAt: string
+	status: MessageStatus
+}
+
+const COACH_GREETING: UiMessage = {
+	id: 'coach_greeting',
+	role: 'assistant',
+	content:
+		'I’m Coach J. I can see your SHOOTRZ profile, goals, drills, and recent shot analysis history.\n\nTell me what you want to improve this week (e.g., elbow extension, balance, or release).',
+	createdAt: new Date().toISOString(),
+	status: 'sent',
+}
+
+const QUICK_CHIPS = [
+	'Analyze my biggest weakness from recent shots',
+	'Give me a 7-day shooting plan',
+	'Fix my elbow alignment',
+	'Help with balance and footwork',
+	'Recommend drills based on my history',
+]
+
+function toUiMessages(items: ChatMessageDto[]): UiMessage[] {
+	return items.map((m, idx) => ({
+		id: `${Date.now()}_${idx}_${m.role}`,
+		role: m.role,
+		content: m.content,
+		createdAt: new Date().toISOString(),
+		status: 'sent',
+	}))
+}
+
+function toPersistedMessages(items: UiMessage[]): ChatMessageDto[] {
+	return items
+		.filter(m => m.status !== 'failed')
+		.filter(m => m.id !== COACH_GREETING.id)
+		.map(m => ({ role: m.role, content: m.content }))
 }
 
 export const ChatScreen: React.FC = () => {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '1',
-      text: "Hey there! I'm Coach J, your AI basketball trainer. I'm here to help you perfect your game! What would you like to work on today?",
-      isUser: false,
-      timestamp: new Date().toISOString(),
-    },
-  ]);
-  const [inputText, setInputText] = useState('');
-  const [isTyping, setIsTyping] = useState(false);
-  const [quickQuestions] = useState([
-    'Help me with shooting form',
-    'What drills should I practice?',
-    'How do I improve my balance?',
-    'Elbow alignment tips',
-    'Best practice routine',
-  ]);
+	const listRef = useRef<FlatList<UiMessage> | null>(null)
+	const [messages, setMessages] = useState<UiMessage[]>([COACH_GREETING])
+	const [inputText, setInputText] = useState('')
+	const [isSending, setIsSending] = useState(false)
+	const [errorBanner, setErrorBanner] = useState<string | null>(null)
+	const [includeRawArtifacts, setIncludeRawArtifacts] = useState(false)
+	const [lastContextUsed, setLastContextUsed] = useState<Record<string, any> | null>(null)
 
-  const generateCoachResponse = (userMessage: string): string => {
-    const message = userMessage.toLowerCase();
+	const contextLabel = useMemo(() => {
+		if (!lastContextUsed) return 'Ready'
+		const parts: string[] = []
+		if (lastContextUsed.profile) parts.push('Profile')
+		if (lastContextUsed.has_client_local_context) parts.push('Goals/Drills')
+		if (lastContextUsed.recent_videos_count) parts.push('History')
+		
+		// Show artifacts status if requested
+		if (lastContextUsed.artifacts_requested) {
+			if (lastContextUsed.artifacts_available) {
+				parts.push('Artifacts ✓')
+			} else {
+				parts.push('Artifacts ✗')
+			}
+		}
+		
+		return parts.length ? `Using: ${parts.join(' • ')}` : 'Using context'
+	}, [lastContextUsed])
 
-    // Basketball-specific coaching responses
-    if (message.includes('shooting') || message.includes('shot')) {
-      return 'Great question about shooting! The key is the BEEF method: Balance, Eyes on target, Elbow alignment, and Follow-through. Make sure your elbow is at 90 degrees and follow through with your shooting hand pointing to the basket. Want me to analyze your form?';
-    }
+	useEffect(() => {
+		let mounted = true
+		const load = async () => {
+			const saved = await chatStorageService.loadConversation()
+			if (!mounted) return
+			if (saved && saved.length > 0) {
+				const filtered = saved.filter(m => m.content.trim() !== COACH_GREETING.content.trim())
+				setMessages([COACH_GREETING, ...toUiMessages(filtered)])
+			}
+		}
+		load()
+		return () => {
+			mounted = false
+		}
+	}, [])
 
-    if (message.includes('form') || message.includes('technique')) {
-      return 'Perfect form starts with your feet shoulder-width apart, knees slightly bent. Keep your shooting elbow aligned with the basket, and remember to follow through with your index and middle fingers pointing down. Practice makes permanent, so focus on consistency!';
-    }
+	useEffect(() => {
+		chatStorageService.saveConversation(toPersistedMessages(messages))
+	}, [messages])
 
-    if (message.includes('practice') || message.includes('drill')) {
-      return "I recommend starting with form shooting close to the basket - 50 shots focusing purely on technique. Then move to the free throw line for consistency drills. Try the 'around the world' drill to practice from different angles. What's your current skill level?";
-    }
+	const send = useCallback(async (text: string) => {
+		const trimmed = text.trim()
+		if (!trimmed || isSending) return
 
-    if (message.includes('elbow') || message.includes('alignment')) {
-      return "Elbow alignment is crucial! Your shooting elbow should be directly under the ball, forming a 90-degree angle. If it's flaring out, practice shooting with your elbow touching your side. This creates a straight line from your elbow to the basket.";
-    }
+		setErrorBanner(null)
+		setIsSending(true)
+		hapticFeedback.medium()
 
-    if (message.includes('balance') || message.includes('stance')) {
-      return 'Balance is everything! Keep your feet shoulder-width apart with your shooting foot slightly forward. Your weight should be evenly distributed. Imagine a straight line from your shooting foot through your body to the basket.';
-    }
+		const userMessage: UiMessage = {
+			id: `u_${Date.now()}`,
+			role: 'user',
+			content: trimmed,
+			createdAt: new Date().toISOString(),
+			status: 'sent',
+		}
 
-    if (message.includes('follow through') || message.includes('release')) {
-      return "Follow-through is your friend! After releasing the ball, hold your shooting hand in the 'gooseneck' position - index and middle fingers pointing down. This ensures proper backspin and trajectory. Hold this position until the ball hits the rim.";
-    }
+		setMessages(prev => [...prev, userMessage])
+		setInputText('')
 
-    if (message.includes('help') || message.includes('tips')) {
-      return "I'm here to help you improve! I can give you tips on shooting form, suggest drills, analyze your technique, and help you set goals. Try asking me about specific aspects like 'elbow alignment' or 'balance' for detailed coaching!";
-    }
+		try {
+			const outbound = [...messages, userMessage]
+				.filter(m => m.status !== 'failed')
+				.slice(-20)
+				.map(m => ({ role: m.role, content: m.content }))
 
-    if (message.includes('goal') || message.includes('improve')) {
-      return "Setting goals is key to improvement! Start with specific, measurable goals like 'make 80% of free throws' or 'shoot 100 form shots daily.' Track your progress and celebrate small wins. What specific area do you want to focus on?";
-    }
+			const resp = await chatService.sendMessage({
+				messages: outbound,
+				includeRawArtifacts,
+			})
 
-    // Default responses
-    const responses = [
-      "That's a great question! Basketball is all about fundamentals and consistency. What specific aspect of your game would you like to work on?",
-      "I love your enthusiasm! Remember, every great shooter started with the basics. Focus on one thing at a time - whether it's your stance, elbow alignment, or follow-through.",
-      "Excellent! The key to improvement is deliberate practice. Set small, achievable goals and track your progress. What's your current biggest challenge?",
-      "That's exactly the right mindset! Basketball is a mental game as much as physical. Stay focused, stay confident, and keep practicing those fundamentals.",
-      "Great to hear from you! Remember the SHOOTRZ motto: 'Perfect the Game.' Every shot is an opportunity to improve. What would you like to perfect today?",
-    ];
+			const assistantMessage: UiMessage = {
+				id: `a_${Date.now()}`,
+				role: 'assistant',
+				content: resp.assistant_message || 'I’m here. Ask me anything about your game.',
+				createdAt: new Date().toISOString(),
+				status: 'sent',
+			}
+			setLastContextUsed(resp.context_used || null)
+			setMessages(prev => [...prev, assistantMessage])
+			hapticFeedback.success()
+		} catch (err: any) {
+			hapticFeedback.error()
+			setErrorBanner(err?.message || 'Failed to reach Coach J. Please try again.')
+		} finally {
+			setIsSending(false)
+		}
+	}, [includeRawArtifacts, isSending, messages])
 
-    return responses[Math.floor(Math.random() * responses.length)];
-  };
+	const handlePressSend = useCallback(() => {
+		send(inputText)
+	}, [inputText, send])
 
-  const handleSendMessage = async () => {
-    if (!inputText.trim()) return;
+	const handleClear = useCallback(async () => {
+		hapticFeedback.light()
+		await chatStorageService.clearConversation()
+		setMessages([COACH_GREETING])
+		setLastContextUsed(null)
+		setErrorBanner(null)
+	}, [])
 
-    hapticFeedback.medium();
+	const renderItem = useCallback(({ item }: { item: UiMessage }) => {
+		const isUser = item.role === 'user'
+		return (
+			<View style={[styles.row, isUser ? styles.rowUser : styles.rowAssistant]}>
+				{!isUser && (
+					<View style={styles.avatar}>
+						<Ionicons name='chatbubbles' size={16} color={SHOOTRZ_THEME.colors.primary} />
+					</View>
+				)}
+				{isUser ? (
+					<LinearGradient
+						colors={SHOOTRZ_THEME.gradients.primary as [ColorValue, ColorValue]}
+						start={{ x: 0, y: 0 }}
+						end={{ x: 1, y: 0 }}
+						style={styles.bubbleUser}
+					>
+						<Text style={styles.textUser}>{item.content}</Text>
+					</LinearGradient>
+				) : (
+					<View style={styles.bubbleAssistant}>
+						<Text style={styles.coachLabel}>Coach J</Text>
+						<Text style={styles.textAssistant}>{item.content}</Text>
+					</View>
+				)}
+			</View>
+		)
+	}, [])
 
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      text: inputText,
-      isUser: true,
-      timestamp: new Date().toISOString(),
-    };
+	return (
+		<SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+			<LinearGradient
+				colors={[
+					SHOOTRZ_THEME.colors.background,
+					SHOOTRZ_THEME.colors.surface,
+					SHOOTRZ_THEME.colors.background,
+				]}
+				start={{ x: 0, y: 0 }}
+				end={{ x: 1, y: 1 }}
+				style={styles.bg}
+			>
+				<KeyboardAvoidingView
+					style={styles.kav}
+					behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+				>
+					<View style={styles.header}>
+						<View style={styles.headerLeft}>
+							<View style={styles.headerIcon}>
+								<Ionicons name='chatbubbles' size={20} color={SHOOTRZ_THEME.colors.primary} />
+							</View>
+							<View>
+								<Text style={styles.title}>Coach J</Text>
+								<Text style={styles.subtitle}>{contextLabel}</Text>
+							</View>
+						</View>
+						<TouchableOpacity onPress={handleClear} style={styles.clearBtn} activeOpacity={0.8}>
+							<Ionicons name='trash' size={18} color={SHOOTRZ_THEME.colors.textSecondary} />
+						</TouchableOpacity>
+					</View>
 
-    setMessages((prev) => [...prev, userMessage]);
-    setInputText('');
-    setIsTyping(true);
+					{errorBanner ? (
+						<View style={styles.errorBanner}>
+							<Ionicons name='warning' size={16} color={SHOOTRZ_THEME.colors.error} />
+							<Text style={styles.errorText}>{errorBanner}</Text>
+						</View>
+					) : null}
 
-    // Simulate typing delay
-    await new Promise((resolve) => setTimeout(resolve, 1000 + Math.random() * 2000));
+					<FlatList
+						ref={ref => {
+							listRef.current = ref
+						}}
+						style={styles.list}
+						contentContainerStyle={styles.listContent}
+						data={messages}
+						keyExtractor={m => m.id}
+						renderItem={renderItem}
+						showsVerticalScrollIndicator={false}
+						onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
+					/>
 
-    const coachResponse: Message = {
-      id: (Date.now() + 1).toString(),
-      text: generateCoachResponse(inputText),
-      isUser: false,
-      timestamp: new Date().toISOString(),
-    };
+					<View style={styles.controls}>
+						<View style={styles.toggleRow}>
+							<Text style={styles.toggleLabel} numberOfLines={1}>
+								Raw artifacts
+							</Text>
+							<Switch
+								value={includeRawArtifacts}
+								onValueChange={setIncludeRawArtifacts}
+								trackColor={{
+									false: SHOOTRZ_THEME.colors.surfaceElevated,
+									true: SHOOTRZ_THEME.colors.primary + '55',
+								}}
+								thumbColor={includeRawArtifacts ? SHOOTRZ_THEME.colors.primary : SHOOTRZ_THEME.colors.textMuted}
+							/>
+						</View>
 
-    setMessages((prev) => [...prev, coachResponse]);
-    setIsTyping(false);
-  };
+						<ScrollView
+							horizontal
+							showsHorizontalScrollIndicator={false}
+							style={styles.chipsScroll}
+							contentContainerStyle={styles.chipsContent}
+						>
+							{QUICK_CHIPS.map(chip => (
+								<TouchableOpacity
+									key={chip}
+									style={styles.chip}
+									onPress={() => {
+										hapticFeedback.light()
+										send(chip)
+									}}
+									activeOpacity={0.85}
+								>
+									<Text style={styles.chipText}>{chip}</Text>
+								</TouchableOpacity>
+							))}
+						</ScrollView>
 
-  const quickQuestionsList = [
-    'How do I improve my shooting form?',
-    'What drills should I practice?',
-    'Help with elbow alignment',
-    'Tips for better balance',
-    'How to set goals?',
-  ];
-
-  return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-      <KeyboardAvoidingView
-        style={styles.keyboardAvoidingView}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
-        {/* Header */}
-        <View style={styles.header}>
-          <View style={styles.coachInfo}>
-            <Ionicons
-              name="chatbubbles"
-              size={32}
-              color={SHOOTRZ_THEME.colors.primary}
-              style={{ marginRight: SHOOTRZ_THEME.spacing.md }}
-            />
-            <View>
-              <Text style={styles.coachName}>Coach J</Text>
-              <Text style={styles.coachTitle}>AI Basketball Trainer</Text>
-            </View>
-          </View>
-          <View style={styles.statusIndicator}>
-            <View style={styles.statusDot} />
-            <Text style={styles.statusText}>Online</Text>
-          </View>
-        </View>
-
-        {/* Messages */}
-        <ScrollView style={styles.messagesContainer} showsVerticalScrollIndicator={false}>
-          {messages.map((message) => (
-            <View
-              key={message.id}
-              style={[
-                styles.messageContainer,
-                message.isUser ? styles.userMessage : styles.coachMessage,
-              ]}
-            >
-              {message.isUser ? (
-                <LinearGradient
-                  colors={SHOOTRZ_THEME.gradients.primary as [ColorValue, ColorValue]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={styles.userBubble}
-                >
-                  <Text style={styles.userText}>{message.text}</Text>
-                </LinearGradient>
-              ) : (
-                <View style={styles.coachBubble}>
-                  <View style={styles.coachAvatarContainer}>
-                    <Ionicons name="chatbubbles" size={16} color={SHOOTRZ_THEME.colors.primary} />
-                  </View>
-                  <View style={styles.coachTextContainer}>
-                    <Text style={styles.coachName}>Coach J</Text>
-                    <Text style={styles.coachText}>{message.text}</Text>
-                  </View>
-                </View>
-              )}
-            </View>
-          ))}
-
-          {isTyping && (
-            <View style={[styles.messageContainer, styles.coachMessage]}>
-              <View style={styles.coachBubble}>
-                <View style={styles.coachAvatarContainer}>
-                  <Ionicons name="chatbubbles" size={16} color={SHOOTRZ_THEME.colors.primary} />
-                </View>
-                <View style={styles.coachTextContainer}>
-                  <Text style={styles.coachName}>Coach J</Text>
-                  <View style={styles.typingIndicator}>
-                    <Text style={styles.typingText}>typing</Text>
-                    <View style={styles.typingDots}>
-                      <View style={[styles.dot, styles.dot1]} />
-                      <View style={[styles.dot, styles.dot2]} />
-                      <View style={[styles.dot, styles.dot3]} />
-                    </View>
-                  </View>
-                </View>
-              </View>
-            </View>
-          )}
-        </ScrollView>
-
-        {/* Quick Questions */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.quickQuestions}>
-          {quickQuestions.map((question, index) => (
-            <LinearGradient
-              key={index}
-              colors={SHOOTRZ_THEME.gradients.secondary as [ColorValue, ColorValue]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.quickQuestionButton}
-            >
-              <TouchableOpacity
-                onPress={() => {
-                  hapticFeedback.light();
-                  setInputText(question);
-                }}
-              >
-                <Text style={styles.quickQuestionText}>{question}</Text>
-              </TouchableOpacity>
-            </LinearGradient>
-          ))}
-        </ScrollView>
-
-        {/* Input */}
-        <View style={styles.inputContainer}>
-          <TextInput
-            style={styles.textInput}
-            placeholder="Ask Coach J anything about basketball..."
-            placeholderTextColor={SHOOTRZ_THEME.colors.textMuted}
-            value={inputText}
-            onChangeText={setInputText}
-            multiline
-            maxLength={500}
-          />
-          {inputText.trim() ? (
-            <LinearGradient
-              colors={SHOOTRZ_THEME.gradients.primary as [ColorValue, ColorValue]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.sendButton}
-            >
-              <TouchableOpacity onPress={handleSendMessage}>
-                <Text style={styles.sendButtonText}>Send</Text>
-              </TouchableOpacity>
-            </LinearGradient>
-          ) : (
-            <TouchableOpacity style={styles.sendButtonDisabled} disabled={true}>
-              <Text style={styles.sendButtonTextDisabled}>Send</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
-  );
-};
+						<View style={styles.inputRow}>
+							<TextInput
+								style={styles.input}
+								value={inputText}
+								onChangeText={setInputText}
+								placeholder='Ask about your form, drills, or progress…'
+								placeholderTextColor={SHOOTRZ_THEME.colors.textMuted}
+								multiline
+								maxLength={1200}
+							/>
+							<TouchableOpacity
+								onPress={handlePressSend}
+								disabled={!inputText.trim() || isSending}
+								activeOpacity={0.85}
+								style={[styles.sendBtn, (!inputText.trim() || isSending) && styles.sendBtnDisabled]}
+							>
+								{isSending ? (
+									<ActivityIndicator color={SHOOTRZ_THEME.colors.textPrimary} />
+								) : (
+									<Ionicons name='send' size={18} color={SHOOTRZ_THEME.colors.textPrimary} />
+								)}
+							</TouchableOpacity>
+						</View>
+					</View>
+				</KeyboardAvoidingView>
+			</LinearGradient>
+		</SafeAreaView>
+	)
+}
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: SHOOTRZ_THEME.colors.background,
-  },
-  keyboardAvoidingView: {
-    flex: 1,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: SHOOTRZ_THEME.spacing.lg,
-    backgroundColor: SHOOTRZ_THEME.colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: SHOOTRZ_THEME.colors.surfaceElevated,
-  },
-  coachInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  coachAvatarContainer: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: SHOOTRZ_THEME.colors.surface,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: SHOOTRZ_THEME.spacing.xs,
-  },
-  coachName: {
-    ...SHOOTRZ_THEME.typography.heading3,
-    marginBottom: 2,
-  },
-  coachTitle: {
-    ...SHOOTRZ_THEME.typography.bodySmall,
-    color: SHOOTRZ_THEME.colors.textSecondary,
-  },
-  statusIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: SHOOTRZ_THEME.colors.secondary,
-    marginRight: SHOOTRZ_THEME.spacing.xs,
-  },
-  statusText: {
-    ...SHOOTRZ_THEME.typography.caption,
-    color: SHOOTRZ_THEME.colors.textSecondary,
-  },
-  messagesContainer: {
-    flex: 1,
-    padding: SHOOTRZ_THEME.spacing.md,
-  },
-  messageContainer: {
-    marginBottom: SHOOTRZ_THEME.spacing.md,
-  },
-  userMessage: {
-    alignItems: 'flex-end',
-  },
-  coachMessage: {
-    alignItems: 'flex-start',
-  },
-  messageBubble: {
-    maxWidth: '80%',
-    padding: SHOOTRZ_THEME.spacing.md,
-    borderRadius: SHOOTRZ_THEME.borderRadius.lg,
-  },
-  userBubble: {
-    backgroundColor: SHOOTRZ_THEME.colors.primary,
-  },
-  coachBubble: {
-    backgroundColor: 'transparent',
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-  },
-  coachTextContainer: {
-    flex: 1,
-  },
-  coachNameText: {
-    ...SHOOTRZ_THEME.typography.caption,
-    color: SHOOTRZ_THEME.colors.primary,
-    fontWeight: '600',
-    marginBottom: SHOOTRZ_THEME.spacing.xs,
-  },
-  messageText: {
-    ...SHOOTRZ_THEME.typography.body,
-    lineHeight: 20,
-  },
-  userText: {
-    color: SHOOTRZ_THEME.colors.textPrimary,
-  },
-  coachText: {
-    color: SHOOTRZ_THEME.colors.textPrimary,
-  },
-  typingIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  typingText: {
-    ...SHOOTRZ_THEME.typography.bodySmall,
-    color: SHOOTRZ_THEME.colors.textMuted,
-    fontStyle: 'italic',
-    marginRight: SHOOTRZ_THEME.spacing.xs,
-  },
-  typingDots: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  dot: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: SHOOTRZ_THEME.colors.textMuted,
-    marginHorizontal: 1,
-  },
-  dot1: {
-    opacity: 0.4,
-  },
-  dot2: {
-    opacity: 0.7,
-  },
-  dot3: {
-    opacity: 1,
-  },
-  quickQuestions: {
-    maxHeight: 50,
-    paddingHorizontal: SHOOTRZ_THEME.spacing.md,
-    marginBottom: SHOOTRZ_THEME.spacing.md,
-  },
-  quickQuestionButton: {
-    paddingHorizontal: SHOOTRZ_THEME.spacing.md,
-    paddingVertical: SHOOTRZ_THEME.spacing.sm,
-    borderRadius: SHOOTRZ_THEME.borderRadius.xl,
-    marginRight: SHOOTRZ_THEME.spacing.sm,
-  },
-  quickQuestionText: {
-    ...SHOOTRZ_THEME.typography.bodySmall,
-    color: SHOOTRZ_THEME.colors.textPrimary,
-    textAlign: 'center',
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    padding: SHOOTRZ_THEME.spacing.md,
-    backgroundColor: SHOOTRZ_THEME.colors.surface,
-    borderTopWidth: 1,
-    borderTopColor: SHOOTRZ_THEME.colors.surfaceElevated,
-  },
-  textInput: {
-    flex: 1,
-    ...COMPONENT_STYLES.input,
-    marginRight: SHOOTRZ_THEME.spacing.md,
-    maxHeight: 100,
-    textAlignVertical: 'top',
-  },
-  sendButton: {
-    paddingHorizontal: SHOOTRZ_THEME.spacing.lg,
-    paddingVertical: SHOOTRZ_THEME.spacing.sm,
-    borderRadius: SHOOTRZ_THEME.borderRadius.lg,
-    marginLeft: SHOOTRZ_THEME.spacing.sm,
-  },
-  sendButtonDisabled: {
-    backgroundColor: SHOOTRZ_THEME.colors.surfaceElevated,
-    paddingHorizontal: SHOOTRZ_THEME.spacing.lg,
-    paddingVertical: SHOOTRZ_THEME.spacing.sm,
-    borderRadius: SHOOTRZ_THEME.borderRadius.lg,
-    marginLeft: SHOOTRZ_THEME.spacing.sm,
-    opacity: 0.5,
-  },
-  sendButtonText: {
-    ...SHOOTRZ_THEME.typography.button,
-    color: SHOOTRZ_THEME.colors.textPrimary,
-    textAlign: 'center',
-  },
-  sendButtonTextDisabled: {
-    ...SHOOTRZ_THEME.typography.button,
-    color: SHOOTRZ_THEME.colors.textMuted,
-    textAlign: 'center',
-  },
-});
+	container: {
+		flex: 1,
+		backgroundColor: SHOOTRZ_THEME.colors.background,
+	},
+	bg: {
+		flex: 1,
+	},
+	kav: {
+		flex: 1,
+	},
+	header: {
+		paddingHorizontal: SHOOTRZ_THEME.spacing.lg,
+		paddingTop: SHOOTRZ_THEME.spacing.lg,
+		paddingBottom: SHOOTRZ_THEME.spacing.md,
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+		backgroundColor: SHOOTRZ_THEME.colors.surface + 'F0',
+		borderBottomWidth: 1,
+		borderBottomColor: SHOOTRZ_THEME.colors.surfaceElevated,
+	},
+	headerLeft: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: SHOOTRZ_THEME.spacing.md,
+	},
+	headerIcon: {
+		width: 36,
+		height: 36,
+		borderRadius: 18,
+		alignItems: 'center',
+		justifyContent: 'center',
+		backgroundColor: SHOOTRZ_THEME.colors.primary + '22',
+	},
+	title: {
+		...SHOOTRZ_THEME.typography.heading3,
+	},
+	subtitle: {
+		...SHOOTRZ_THEME.typography.bodySmall,
+		color: SHOOTRZ_THEME.colors.textSecondary,
+		marginTop: 2,
+	},
+	clearBtn: {
+		padding: 10,
+		borderRadius: 12,
+		backgroundColor: SHOOTRZ_THEME.colors.surfaceElevated + '55',
+	},
+	errorBanner: {
+		marginHorizontal: SHOOTRZ_THEME.spacing.lg,
+		marginTop: SHOOTRZ_THEME.spacing.md,
+		padding: SHOOTRZ_THEME.spacing.md,
+		borderRadius: SHOOTRZ_THEME.borderRadius.lg,
+		backgroundColor: SHOOTRZ_THEME.colors.error + '14',
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: SHOOTRZ_THEME.spacing.sm,
+	},
+	errorText: {
+		flex: 1,
+		...SHOOTRZ_THEME.typography.bodySmall,
+		color: SHOOTRZ_THEME.colors.error,
+	},
+	list: {
+		flex: 1,
+	},
+	listContent: {
+		paddingHorizontal: SHOOTRZ_THEME.spacing.lg,
+		paddingVertical: SHOOTRZ_THEME.spacing.lg,
+		gap: SHOOTRZ_THEME.spacing.md,
+	},
+	row: {
+		flexDirection: 'row',
+		alignItems: 'flex-end',
+	},
+	rowUser: {
+		justifyContent: 'flex-end',
+	},
+	rowAssistant: {
+		justifyContent: 'flex-start',
+	},
+	avatar: {
+		width: 30,
+		height: 30,
+		borderRadius: 15,
+		alignItems: 'center',
+		justifyContent: 'center',
+		backgroundColor: SHOOTRZ_THEME.colors.surfaceElevated,
+		marginRight: SHOOTRZ_THEME.spacing.sm,
+	},
+	bubbleUser: {
+		maxWidth: '84%',
+		paddingHorizontal: SHOOTRZ_THEME.spacing.md,
+		paddingVertical: SHOOTRZ_THEME.spacing.sm,
+		borderRadius: SHOOTRZ_THEME.borderRadius.xl,
+	},
+	textUser: {
+		...SHOOTRZ_THEME.typography.body,
+		color: '#fff',
+		lineHeight: 20,
+	},
+	bubbleAssistant: {
+		maxWidth: '84%',
+		backgroundColor: SHOOTRZ_THEME.colors.surface,
+		borderWidth: 1,
+		borderColor: SHOOTRZ_THEME.colors.surfaceElevated,
+		paddingHorizontal: SHOOTRZ_THEME.spacing.md,
+		paddingVertical: SHOOTRZ_THEME.spacing.sm,
+		borderRadius: SHOOTRZ_THEME.borderRadius.xl,
+	},
+	coachLabel: {
+		...SHOOTRZ_THEME.typography.caption,
+		color: SHOOTRZ_THEME.colors.primary,
+		fontWeight: '700',
+		marginBottom: 4,
+	},
+	textAssistant: {
+		...SHOOTRZ_THEME.typography.body,
+		color: SHOOTRZ_THEME.colors.textPrimary,
+		lineHeight: 20,
+	},
+	controls: {
+		padding: SHOOTRZ_THEME.spacing.lg,
+		paddingBottom: SHOOTRZ_THEME.spacing.lg,
+		backgroundColor: SHOOTRZ_THEME.colors.surface + 'F8',
+		borderTopWidth: 1,
+		borderTopColor: SHOOTRZ_THEME.colors.surfaceElevated,
+		gap: SHOOTRZ_THEME.spacing.md,
+	},
+	toggleRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+		minHeight: 32,
+	},
+	toggleLabel: {
+		...SHOOTRZ_THEME.typography.bodySmall,
+		color: SHOOTRZ_THEME.colors.textSecondary,
+		flexShrink: 1,
+		marginRight: SHOOTRZ_THEME.spacing.sm,
+	},
+	chipsScroll: {
+		maxHeight: 36,
+	},
+	chipsContent: {
+		gap: SHOOTRZ_THEME.spacing.sm,
+		paddingRight: SHOOTRZ_THEME.spacing.lg,
+	},
+	chip: {
+		paddingHorizontal: SHOOTRZ_THEME.spacing.md,
+		paddingVertical: SHOOTRZ_THEME.spacing.sm,
+		borderRadius: SHOOTRZ_THEME.borderRadius.xl,
+		backgroundColor: SHOOTRZ_THEME.colors.surfaceElevated,
+	},
+	chipText: {
+		...SHOOTRZ_THEME.typography.bodySmall,
+		color: SHOOTRZ_THEME.colors.textPrimary,
+	},
+	inputRow: {
+		flexDirection: 'row',
+		alignItems: 'flex-end',
+		gap: SHOOTRZ_THEME.spacing.md,
+	},
+	input: {
+		flex: 1,
+		...COMPONENT_STYLES.input,
+		maxHeight: 130,
+		textAlignVertical: 'top',
+	},
+	sendBtn: {
+		width: 46,
+		height: 46,
+		borderRadius: 16,
+		alignItems: 'center',
+		justifyContent: 'center',
+		backgroundColor: SHOOTRZ_THEME.colors.primary,
+	},
+	sendBtnDisabled: {
+		opacity: 0.5,
+	},
+})

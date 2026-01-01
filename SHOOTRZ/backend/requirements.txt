@@ -17,6 +17,7 @@ uvicorn[standard]>=0.24.0
 python-multipart>=0.0.9
 pydantic>=2.6.0
 supabase>=2.3.0
+openai>=1.0.0
 
 # Advanced AI dependencies
 ultralytics>=8.0.0    # YOLOv8 for ball detection AND pose estimation

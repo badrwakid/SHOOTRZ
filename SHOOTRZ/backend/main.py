@@ -5,6 +5,7 @@ import time
 import json
 
 from .routers import history, feedback, db_test, db_integration_test, sessions, mvp
+from .routers import chat
 from .routers.recommendation_routes import router as recommendation_router
 # Track server start time for health endpoint
 _start_time = time.time()
@@ -56,6 +57,7 @@ def create_app() -> FastAPI:
         pass
     # #endregion
     app.include_router(mvp.router)  # MVP analysis endpoints
+    app.include_router(chat.router)  # AI coach chat
     app.include_router(history.router)
     app.include_router(feedback.router)
     app.include_router(sessions.router)
