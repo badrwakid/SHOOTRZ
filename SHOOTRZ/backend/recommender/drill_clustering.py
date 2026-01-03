@@ -1,26 +1,35 @@
+# recommender/drill_clustering.py
 import numpy as np
 import pandas as pd
 from pathlib import Path
+from .dummy_data import generate_dummy_storage
 
-# Get the directory containing this file, then navigate to storage
 _BASE_DIR = Path(__file__).parent.parent
-EMBED_PATH = _BASE_DIR / "storage" / "drill_embeddings.npy"
-META_PATH = _BASE_DIR / "storage" / "drills_metadata.csv"
+STORAGE_DIR = _BASE_DIR / "storage"
+
+EMBED_PATH = STORAGE_DIR / "drill_embeddings.npy"
+META_PATH = STORAGE_DIR / "drills_metadata.csv"
+FAISS_PATH = STORAGE_DIR / "faiss_index.bin"
+
+def _ensure_storage_exists():
+    """
+    If any storage artifact is missing, generate all dummy artifacts once.
+    """
+    if not (EMBED_PATH.exists() and META_PATH.exists() and FAISS_PATH.exists()):
+        generate_dummy_storage(STORAGE_DIR)
 
 def load_drill_metadata():
-    if not META_PATH.exists():
-        raise FileNotFoundError(f"Metadata file missing: {META_PATH}")
+    _ensure_storage_exists()
 
     drills = pd.read_csv(META_PATH)
-    
-    if "cluster" not in drills.columns or "tier" not in drills.columns:
-        raise ValueError("drills_metadata.csv must contain 'cluster' and 'tier' columns")
+    required = {"drill_id", "cluster", "tier"}
+    if not required.issubset(drills.columns):
+        raise ValueError(f"drills_metadata.csv must contain columns: {required}")
 
     return drills
 
 def load_drill_embeddings():
-    if not EMBED_PATH.exists():
-        raise FileNotFoundError(f"Embedding file missing: {EMBED_PATH}")
+    _ensure_storage_exists()
 
-    emb = np.load(EMBED_PATH)
-    return emb.astype("float32")
+    emb = np.load(EMBED_PATH).astype("float32")
+    return emb
