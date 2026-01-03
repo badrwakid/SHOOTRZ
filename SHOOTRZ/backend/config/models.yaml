@@ -1,0 +1,87 @@
+# Model Configuration for SHOOTRZ Backend
+# 
+# This file defines model paths, settings, and fallback chains for all models
+# used in the video processing pipeline.
+
+models:
+  # YOLOv8 Ball Detection
+  yolov8_ball:
+    finetuned: "models/yolov8n_basketball_deepsport.pt"
+    pretrained: "yolov8n.pt"  # Auto-downloaded by ultralytics
+    prefer_finetuned: true
+    conf_threshold: 0.5
+    track_threshold: 0.7
+  
+  # YOLOv8-Pose Detection
+  yolov8_pose:
+    finetuned: "models/yolov8n_pose_basketball.pt"
+    pretrained: "yolov8n-pose.pt"  # Auto-downloaded by ultralytics
+    prefer_finetuned: true
+    conf_threshold: 0.5
+    enabled: true  # Set to false to use MediaPipe only
+  
+  # PoseMagic 3D Lifting
+  posemagic:
+    finetuned: "models/posemagic_basketball.pth"
+    pretrained: null  # No pretrained available, uses heuristic fallback
+    prefer_finetuned: true
+    sequence_length: 81
+    enabled: false  # Requires GPU, enable when model is available
+  
+  # HybrIK 3D Lifting
+  hybrik:
+    finetuned: "models/hybrik_basketball.pth"
+    pretrained: null  # No pretrained available, uses heuristic fallback
+    prefer_finetuned: true
+    enabled: false  # Requires GPU, enable when model is available
+
+# Pose Detection Strategy
+pose_detection:
+  # Options: "mediapipe", "yolo", "ensemble"
+  # - "mediapipe": Use MediaPipe only (33 landmarks)
+  # - "yolo": Use YOLOv8-pose only (17 keypoints)
+  # - "ensemble": Use both and combine (requires both enabled)
+  strategy: "mediapipe"
+  
+  # Ensemble settings (when strategy = "ensemble")
+  ensemble:
+    mediapipe_weight: 0.6
+    yolo_weight: 0.4
+    combine_method: "weighted_average"  # or "yolo_primary"
+
+# 3D Lifting Strategy
+pose_3d:
+  # Options: "posemagic", "hybrik", "heuristic"
+  # - "posemagic": Use PoseMagic temporal model (requires model weights)
+  # - "hybrik": Use HybrIK per-frame model (requires model weights)
+  # - "heuristic": Use geometric heuristics (always available)
+  method: "heuristic"
+  
+  # Fallback chain: try methods in order until one succeeds
+  fallback_chain: ["posemagic", "hybrik", "heuristic"]
+  
+  # Enable 3D lifting in pipeline
+  enabled: false  # Set to true when models are available
+
+# Device Configuration
+device:
+  # Auto-detect GPU, fallback to CPU
+  auto_detect: true
+  preferred: "cuda"  # or "cpu"
+  
+  # GPU memory settings (for PyTorch models)
+  gpu:
+    allow_growth: true
+    memory_fraction: 0.5
+
+# Model Loading
+loading:
+  # Cache models in memory for faster inference
+  cache_models: true
+  
+  # Preload models at startup (faster first inference, higher memory)
+  preload: false
+  
+  # Model validation on load
+  validate_on_load: true
+

@@ -28,7 +28,7 @@ def detect_and_track_ball(
 	
 	Args:
 		frames: List of RGB frames [H, W, 3]
-		model_path: Path to YOLOv8 model (None = use pretrained)
+		model_path: Path to YOLOv8 model (None = auto-detect fine-tuned model)
 		conf_threshold: Detection confidence threshold
 		track_threshold: Tracking IOU threshold
 	
@@ -43,13 +43,34 @@ def detect_and_track_ball(
 			"warning": "YOLOv8 not available - using placeholder",
 		}
 
-	# Load model
+	# Use model loader for automatic fallback
+	from .model_loader import get_model_loader
+	
+	loader = get_model_loader()
+	
 	if model_path and Path(model_path).exists():
 		model = YOLO(model_path)
+		using_finetuned = True
+		ball_class_id = 0  # Fine-tuned model: class 0 is ball
 	else:
-		# Use pretrained YOLOv8-nano (works with COCO classes, ball is 'sports ball')
-		# For production, use fine-tuned model: 'models/yolov8n_basketball.pt'
-		model = YOLO("yolov8n.pt")
+		# Try to load via model loader
+		loaded_model = loader.load_yolov8_ball(prefer_finetuned=True)
+		
+		if loaded_model is not None:
+			model = loaded_model
+			# Check if fine-tuned was loaded
+			model_path_obj = loader.get_model_path("yolov8_ball", prefer_finetuned=True)
+			using_finetuned = (
+				model_path_obj is not None and
+				isinstance(model_path_obj, Path) and
+				"basketball" in model_path_obj.name
+			)
+			ball_class_id = 0 if using_finetuned else 37
+		else:
+			# Final fallback
+			model = YOLO("yolov8n.pt")
+			using_finetuned = False
+			ball_class_id = 37  # COCO class 37 is "sports ball"
 
 	trajectory = []
 	all_detections = []
@@ -80,10 +101,8 @@ def detect_and_track_ball(
 				classes = boxes.cls.int().cpu().tolist()
 				confidences = boxes.conf.cpu().tolist()
 				
-				# COCO class 37 is "sports ball"
-				ball_class_id = 37
-				
 				# Find ball detections
+				# ball_class_id is set above based on model type
 				for i, (box, class_id, conf, track_id) in enumerate(
 					zip(boxes.xyxy.cpu(), classes, confidences, track_ids)
 				):
@@ -129,6 +148,7 @@ def detect_and_track_ball(
 		"trajectory": trajectory,
 		"detections": all_detections,
 		"track_history": track_history,
+		"model_type": "finetuned" if using_finetuned else "pretrained",
 	}
 
 

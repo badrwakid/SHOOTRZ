@@ -13,6 +13,7 @@ from .biomechanics import compute_entry_angle, compute_release_angle
 def compute_arc_height(
 	ball_trajectory: np.ndarray,
 	rim_height: float = 3.05,
+	frame_height: Optional[int] = None,
 ) -> Dict[str, float]:
 	"""
 	Compute maximum height of ball trajectory relative to rim.
@@ -21,7 +22,9 @@ def compute_arc_height(
 	
 	Args:
 		ball_trajectory: Array of 3D ball positions [[x, y, z], ...]
+			If coordinates are normalized (0-1), provide frame_height for conversion
 		rim_height: Rim height in meters (default: 3.05m)
+		frame_height: Video frame height in pixels (for normalized coordinate conversion)
 	
 	Returns:
 		Dict with arc_height_meters, max_height_meters, and confidence
@@ -34,11 +37,96 @@ def compute_arc_height(
 		}
 	
 	# Extract Y coordinates (height)
+	# In normalized image coordinates: Y=0 is top (high), Y=1 is bottom (low)
+	# So the maximum height is the MINIMUM Y value (closest to 0)
 	heights = ball_trajectory[:, 1]
-	max_height = float(np.max(heights))
-	arc_height = max_height - rim_height
+	min_y_normalized = float(np.min(heights))  # Minimum Y = highest point
+	max_y_normalized = float(np.max(heights))  # Maximum Y = lowest point
 	
-	confidence = 1.0 if len(ball_trajectory) >= 5 else 0.6
+	# Check if coordinates are normalized (0-1 range)
+	# If values are in 0-1 range, assume normalized coordinates
+	is_normalized = max_y_normalized <= 1.0 and min_y_normalized >= 0.0
+	
+	if is_normalized and frame_height is not None:
+		# Convert normalized to meters
+		# In image coordinates: Y=0 is top (high), Y=1 is bottom (low)
+		# Assume camera is positioned such that:
+		# - Top of frame (y=0) = ~4.5m (above rim)
+		# - Bottom of frame (y=1) = ~0m (ground)
+		# - Rim (y≈0.32 for 3.05m) = 3.05m
+		# Linear interpolation: height = 4.5 * (1 - y_normalized)
+		# min_y_normalized is the highest point (minimum Y value)
+		estimated_max_height = 4.5 * (1.0 - min_y_normalized)
+		
+		# Clamp to reasonable range (0-5m)
+		estimated_max_height = max(0.0, min(5.0, estimated_max_height))
+		max_height = estimated_max_height
+		arc_height = max_height - rim_height
+		
+		# Lower confidence for estimated values
+		confidence = 0.7 if len(ball_trajectory) >= 5 else 0.4
+	elif is_normalized:
+		# Normalized coordinates but no frame_height - estimate conversion
+		# In image coordinates: Y=0 is top (high), Y=1 is bottom (low)
+		# min_y_normalized is the highest point (minimum Y value)
+		
+		# Quick check: if min Y is very high (near bottom of frame), ball likely didn't go high
+		if min_y_normalized > 0.8:  # Ball never went high (Y always > 0.8)
+			# Ball tracking likely incorrect or ball never went high
+			return {
+				"arc_height_meters": 0.0,
+				"max_height_meters": 0.0,
+				"confidence": 0.0,  # No confidence - ball tracking likely incorrect
+			}
+		
+		estimated_max_height = 4.5 * (1.0 - min_y_normalized)
+		estimated_max_height = max(0.0, min(5.0, estimated_max_height))
+		max_height = estimated_max_height
+		arc_height = max_height - rim_height
+		
+		# If arc height is negative, ball never went above rim - return 0 confidence
+		if arc_height < 0:
+			return {
+				"arc_height_meters": 0.0,
+				"max_height_meters": float(max_height),
+				"confidence": 0.0,  # No confidence - ball tracking likely incorrect
+			}
+		
+		confidence = 0.6 if len(ball_trajectory) >= 5 else 0.4
+	else:
+		# Assume coordinates are already in meters
+		# In this case, Y increases upward, so max Y is the highest point
+		max_height = float(np.max(heights))
+		arc_height = max_height - rim_height
+		
+		# Validate: arc height should be reasonable (0-2m above rim)
+		if arc_height < 0 or arc_height > 3.0:
+			# Negative arc height means ball never went above rim - invalid
+			if arc_height < 0:
+				return {
+					"arc_height_meters": 0.0,
+					"max_height_meters": float(max_height),
+					"confidence": 0.0,  # No confidence - invalid trajectory
+				}
+			# Likely coordinate system issue - try to detect if it's actually normalized
+			if max_height < 2.0:
+				# Probably normalized, convert
+				estimated_max_height = 4.5 * (1.0 - min_y_normalized)
+				estimated_max_height = max(0.0, min(5.0, estimated_max_height))
+				max_height = estimated_max_height
+				arc_height = max_height - rim_height
+				# Check again after conversion
+				if arc_height < 0:
+					return {
+						"arc_height_meters": 0.0,
+						"max_height_meters": float(max_height),
+						"confidence": 0.0,
+					}
+				confidence = 0.5
+			else:
+				confidence = 0.2
+		else:
+			confidence = 1.0 if len(ball_trajectory) >= 5 else 0.6
 	
 	return {
 		"arc_height_meters": float(arc_height),

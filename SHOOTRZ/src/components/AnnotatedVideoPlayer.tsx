@@ -30,21 +30,16 @@ export const AnnotatedVideoPlayer: React.FC<AnnotatedVideoPlayerProps> = ({
 	phases,
 	onFrameChange,
 }) => {
-	// Use annotated video if available, otherwise fall back to original
-	const displayUri = annotatedVideoUri || videoUri
-	const isAnnotated = !!annotatedVideoUri
+	// Only show annotated video - don't fall back to original
+	// If no annotated video, don't render anything
+	if (!annotatedVideoUri) {
+		return null
+	}
 
 	return (
 		<View style={styles.container}>
-			{!isAnnotated && (
-				<View style={styles.noteContainer}>
-					<Text style={styles.noteText}>
-						Note: Showing original video. Annotated video with skeleton overlay coming soon.
-					</Text>
-				</View>
-			)}
 			<AnalysisPlayer
-				videoUri={displayUri}
+				videoUri={annotatedVideoUri}
 				poseResults={poseResults}
 				ballTrajectory={ballTrajectory}
 				phases={phases}

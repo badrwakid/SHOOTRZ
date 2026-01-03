@@ -284,17 +284,44 @@ class PhaseDetector:
 					"confidence": 0.9,
 				})
 		else:
-			# Estimate release frame from pose (when arm is extended)
-			# Use midpoint as fallback
-			release_frame = total_frames // 2
+			# Estimate release frame from pose (when arm is extended upward)
+			# Find frame where wrist is highest (arm extension)
+			wrist_heights = []
+			for result in pose_results:
+				landmarks = result.get("landmarks")
+				if landmarks is not None and len(landmarks) > 16:
+					# Right wrist Y coordinate (lower Y = higher in image for normalized coords)
+					wrist_y = landmarks[16][1] if len(landmarks[16]) > 1 else 0.5
+					wrist_heights.append(wrist_y)
+				else:
+					wrist_heights.append(0.5)  # Default middle
+			
+			if wrist_heights:
+				# Find minimum Y (highest wrist position) - this is likely release
+				min_wrist_y = min(wrist_heights)
+				release_frame = wrist_heights.index(min_wrist_y)
+			else:
+				# Fallback to midpoint
+				release_frame = total_frames // 2
+			
+			# Release phase is short (few frames around release)
+			release_start = max(0, release_frame - 2)
+			release_end = min(total_frames - 1, release_frame + 2)
 			phases.append({
 				"phase": ShootingPhase.RELEASE,
-				"start_frame": release_frame - 1,
-				"end_frame": release_frame + 1,
-				"confidence": 0.5,
+				"start_frame": release_start,
+				"end_frame": release_end,
+				"confidence": 0.6,  # Moderate confidence for pose-based estimate
 			})
 
 		# Detect landing phase (after release)
+		# Get release_frame from phases if not set
+		if release_frame is None:
+			for phase_info in phases:
+				if phase_info["phase"] == ShootingPhase.RELEASE:
+					release_frame = phase_info["start_frame"] + (phase_info["end_frame"] - phase_info["start_frame"]) // 2
+					break
+		
 		if release_frame is not None:
 			landing_start = release_frame + 3
 			if landing_start < total_frames:

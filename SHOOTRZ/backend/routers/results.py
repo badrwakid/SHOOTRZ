@@ -57,6 +57,7 @@ async def get_result(job_id: str):
 		"pose_results": job.get("pose_results", 0),
 		"hand_results": job.get("hand_results", 0),
 		"ball_trajectory_length": job.get("ball_trajectory_length", 0),
+		"annotated_video_url": job.get("annotated_video_url"),
 		"error": job.get("error"),
 	}
 

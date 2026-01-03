@@ -33,6 +33,7 @@ class VideoProcessingPipeline:
 		self,
 		use_3d_lifting: bool = False,
 		enable_ball_tracking: bool = True,
+		pose_strategy: str = "mediapipe",
 	):
 		"""
 		Initialize processing pipeline.
@@ -40,6 +41,7 @@ class VideoProcessingPipeline:
 		Args:
 			use_3d_lifting: Whether to use 3D pose lifting (requires GPU)
 			enable_ball_tracking: Whether to track ball trajectory
+			pose_strategy: "mediapipe", "yolo", or "ensemble"
 		"""
 		self.pose_detector = MediaPipePoseDetector()
 		self.hands_detector = MediaPipeHandsDetector()
@@ -47,6 +49,20 @@ class VideoProcessingPipeline:
 		self.metrics_calculator = MetricsCalculator(use_3d=use_3d_lifting)
 		self.use_3d_lifting = use_3d_lifting
 		self.enable_ball_tracking = enable_ball_tracking
+		self.pose_strategy = pose_strategy
+		
+		# Initialize YOLOv8-pose detector if needed
+		self.yolo_pose_detector = None
+		if pose_strategy in ["yolo", "ensemble"]:
+			try:
+				from ..inference.yolo_pose_detector import YOLOv8PoseDetector
+				self.yolo_pose_detector = YOLOv8PoseDetector(use_finetuned=True)
+			except Exception as e:
+				print(f"Warning: Could not initialize YOLOv8-pose: {e}")
+				if pose_strategy == "yolo":
+					# Fallback to MediaPipe if YOLO not available
+					self.pose_strategy = "mediapipe"
+					print("Falling back to MediaPipe pose detection")
 
 	@timeit
 	def load_video_frames(
@@ -137,14 +153,51 @@ class VideoProcessingPipeline:
 		pose_results = []
 		for idx, frame in enumerate(frames):
 			try:
-				result = self.pose_detector.process_frame(frame)
+				result = None
+				
+				# Use strategy-based pose detection
+				if self.pose_strategy == "yolo" and self.yolo_pose_detector:
+					result = self.yolo_pose_detector.process_frame(frame)
+				elif self.pose_strategy == "ensemble" and self.yolo_pose_detector:
+					# Get both MediaPipe and YOLO results
+					mp_result = self.pose_detector.process_frame(frame)
+					yolo_result = self.yolo_pose_detector.process_frame(frame)
+					
+					# Combine results (simplified: prefer YOLO if available, else MediaPipe)
+					if yolo_result:
+						result = yolo_result
+						# Convert YOLO 17 keypoints to MediaPipe 33 format (approximate)
+						# For now, just use YOLO result directly
+					elif mp_result:
+						result = mp_result
+				else:
+					# Default: MediaPipe
+					result = self.pose_detector.process_frame(frame)
+				
 				if result:
-					pose_results.append({
-						"frame_idx": idx,
-						"landmarks": result["landmarks"],
-						"confidence": result["confidence"],
-						"timestamp_ms": (idx / fps) * 1000.0 if fps > 0 else idx * 33.33,
-					})
+					# Validate landmarks structure
+					landmarks = result.get("landmarks")
+					if landmarks is not None:
+						# Ensure landmarks is numpy array with correct shape
+						if not isinstance(landmarks, np.ndarray):
+							landmarks = np.array(landmarks)
+						
+						# Ensure it's [33, 3] or [33, 2]
+						if len(landmarks.shape) == 1:
+							landmarks = landmarks.reshape(-1, 3) if len(landmarks) % 3 == 0 else landmarks.reshape(-1, 2)
+						
+						# Pad to [33, 3] if needed
+						if landmarks.shape[0] < 33:
+							padded = np.zeros((33, 3))
+							padded[:landmarks.shape[0], :landmarks.shape[1]] = landmarks
+							landmarks = padded
+						
+						pose_results.append({
+							"frame_idx": idx,
+							"landmarks": landmarks,
+							"confidence": result.get("confidence", np.ones(33)),
+							"timestamp_ms": (idx / fps) * 1000.0 if fps > 0 else idx * 33.33,
+						})
 			except Exception as e:
 				handle_processing_error(e, context=f"Pose detection frame {idx}", return_default=None)
 
@@ -262,6 +315,28 @@ class VideoProcessingPipeline:
 			except Exception as e:
 				print(f"Database storage failed: {e}")
 
+		# Step 10: Generate annotated video
+		annotated_video_path = None
+		try:
+			from ..utils.video_annotator import annotate_video
+			
+			# Create processed directory
+			processed_dir = Path(video_path).parent / "processed"
+			processed_dir.mkdir(parents=True, exist_ok=True)
+			
+			# Generate annotated video
+			annotated_video_path = annotate_video(
+				video_path=video_path,
+				pose_results=pose_results,
+				phases=phases,
+				ball_trajectory=ball_trajectory,
+				output_path=str(processed_dir / f"{Path(video_path).stem}_annotated.mp4"),
+				fps=fps,
+			)
+		except Exception as e:
+			print(f"Video annotation failed: {e}")
+			annotated_video_path = None
+		
 		return {
 			"video_id": video_id,
 			"metrics": metrics,
@@ -275,6 +350,7 @@ class VideoProcessingPipeline:
 				}
 				for p in phases
 			],
+			"annotated_video_path": annotated_video_path,
 			"pose_results": len(pose_results),
 			"hand_results": len(hand_results),
 			"ball_trajectory_length": len(ball_trajectory) if ball_trajectory else 0,
