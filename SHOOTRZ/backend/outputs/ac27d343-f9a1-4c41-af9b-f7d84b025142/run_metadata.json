@@ -1,0 +1,32 @@
+{
+  "run_id": "ac27d343-f9a1-4c41-af9b-f7d84b025142",
+  "timestamp": "2026-01-14T14:29:36.780757",
+  "created_at": "2026-01-14 14:29:36",
+  "input_video": "D:\\Users\\Badr\\myprojects\\Grad\\SHOOTRZ\\backend\\outputs\\ac27d343-f9a1-4c41-af9b-f7d84b025142\\input_video.mp4",
+  "video_path": "C:\\Users\\Badr\\AppData\\Local\\Temp\\tmps4_4ug70.mp4",
+  "video_metadata": {
+    "video_path": "C:\\Users\\Badr\\AppData\\Local\\Temp\\tmps4_4ug70.mp4",
+    "fps": 56.184276414621934,
+    "frame_count": 187,
+    "width": 1080,
+    "height": 1920,
+    "duration_seconds": 3.328333333333333,
+    "resolution": "1080x1920"
+  },
+  "quality_warnings": [],
+  "shooting_side": "right",
+  "pose_frames_detected": 187,
+  "shot_window": {
+    "start_frame": 87,
+    "crouch_frame": 97,
+    "release_frame": 112,
+    "end_frame": 132,
+    "confidence": "high",
+    "confidence_score": 0.8073141,
+    "method": "knee_minimum_wrist_peak",
+    "crouch_confidence": 0.8073141,
+    "release_confidence": 0.993522
+  },
+  "overall_score": 23,
+  "metrics_count": 3
+}

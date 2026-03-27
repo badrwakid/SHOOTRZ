@@ -271,20 +271,25 @@ def annotate_video(
 	
 	frame_idx = 0
 	
-	# Create phase map for quick lookup
+	# Create frame-to-phase mapping for quick lookup
 	phase_map = {}
 	if phases:
 		for phase in phases:
-			phase_name = phase.get("phase")
-			if isinstance(phase_name, str):
-				phase_name = phase_name.lower()
+			phase_obj = phase.get("phase")
+			# Handle both enum and string phase names
+			if isinstance(phase_obj, str):
+				phase_name = phase_obj.lower()
 			else:
-				# Handle enum
-				phase_name = str(phase_name).lower().split('.')[-1]
+				# Handle ShootingPhase enum
+				try:
+					phase_name = phase_obj.value if hasattr(phase_obj, 'value') else str(phase_obj).lower().split('.')[-1]
+				except:
+					phase_name = str(phase_obj).lower().split('.')[-1]
 			
 			start_frame = phase.get("start_frame", 0)
 			end_frame = phase.get("end_frame", len(pose_results) - 1)
 			
+			# Assign phase to all frames in range
 			for f in range(start_frame, end_frame + 1):
 				phase_map[f] = phase_name
 	

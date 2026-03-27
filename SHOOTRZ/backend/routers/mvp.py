@@ -17,6 +17,7 @@ import json
 import pandas as pd
 import numpy as np
 import time
+import traceback
 
 import sys
 from pathlib import Path as PathLib
@@ -31,6 +32,7 @@ from mvp.core.pipeline import MVPPipeline
 from utils.id_gen import generate_job_id
 from utils.video_annotator import annotate_video
 from inference.pose_2d import BASKETBALL_KEYPOINTS
+from inference.phase_detector import PhaseDetector
 
 router = APIRouter(prefix="/mvp", tags=["mvp"])
 logger = logging.getLogger(__name__)
@@ -264,15 +266,78 @@ def _process_video_job(
                         "confidence": confidence
                     })
                 
+                # Use new motion-based phase detector with validation and detailed logging
                 phases = []
-                if shot_window_path.exists():
-                    with open(shot_window_path, "r") as f:
-                        sw = json.load(f)
-                    phases = [
-                        {"phase": "start", "start_frame": sw.get("start_frame", 0), "end_frame": sw.get("crouch_frame", 0)},
-                        {"phase": "crouch", "start_frame": sw.get("crouch_frame", 0), "end_frame": sw.get("release_frame", 0)},
-                        {"phase": "release", "start_frame": sw.get("release_frame", 0), "end_frame": sw.get("end_frame", sw.get("release_frame", 0))},
-                    ]
+                try:
+                    # Validate pose_results format
+                    if not pose_results:
+                        raise ValueError("pose_results is empty - cannot detect phases")
+                    first_result = pose_results[0]
+                    if "landmarks" not in first_result:
+                        raise ValueError("pose_results missing 'landmarks' key")
+                    landmarks_shape = first_result["landmarks"].shape
+                    logger.info(
+                        "Phase detection input ready",
+                        extra={
+                            "run_id": result.get("run_id"),
+                            "frames": len(pose_results),
+                            "landmarks_shape": landmarks_shape,
+                        },
+                    )
+                    if landmarks_shape[0] < 33:
+                        logger.warning(
+                            "Landmarks count is less than 33 (got %s)",
+                            landmarks_shape[0],
+                        )
+
+                    # Run detector
+                    fps = pose_json.get("video_metadata", {}).get("fps", 30.0)
+                    logger.info(
+                        "Starting phase detection",
+                        extra={
+                            "run_id": result.get("run_id"),
+                            "fps": fps,
+                            "frames": len(pose_results),
+                        },
+                    )
+                    phase_detector = PhaseDetector(fps=fps)
+                    phases = phase_detector.detect_phases(pose_results)
+
+                    # Verify results are from new detector
+                    if phases:
+                        phase_names = [p.get("phase") for p in phases]
+                        has_peak = any("peak_frame" in p for p in phases)
+                        logger.info(
+                            "Phase detection success",
+                            extra={
+                                "run_id": result.get("run_id"),
+                                "phase_count": len(phases),
+                                "phases": phase_names,
+                                "has_peak_frame": has_peak,
+                            },
+                        )
+                        if "start" in phase_names:
+                            raise ValueError("Phase detection returned old format ('start' phase present)")
+                        if not has_peak:
+                            logger.warning("Phases missing peak_frame; ensure new detector is used")
+                        # Track detector version and timestamp
+                        job_store[job_id]["phase_detector_version"] = "motion_based_v2"
+                        job_store[job_id]["phase_detected_at"] = time.time()
+                    else:
+                        logger.warning("Phase detector returned empty phases")
+                except Exception as phase_err:
+                    logger.warning(f"Phase detection failed: {phase_err}, using fallback", exc_info=True)
+                    # Fallback to old method if phase detector fails
+                    if shot_window_path.exists():
+                        with open(shot_window_path, "r") as f:
+                            sw = json.load(f)
+                        phases = [
+                            {"phase": "stance", "start_frame": sw.get("start_frame", 0), "end_frame": sw.get("crouch_frame", 0)},
+                            {"phase": "crouch", "start_frame": sw.get("crouch_frame", 0), "end_frame": sw.get("release_frame", 0)},
+                            {"phase": "release", "start_frame": sw.get("release_frame", 0), "end_frame": sw.get("end_frame", sw.get("release_frame", 0))},
+                        ]
+                    job_store[job_id]["phase_detector_version"] = "fallback"
+                    job_store[job_id]["phase_detected_at"] = time.time()
                 
                 annotate_video(
                     video_path=overlay_video_path,
@@ -618,3 +683,69 @@ async def get_artifact(run_id: str, filename: str):
         media_type=media_type,
         filename=filename
     )
+
+
+@router.get("/mvp/test-phase-detection/{run_id}")
+async def test_phase_detection(run_id: str):
+    """
+    Debug endpoint to verify motion-based phase detection is working on a given run.
+    Reads pose_keypoints.json from outputs/{run_id} and runs PhaseDetector.
+    """
+    try:
+        pose_json_path = Path(f"outputs/{run_id}/pose_keypoints.json")
+        if not pose_json_path.exists():
+            raise HTTPException(status_code=404, detail=f"pose_keypoints.json not found for run_id={run_id}")
+
+        with open(pose_json_path, "r") as f:
+            pose_json = json.load(f)
+
+        pose_frames = pose_json.get("frames", [])
+        keypoint_count = max(BASKETBALL_KEYPOINTS.values()) + 1
+        pose_results = []
+
+        for frame in pose_frames:
+            frame_idx = frame.get("frame_idx", 0)
+            joints = frame.get("joints", {})
+
+            landmarks = np.zeros((keypoint_count, 3), dtype=float)
+            confidence = np.zeros((keypoint_count,), dtype=float)
+
+            for joint_name, joint_data in joints.items():
+                if joint_name not in BASKETBALL_KEYPOINTS:
+                    continue
+                idx = BASKETBALL_KEYPOINTS[joint_name]
+                landmarks[idx, 0] = joint_data.get("x_norm", 0.0)
+                landmarks[idx, 1] = joint_data.get("y_norm", 0.0)
+                landmarks[idx, 2] = joint_data.get("z_norm", 0.0)
+                confidence[idx] = joint_data.get("confidence", 0.0)
+
+            pose_results.append(
+                {
+                    "frame_idx": frame_idx,
+                    "landmarks": landmarks,
+                    "confidence": confidence,
+                }
+            )
+
+        if not pose_results:
+            raise HTTPException(status_code=400, detail="pose_results is empty")
+
+        fps = pose_json.get("video_metadata", {}).get("fps", 30.0)
+        phase_detector = PhaseDetector(fps=fps)
+        phases = phase_detector.detect_phases(pose_results)
+
+        return {
+            "success": True,
+            "run_id": run_id,
+            "phase_count": len(phases),
+            "phases": phases,
+            "fps": fps,
+            "landmarks_shape": list(pose_results[0]["landmarks"].shape),
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "run_id": run_id,
+            "error": str(e),
+            "traceback": traceback.format_exc(),
+        }
