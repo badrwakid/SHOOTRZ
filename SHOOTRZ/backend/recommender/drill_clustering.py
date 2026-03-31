@@ -28,8 +28,18 @@ def load_drill_metadata():
 
     return drills
 
+def _load_embeddings_or_regenerate():
+    emb = np.load(EMBED_PATH, allow_pickle=False)
+    if emb.ndim != 2 or emb.size == 0:
+        raise ValueError("Invalid drill_embeddings array")
+    return emb.astype("float32")
+
+
 def load_drill_embeddings():
     _ensure_storage_exists()
 
-    emb = np.load(EMBED_PATH).astype("float32")
-    return emb
+    try:
+        return _load_embeddings_or_regenerate()
+    except (OSError, ValueError, EOFError):
+        generate_dummy_storage(STORAGE_DIR)
+        return _load_embeddings_or_regenerate()

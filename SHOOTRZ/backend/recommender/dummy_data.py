@@ -109,7 +109,7 @@ def generate_dummy_storage(
     index.add(embeddings)
     faiss.write_index(index, str(storage_dir / "faiss_index.bin"))
 
-    print("✅ Realistic basketball dummy data generated")
+    print("[OK] Realistic basketball dummy data generated")
     print(metadata["family"].value_counts())
     print(metadata["tier"].value_counts())
 
