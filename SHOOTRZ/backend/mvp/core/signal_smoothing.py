@@ -48,6 +48,7 @@ class SignalSmoother:
         for joint in pose_keypoints_df["joint"].unique():
             joint_df = pose_keypoints_df[pose_keypoints_df["joint"] == joint].copy()
             joint_df = joint_df.sort_values("frame_id")
+            joint_df = joint_df.reset_index(drop=True)
             
             # Handle missing data and smooth
             joint_smoothed = self._process_joint_timeseries(joint_df)
