@@ -46,9 +46,12 @@ def recommend_drill(user_vec, user_context, drills, labels, tiers, faiss_index, 
     ue = np.asarray(user_vec, dtype="float32").reshape(1, -1)
     ue /= (np.linalg.norm(ue, axis=1, keepdims=True) + 1e-9)
 
-    # FAISS search
+    # FAISS search (FAISS uses -1 for invalid / padding slots; must not use as array index)
     _, indices = faiss_index.search(ue, 10)
     neighbor_ids = indices[0]
+    valid_neighbors = [int(i) for i in np.asarray(neighbor_ids).ravel() if int(i) >= 0]
+    if not valid_neighbors:
+        raise RuntimeError("FAISS returned no valid neighbor indices")
 
     # Bandit expected rewards (dict: arm -> score)
     expectations = linucb_expectation_scores(bandit, user_context)
@@ -63,7 +66,8 @@ def recommend_drill(user_vec, user_context, drills, labels, tiers, faiss_index, 
 
     # Filter FAISS neighbors by the bandit's chosen cluster & tier
     pool = [
-        i for i in neighbor_ids
+        i
+        for i in valid_neighbors
         if labels[i] == target_cluster and tiers[i] == target_tier
     ]
 
@@ -76,7 +80,7 @@ def recommend_drill(user_vec, user_context, drills, labels, tiers, faiss_index, 
         pick = int(pool[0])
         effective_arm = best_arm
     else:
-        pick = int(neighbor_ids[0])
+        pick = int(valid_neighbors[0])
         drill_cluster = int(drills.loc[pick, "cluster"])
         drill_tier = int(drills.loc[pick, "tier"])
         effective_arm = f"C{drill_cluster}_T{drill_tier}"
