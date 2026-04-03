@@ -25,11 +25,11 @@ npm install
 npm start
 ```
 
-## Active Architecture
+## Architecture
 
-- Current verified architecture: `ARCHITECTURE_CURRENT.md`
-- Active module inventory: `ACTIVE_MODULES.md`
-- Deprecated/noise inventory: `DEPRECATED_MODULES.md`
+- API: `backend/routers`, entry `backend/main.py`
+- MVP pipeline: `backend/mvp/core/pipeline.py`
+- Contracts: `backend/contracts`, `src/types/contracts`
 
 ## MVP-Critical Flow
 
