@@ -52,6 +52,57 @@ export interface AnalysisResult {
     release: number;
     bodyAlignment: number;
   };
+  mvp?: {
+    scoreComponents?: Array<{
+      name: string;
+      value: number;
+      weight: number;
+    }>;
+    keyFrameImages?: {
+      start?: string;
+      crouch?: string;
+      release?: string;
+      end?: string;
+    };
+    shotWindow?: {
+      start_frame?: number;
+      crouch_frame?: number;
+      release_frame?: number;
+      end_frame?: number;
+      confidence?: string;
+    };
+    events?: {
+      start?: {
+        frame?: number | null;
+        timestamp?: number | null;
+        status?: string;
+        confidence?: number;
+        reason_codes?: string[];
+      };
+      crouch?: {
+        frame?: number | null;
+        timestamp?: number | null;
+        status?: string;
+        confidence?: number;
+        reason_codes?: string[];
+      };
+      release?: {
+        frame?: number | null;
+        timestamp?: number | null;
+        status?: string;
+        confidence?: number;
+        reason_codes?: string[];
+      };
+      end?: {
+        frame?: number | null;
+        timestamp?: number | null;
+        status?: string;
+        confidence?: number;
+        reason_codes?: string[];
+      };
+    };
+    diagnostics?: Record<string, unknown>;
+  };
 }
 
 class StorageService {

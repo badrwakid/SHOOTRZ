@@ -1,4 +1,10 @@
 import axios, { AxiosResponse } from 'axios';
+import type {
+	HealthResponse as ApiHealthResponse,
+	HistoryResponse,
+	HistoryStatsResponse,
+	MVPResultResponse as ApiMVPResultResponse,
+} from '../types/contracts';
 
 // FastAPI Backend (port 8000)
 // - iOS Simulator: Use 'http://127.0.0.1:8000' or 'http://localhost:8000'
@@ -165,6 +171,89 @@ export interface HealthResponse {
   uptime: number;
 }
 
+export interface MVPMetric {
+	name: string
+	value: number
+	unit: string
+	verdict: 'Good' | 'Needs Work' | 'Low Confidence'
+	explanation: string
+	confidence: number
+	frame_range?: [number, number]
+}
+
+export interface MVPScoreComponent {
+	name: string
+	value: number
+	unit: string
+	weight: number
+	explanation: string
+}
+
+export interface MVPResultResponse {
+	status: 'queued' | 'processing' | 'completed' | 'failed'
+	contract_version?: string
+	run_id?: string
+	overall_score?: number
+	feedback_summary?: string
+	feedback_bullets?: string[]
+	metrics?: MVPMetric[]
+	score_components?: MVPScoreComponent[]
+	shot_window?: {
+		start_frame?: number
+		crouch_frame?: number
+		release_frame?: number
+		end_frame?: number
+		confidence?: string
+		confidence_score?: number
+	}
+	events?: {
+		start?: MVPEvent
+		crouch?: MVPEvent
+		release?: MVPEvent
+		end?: MVPEvent
+	}
+	angles_data?: {
+		frames: number[]
+		timestamps: number[]
+		elbow: Array<number | null>
+		knee: Array<number | null>
+		wrist: Array<number | null>
+	}
+	artifacts?: {
+		overlay_video?: string | null
+		angles_csv?: string
+		report_json?: string
+		event_candidates?: string
+		event_confidence?: string
+		feature_table?: string
+		signals_smoothed?: string
+		warnings?: string
+	}
+	key_frame_images?: {
+		start?: string
+		crouch?: string
+		release?: string
+		end?: string
+	}
+	diagnostics?: Record<string, unknown>
+	quality_warnings?: string[]
+	error?: string
+	error_detail?: string
+}
+
+export interface MVPEvent {
+	frame?: number | null
+	timestamp?: number | null
+	status?: 'detected' | 'estimated' | 'missing' | string
+	confidence?: number
+	reason_codes?: string[]
+	alternatives?: Array<{
+		frame_id: number
+		score: number
+		kind: string
+	}>
+}
+
 export interface PerformanceResponse {
   success: boolean;
   summary: {
@@ -220,9 +309,6 @@ class ApiService {
    * MVP Analysis - Analyze video with deterministic pipeline
    */
   async analyzeMVP(videoUri: string, shootingSide: string = 'auto'): Promise<{ job_id: string; status: string }> {
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/ab7e580c-562f-4fa3-bc63-01f120e7455b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api.service.ts:222',message:'analyzeMVP entry',data:{videoUri:videoUri?.substring(0,50),shootingSide,baseURL:this.baseURL,timeout:this.timeout},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,B,C'})}).catch(()=>{});
-    // #endregion
     try {
       if (!videoUri || videoUri.trim() === '') {
         throw new Error('Invalid video URI: URI is empty');
@@ -231,10 +317,6 @@ class ApiService {
       const formData = new FormData();
       const filename = this.getVideoFilename(videoUri);
       const requestUrl = `${this.baseURL}/mvp/analyze`;
-      
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/ab7e580c-562f-4fa3-bc63-01f120e7455b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api.service.ts:232',message:'Before request',data:{requestUrl,filename,hasVideoUri:!!videoUri},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,B,C'})}).catch(()=>{});
-      // #endregion
       
       formData.append('file', {
         uri: videoUri,
@@ -245,11 +327,6 @@ class ApiService {
       if (__DEV__) {
         console.log('📹 MVP Analysis - Uploading video:', { filename, shootingSide });
       }
-
-      const requestStartTime = Date.now();
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/ab7e580c-562f-4fa3-bc63-01f120e7455b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api.service.ts:245',message:'Request starting',data:{requestUrl,timeout:this.timeout},timestamp:requestStartTime,sessionId:'debug-session',runId:'run1',hypothesisId:'A,B,C'})}).catch(()=>{});
-      // #endregion
 
       let response;
       try {
@@ -267,19 +344,12 @@ class ApiService {
           }
         );
 
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/ab7e580c-562f-4fa3-bc63-01f120e7455b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api.service.ts:260',message:'Request success',data:{status:response.status,data:response.data,elapsed:Date.now()-requestStartTime},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,B,C'})}).catch(()=>{});
-        // #endregion
-
         if (__DEV__) {
           console.log('✅ MVP Analysis queued:', response.data);
         }
 
         return { job_id: response.data.job_id, status: response.data.status };
       } catch (axiosError: any) {
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/ab7e580c-562f-4fa3-bc63-01f120e7455b',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api.service.ts:270',message:'Request error',data:{hasResponse:!!axiosError.response,hasRequest:!!axiosError.request,message:axiosError.message,code:axiosError.code,elapsed:Date.now()-requestStartTime},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,B,C,D'})}).catch(()=>{});
-        // #endregion
         throw axiosError;
       }
     } catch (error: any) {
@@ -301,7 +371,7 @@ class ApiService {
   /**
    * Get MVP analysis result
    */
-  async getMVPResult(jobId: string): Promise<any> {
+  async getMVPResult(jobId: string): Promise<ApiMVPResultResponse> {
     try {
       const response = await axios.get(`${this.baseURL}/mvp/result/${jobId}`, {
         timeout: 30000,
@@ -342,7 +412,7 @@ class ApiService {
         console.log(`🏥 Health check: GET ${healthUrl}`);
       }
       
-      const response: AxiosResponse<HealthResponse> = await axios.get(healthUrl, {
+      const response: AxiosResponse<ApiHealthResponse> = await axios.get(healthUrl, {
         timeout: 5000,
         validateStatus: (status) => status < 500, // Don't throw on 404, just return false
       });
@@ -378,9 +448,9 @@ class ApiService {
   /**
    * Get detailed health information
    */
-  async getHealthInfo(): Promise<HealthResponse | null> {
+  async getHealthInfo(): Promise<ApiHealthResponse | null> {
     try {
-      const response: AxiosResponse<HealthResponse> = await axios.get(`${this.baseURL}/health`, {
+      const response: AxiosResponse<ApiHealthResponse> = await axios.get(`${this.baseURL}/health`, {
         timeout: 5000,
       });
 
@@ -451,7 +521,11 @@ class ApiService {
   /**
    * Get user's analysis history
    */
-  async getHistory(userId: string, limit?: number, offset?: number): Promise<any> {
+  async getHistory(
+    userId: string,
+    limit?: number,
+    offset?: number
+  ): Promise<HistoryResponse> {
     try {
       const params = new URLSearchParams()
       if (limit) params.append('limit', limit.toString())
@@ -471,7 +545,7 @@ class ApiService {
   /**
    * Get history statistics
    */
-  async getHistoryStats(userId: string): Promise<any> {
+  async getHistoryStats(userId: string): Promise<HistoryStatsResponse> {
     try {
       const response = await axios.get(
         `${this.baseURL}/history/${userId}/stats`,

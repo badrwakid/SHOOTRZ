@@ -20,7 +20,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { SHOOTRZ_THEME, COMPONENT_STYLES } from '../constants/theme'
 import { hapticFeedback } from '../utils/hapticFeedback'
 import { chatService } from '../services/chat.service'
-import type { ChatMessageDto } from '../services/chat.service'
+import type { ChatMessageDto } from '../types/contracts'
 import { chatStorageService } from '../services/chat-storage.service'
 
 type MessageStatus = 'sent' | 'sending' | 'failed'

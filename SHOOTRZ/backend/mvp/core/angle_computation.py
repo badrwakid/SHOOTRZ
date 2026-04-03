@@ -9,15 +9,9 @@ import numpy as np
 import pandas as pd
 from pathlib import Path
 from typing import Dict, Any, List
-import sys
 
-# Add backend to path
-backend_path = Path(__file__).parent.parent.parent
-if str(backend_path) not in sys.path:
-    sys.path.insert(0, str(backend_path))
-
-from metrics.biomechanics import joint_angle
-from inference.pose_2d import BASKETBALL_KEYPOINTS
+from backend.metrics.biomechanics import joint_angle
+from backend.inference.pose_2d import BASKETBALL_KEYPOINTS
 
 
 class AngleComputer:

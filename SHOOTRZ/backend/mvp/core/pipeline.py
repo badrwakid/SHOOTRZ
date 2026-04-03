@@ -5,9 +5,12 @@ Coordinates all processing steps from video ingestion to final report.
 """
 
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 import sys
 import shutil
+import json
+
+import pandas as pd
 
 # Add backend to path
 backend_path = Path(__file__).parent.parent.parent
@@ -116,7 +119,6 @@ class MVPPipeline:
         
         # PHASE 3: Signal Smoothing
         smoother = SignalSmoother(self.config.get("smoothing", {}))
-        import pandas as pd
         pose_df = pd.read_csv(self.run_tracker.get_output_path("pose_keypoints.csv"))
         smoothed_df = smoother.smooth_keypoints(pose_df)
         smoother.export_smoothed_csv(
@@ -142,7 +144,29 @@ class MVPPipeline:
             shot_window,
             self.run_tracker.get_output_path("shot_window.json")
         )
-        
+
+        diag = shot_window.get("diagnostics") or {}
+        with open(self.run_tracker.get_output_path("event_candidates.json"), "w") as ef:
+            json.dump(diag.get("candidates", {}), ef, indent=2)
+        warnings_list = list(diag.get("warnings", []))
+        warnings_list.extend(
+            quality_warnings_list(shot_window, angles_df, video_metadata)
+        )
+        with open(self.run_tracker.get_output_path("warnings.json"), "w") as wf:
+            json.dump({"warnings": warnings_list}, wf, indent=2)
+
+        with open(self.run_tracker.get_output_path("event_confidence.json"), "w") as cf:
+            json.dump(shot_window.get("events") or {}, cf, indent=2)
+        build_feature_table(
+            angles_df,
+            smoothed_df,
+            self.run_tracker.get_output_path("feature_table.csv"),
+        )
+        export_smoothed_signals(
+            smoothed_df,
+            self.run_tracker.get_output_path("signals_smoothed.csv"),
+        )
+
         self.run_tracker.add_metadata("shot_window", shot_window)
         
         # PHASE 6: Metrics Derivation
@@ -151,13 +175,17 @@ class MVPPipeline:
             "scoring": self.config.get("scoring", {})
         })
         metrics = metrics_derivation.derive_metrics(angles_df, shot_window)
-        overall_score, feedback_summary = metrics_derivation.compute_overall_score(metrics)
+        overall_score, feedback_summary, feedback_bullets, score_components = (
+            metrics_derivation.compute_overall_score(metrics, angles_df, shot_window)
+        )
         
         metrics_derivation.export_report_json(
             metrics,
             overall_score,
             feedback_summary,
-            self.run_tracker.get_output_path("report.json")
+            self.run_tracker.get_output_path("report.json"),
+            score_components=score_components,
+            feedback_bullets=feedback_bullets,
         )
         
         self.run_tracker.add_metadata("overall_score", overall_score)
@@ -172,10 +200,114 @@ class MVPPipeline:
             "status": "completed",
             "overall_score": overall_score,
             "feedback_summary": feedback_summary,
+            "feedback_bullets": feedback_bullets,
+            "score_components": score_components,
             "metrics": metrics,
             "shot_window": shot_window,
             "shooting_side": detected_side,
             "video_metadata": video_metadata,
             "quality_warnings": video_loader.quality_warnings,
             "output_dir": str(self.run_tracker.get_run_dir()),
+            "diagnostics": build_pipeline_diagnostics(shot_window, score_components),
         }
+
+
+def quality_warnings_list(
+    shot_window: Dict[str, Any],
+    angles_df,
+    video_metadata: Optional[Dict[str, Any]] = None,
+) -> list:
+    out = []
+    sw = shot_window.get("confidence_score", 1.0) or 0.0
+    if sw < 0.45:
+        out.append("low_event_confidence")
+    if angles_df is not None and len(angles_df) < 15:
+        out.append("few_angle_frames")
+    if video_metadata:
+        fps = float(video_metadata.get("fps") or 0.0)
+        if 0 < fps < 24:
+            out.append("low_fps")
+        if fps > 60:
+            out.append("high_fps_unusual")
+    seen = set()
+    uniq = []
+    for w in out:
+        if w not in seen:
+            uniq.append(w)
+            seen.add(w)
+    return uniq
+
+
+def export_smoothed_signals(smoothed_df: pd.DataFrame, output_path: Path) -> None:
+    cols = [
+        "frame_id",
+        "joint",
+        "x_norm_smooth",
+        "y_norm_smooth",
+        "confidence",
+        "interpolated",
+    ]
+    available = [c for c in cols if c in smoothed_df.columns]
+    if not available:
+        return
+    smoothed_df[available].to_csv(output_path, index=False)
+
+
+def build_feature_table(
+    angles_df: pd.DataFrame,
+    smoothed_df: pd.DataFrame,
+    output_path: Path,
+) -> None:
+    rows: List[Dict[str, Any]] = []
+    for _, row in angles_df.iterrows():
+        rows.append(
+            {
+                "frame_id": int(row["frame_id"]),
+                "timestamp": float(row["timestamp"]),
+                "knee_angle": None
+                if pd.isna(row["knee_angle"])
+                else float(row["knee_angle"]),
+                "elbow_angle": None
+                if pd.isna(row["elbow_angle"])
+                else float(row["elbow_angle"]),
+                "wrist_angle": None
+                if pd.isna(row["wrist_angle"])
+                else float(row["wrist_angle"]),
+                "confidence_knee": float(row.get("confidence_knee", 0.0)),
+                "confidence_elbow": float(row.get("confidence_elbow", 0.0)),
+                "confidence_wrist": float(row.get("confidence_wrist", 0.0)),
+            }
+        )
+    feature_df = pd.DataFrame(rows)
+    if "joint" in smoothed_df.columns and "y_norm_smooth" in smoothed_df.columns:
+        hips = smoothed_df[smoothed_df["joint"].str.contains("_hip", na=False)][
+            ["frame_id", "y_norm_smooth"]
+        ].groupby("frame_id", as_index=False).mean().rename(
+            columns={"y_norm_smooth": "hip_y_smooth"}
+        )
+        wrists = smoothed_df[smoothed_df["joint"].str.contains("_wrist", na=False)][
+            ["frame_id", "y_norm_smooth"]
+        ].groupby("frame_id", as_index=False).mean().rename(
+            columns={"y_norm_smooth": "wrist_y_smooth"}
+        )
+        feature_df = feature_df.merge(hips, on="frame_id", how="left").merge(
+            wrists, on="frame_id", how="left"
+        )
+    feature_df.to_csv(output_path, index=False)
+
+
+def build_pipeline_diagnostics(
+    shot_window: Dict[str, Any],
+    score_components: list,
+) -> Dict[str, Any]:
+    """Compact diagnostics for API consumers."""
+    diag = shot_window.get("diagnostics") or {}
+    return {
+        "event_method": shot_window.get("method"),
+        "event_confidence_score": shot_window.get("confidence_score"),
+        "event_warnings": diag.get("warnings", []),
+        "score_component_summary": [
+            {"name": c["name"], "value": c["value"], "weight": c["weight"]}
+            for c in (score_components or [])
+        ],
+    }

@@ -66,21 +66,30 @@ class MediaPipePoseDetector:
 		)
 		self.keypoints_map = BASKETBALL_KEYPOINTS
 
-	def process_frame(self, frame: np.ndarray) -> Optional[Dict[str, np.ndarray]]:
+	def process_frame(
+		self,
+		frame: np.ndarray,
+		*,
+		input_is_rgb: bool = True,
+	) -> Optional[Dict[str, np.ndarray]]:
 		"""
 		Process a single frame to extract pose landmarks.
-		
+
 		Args:
-			frame: RGB image frame [H, W, 3]
-		
+			frame: Image frame [H, W, 3]. When input_is_rgb is True (MVP pipeline:
+				frames from VideoLoader are already RGB), pass through. When False
+				(opencv VideoCapture BGR), convert to RGB once.
+			input_is_rgb: If True, MediaPipe receives ``frame`` as RGB unchanged.
+
 		Returns:
 			Dict with 'landmarks' [33, 3], 'confidence' [33], or None if no detection
 		"""
-		# MediaPipe expects RGB
-		if frame.shape[2] == 3:
-			frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+		if frame.ndim != 3 or frame.shape[2] != 3:
+			return None
+		if input_is_rgb:
+			frame_rgb = np.ascontiguousarray(frame)
 		else:
-			frame_rgb = frame
+			frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
 		pose_results = self.pose.process(frame_rgb)
 
@@ -143,8 +152,8 @@ class MediaPipePoseDetector:
 				frame_idx += 1
 				continue
 
-			# Process frame
-			result = self.process_frame(frame)
+			# OpenCV yields BGR
+			result = self.process_frame(frame, input_is_rgb=False)
 			if result is not None:
 				timestamp_ms = (frame_idx / fps) * 1000.0 if fps > 0 else frame_idx * 33.33
 
@@ -236,7 +245,7 @@ def run_pose_2d_on_frames(frames: List[np.ndarray]) -> Dict[str, any]:
 	results = []
 
 	for idx, frame in enumerate(frames):
-		result = detector.process_frame(frame)
+		result = detector.process_frame(frame, input_is_rgb=True)
 		if result is not None:
 			results.append({
 				"frame_idx": idx,

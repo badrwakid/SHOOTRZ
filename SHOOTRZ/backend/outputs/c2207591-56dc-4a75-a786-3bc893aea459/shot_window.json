@@ -1,0 +1,303 @@
+{
+  "start_frame": 0,
+  "crouch_frame": 8,
+  "release_frame": 325,
+  "end_frame": 330,
+  "confidence": "low",
+  "confidence_score": 0.22021062204823513,
+  "method": "fused_temporal",
+  "crouch_confidence": 0.59450176,
+  "release_confidence": 0.22021062204823513,
+  "start_confidence": 0.8,
+  "end_confidence": 0.75,
+  "events": {
+    "start": {
+      "frame": 0,
+      "confidence": 0.8,
+      "status": "detected",
+      "reason_codes": [],
+      "alternatives": [
+        {
+          "frame_id": 0,
+          "score": 0.8,
+          "kind": "energy_onset"
+        },
+        {
+          "frame_id": 0,
+          "score": 0.4,
+          "kind": "pre_frames_fallback"
+        }
+      ]
+    },
+    "crouch": {
+      "frame": 8,
+      "confidence": 0.59450176,
+      "status": "estimated",
+      "reason_codes": [],
+      "alternatives": [
+        {
+          "frame_id": 9,
+          "score": 0.6,
+          "kind": "wrist_dip"
+        },
+        {
+          "frame_id": 8,
+          "score": 0.59450176,
+          "kind": "fused"
+        },
+        {
+          "frame_id": 8,
+          "score": 0.34450176,
+          "kind": "knee_min"
+        }
+      ]
+    },
+    "release": {
+      "frame": 325,
+      "confidence": 0.22021062204823513,
+      "status": "missing",
+      "reason_codes": [
+        "release_weak_evidence"
+      ],
+      "alternatives": [
+        {
+          "frame_id": 325,
+          "score": 0.6532318273730836,
+          "kind": "peak"
+        },
+        {
+          "frame_id": 346,
+          "score": 0.5129316542785558,
+          "kind": "vel_zero"
+        },
+        {
+          "frame_id": 340,
+          "score": 0.5100313770895394,
+          "kind": "vel_zero"
+        }
+      ]
+    },
+    "end": {
+      "frame": 330,
+      "confidence": 0.75,
+      "status": "detected",
+      "reason_codes": [],
+      "alternatives": [
+        {
+          "frame_id": 330,
+          "score": 0.75,
+          "kind": "wrist_settle"
+        }
+      ]
+    }
+  },
+  "diagnostics": {
+    "method": "fused_temporal",
+    "candidates": {
+      "crouch": {
+        "base_frame": 8,
+        "base_confidence": 0.34450176,
+        "candidates": [
+          {
+            "frame_id": 8,
+            "score": 0.34450176,
+            "kind": "knee_min"
+          },
+          {
+            "frame_id": 9,
+            "score": 0.6,
+            "kind": "wrist_dip"
+          },
+          {
+            "frame_id": 8,
+            "score": 0.59450176,
+            "kind": "fused"
+          }
+        ],
+        "knee_min_frame": 8,
+        "fused_frame": 8,
+        "hip_boost": 0.15,
+        "wrist_boost": 0.1
+      },
+      "release": {
+        "candidates": [
+          {
+            "frame_id": 29,
+            "score": 0.24730988599999942,
+            "kind": "peak"
+          },
+          {
+            "frame_id": 129,
+            "score": 0.37498436800000057,
+            "kind": "peak"
+          },
+          {
+            "frame_id": 325,
+            "score": 0.6532318273730836,
+            "kind": "peak"
+          },
+          {
+            "frame_id": 17,
+            "score": 0.4887462335776322,
+            "kind": "vel_zero"
+          },
+          {
+            "frame_id": 29,
+            "score": 0.45750393837703507,
+            "kind": "vel_zero"
+          },
+          {
+            "frame_id": 31,
+            "score": 0.46437415819257905,
+            "kind": "vel_zero"
+          },
+          {
+            "frame_id": 36,
+            "score": 0.4713487829548279,
+            "kind": "vel_zero"
+          },
+          {
+            "frame_id": 48,
+            "score": 0.5,
+            "kind": "vel_zero"
+          },
+          {
+            "frame_id": 54,
+            "score": 0.5,
+            "kind": "vel_zero"
+          },
+          {
+            "frame_id": 59,
+            "score": 0.5,
+            "kind": "vel_zero"
+          },
+          {
+            "frame_id": 66,
+            "score": 0.5,
+            "kind": "vel_zero"
+          },
+          {
+            "frame_id": 84,
+            "score": 0.5,
+            "kind": "vel_zero"
+          },
+          {
+            "frame_id": 95,
+            "score": 0.5,
+            "kind": "vel_zero"
+          },
+          {
+            "frame_id": 126,
+            "score": 0.5,
+            "kind": "vel_zero"
+          },
+          {
+            "frame_id": 129,
+            "score": 0.5,
+            "kind": "vel_zero"
+          },
+          {
+            "frame_id": 134,
+            "score": 0.5,
+            "kind": "vel_zero"
+          },
+          {
+            "frame_id": 143,
+            "score": 0.5,
+            "kind": "vel_zero"
+          },
+          {
+            "frame_id": 146,
+            "score": 0.5,
+            "kind": "vel_zero"
+          },
+          {
+            "frame_id": 153,
+            "score": 0.5,
+            "kind": "vel_zero"
+          },
+          {
+            "frame_id": 157,
+            "score": 0.5,
+            "kind": "vel_zero"
+          },
+          {
+            "frame_id": 305,
+            "score": 0.4493205919625878,
+            "kind": "vel_zero"
+          },
+          {
+            "frame_id": 312,
+            "score": 0.4624731989457728,
+            "kind": "vel_zero"
+          },
+          {
+            "frame_id": 322,
+            "score": 0.4658826792322086,
+            "kind": "vel_zero"
+          },
+          {
+            "frame_id": 325,
+            "score": 0.4945380606943025,
+            "kind": "vel_zero"
+          },
+          {
+            "frame_id": 330,
+            "score": 0.5078383808492354,
+            "kind": "vel_zero"
+          },
+          {
+            "frame_id": 340,
+            "score": 0.5100313770895394,
+            "kind": "vel_zero"
+          },
+          {
+            "frame_id": 346,
+            "score": 0.5129316542785558,
+            "kind": "vel_zero"
+          },
+          {
+            "frame_id": 401,
+            "score": 0.5,
+            "kind": "vel_zero"
+          }
+        ],
+        "chosen": {
+          "frame_id": 325,
+          "score": 0.6532318273730836,
+          "kind": "peak"
+        }
+      },
+      "start": {
+        "confidence": 0.8,
+        "reason": "low_motion_window",
+        "candidates": [
+          {
+            "frame_id": 0,
+            "score": 0.4,
+            "kind": "pre_frames_fallback"
+          },
+          {
+            "frame_id": 0,
+            "score": 0.8,
+            "kind": "energy_onset"
+          }
+        ]
+      },
+      "end": {
+        "confidence": 0.75,
+        "reason": "wrist_settle",
+        "candidates": [
+          {
+            "frame_id": 330,
+            "score": 0.75,
+            "kind": "wrist_settle"
+          }
+        ]
+      }
+    },
+    "warnings": [
+      "release_weak_evidence"
+    ]
+  }
+}

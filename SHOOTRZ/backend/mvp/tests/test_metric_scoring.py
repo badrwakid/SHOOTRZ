@@ -106,7 +106,7 @@ class TestMetricScoring:
         }
         
         metrics = self.derivation.derive_metrics(angles_df, shot_window)
-        score, feedback = self.derivation.compute_overall_score(metrics)
+        score, feedback, _, _ = self.derivation.compute_overall_score(metrics)
         
         assert 0 <= score <= 100, f"Score {score} outside [0, 100] range"
     
@@ -131,10 +131,52 @@ class TestMetricScoring:
         }
         
         metrics = self.derivation.derive_metrics(angles_df, shot_window)
-        score, feedback = self.derivation.compute_overall_score(metrics)
+        score, feedback, bullets, components = self.derivation.compute_overall_score(
+            metrics,
+            angles_df,
+            shot_window,
+        )
         
         # All optimal should give high score
         assert score >= 80, f"Expected score >= 80 for optimal form, got {score}"
+        assert isinstance(bullets, list)
+        assert len(components) == 4
+
+    def test_feedback_changes_when_metrics_change(self):
+        """Feedback should differ when quality degrades."""
+        good_df = pd.DataFrame({
+            "frame_id": list(range(50)),
+            "timestamp": [i * 0.033 for i in range(50)],
+            "knee_angle": [105.0] * 50,
+            "elbow_angle": [165.0] * 50,
+            "wrist_angle": [80.0] * 25 + [100.0] * 25,
+            "confidence_knee": [0.95] * 50,
+            "confidence_elbow": [0.95] * 50,
+            "confidence_wrist": [0.95] * 50,
+        })
+        bad_df = pd.DataFrame({
+            "frame_id": list(range(50)),
+            "timestamp": [i * 0.033 for i in range(50)],
+            "knee_angle": [135.0] * 50,
+            "elbow_angle": [135.0] * 50,
+            "wrist_angle": [88.0] * 50,
+            "confidence_knee": [0.95] * 50,
+            "confidence_elbow": [0.95] * 50,
+            "confidence_wrist": [0.95] * 50,
+        })
+        shot_window = {"start_frame": 5, "crouch_frame": 20, "release_frame": 30, "end_frame": 40}
+
+        good_metrics = self.derivation.derive_metrics(good_df, shot_window)
+        bad_metrics = self.derivation.derive_metrics(bad_df, shot_window)
+        good_score, good_feedback, _, _ = self.derivation.compute_overall_score(
+            good_metrics, good_df, shot_window
+        )
+        bad_score, bad_feedback, _, _ = self.derivation.compute_overall_score(
+            bad_metrics, bad_df, shot_window
+        )
+
+        assert good_score > bad_score
+        assert good_feedback != bad_feedback
 
 
 if __name__ == "__main__":

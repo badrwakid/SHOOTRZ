@@ -8,7 +8,7 @@ Validates:
 
 import numpy as np
 
-from inference.phase_detector import PhaseDetector, ShootingPhase
+from backend.inference.phase_detector import PhaseDetector, ShootingPhase
 
 
 def make_pose_frame(hip_y: float, knee_angle: float, wrist_y: float) -> dict:

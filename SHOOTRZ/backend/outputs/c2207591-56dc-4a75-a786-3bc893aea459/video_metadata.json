@@ -1,0 +1,15 @@
+{
+  "video_path": "C:\\Users\\Badr\\AppData\\Local\\Temp\\tmpplfrliox.mov",
+  "fps": 30.0,
+  "frame_count": 411,
+  "width": 1080,
+  "height": 1920,
+  "duration_seconds": 13.7,
+  "resolution": "1080x1920",
+  "quality_warnings": [],
+  "frame_sampling": {
+    "frame_skip": 1,
+    "max_frames": null,
+    "total_processed_frames": 411
+  }
+}

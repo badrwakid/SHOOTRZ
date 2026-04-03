@@ -1,6 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
-
-import type { ChatMessageDto } from './chat.service'
+import type { ChatMessageDto } from '../types/contracts'
 
 const KEY = '@shootrz_chat_conversation_v1'
 

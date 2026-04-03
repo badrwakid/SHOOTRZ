@@ -1,26 +1,7 @@
 import { API_BASE_URL } from './api.service'
 import { storageService } from './storage.service'
 import { supabase } from './supabase.client'
-
-export type ChatRole = 'user' | 'assistant'
-
-export interface ChatMessageDto {
-	role: ChatRole
-	content: string
-}
-
-export interface ChatRequestDto {
-	messages: ChatMessageDto[]
-	includeRawArtifacts?: boolean
-	model?: string
-}
-
-export interface ChatResponseDto {
-	assistant_message: string
-	context_used: Record<string, any>
-	model: string
-	usage?: Record<string, any>
-}
+import type { ChatRequestDto, ChatResponseDto } from '../types/contracts'
 
 async function getAccessToken(): Promise<string> {
 	const { data, error } = await supabase.auth.getSession()

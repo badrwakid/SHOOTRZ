@@ -1,10 +1,11 @@
 """
 Inference package init.
 
-Exposes key modules for import via absolute paths to avoid relative import issues
-when loaded from different contexts (e.g., FastAPI routers).
+Re-exports for `from backend.inference import ...` when the app runs as package
+`backend` (e.g. uvicorn backend.main:app). Use relative imports here — top-level
+`inference` is not on sys.path in that layout.
 """
 
-from inference.phase_detector import PhaseDetector, ShootingPhase  # noqa: F401
-from inference.motion_analyzer import MotionSignals  # noqa: F401
+from .phase_detector import PhaseDetector, ShootingPhase  # noqa: F401
+from .motion_analyzer import MotionSignals  # noqa: F401
 

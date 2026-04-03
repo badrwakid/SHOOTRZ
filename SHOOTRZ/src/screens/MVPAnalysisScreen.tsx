@@ -19,48 +19,87 @@ import { useAuth } from '../context/AuthContext';
 import { storageService } from '../services/storage.service';
 import { CameraRecorder } from '../components/CameraRecorder';
 import { LoadingBasketball } from '../components/LoadingBasketball';
-import { ScoreCard } from '../components/ScoreCard';
 import { AngleGraph } from '../components/AngleGraph';
-import { MetricsTable } from '../components/MetricsTable';
-import { FeedbackPanel } from '../components/FeedbackPanel';
 import { API_BASE_URL, apiService } from '../services/api.service';
 import { SHOOTRZ_THEME } from '../constants/theme';
 import { hapticFeedback } from '../utils/hapticFeedback';
+import type { MVPMetric, MVPResultResponse } from '../types/contracts';
 
-interface Metric {
-	name: string;
-	value: number;
-	unit: string;
-	verdict: 'Good' | 'Needs Work' | 'Low Confidence';
-	explanation: string;
-	confidence: number;
-}
-
-interface AnalysisResult {
+interface AnalysisResult extends MVPResultResponse {
+	contract_version?: string;
 	run_id: string;
-	status: string;
+	status: 'queued' | 'processing' | 'completed' | 'failed';
 	overall_score: number;
 	feedback_summary: string;
-	metrics: Metric[];
+	feedback_bullets?: string[];
+	metrics: MVPMetric[];
+	score_components?: Array<{
+		name: string;
+		value: number;
+		weight: number;
+		unit?: string;
+		explanation?: string;
+	}>;
 	shot_window: {
-		start_frame: number;
-		crouch_frame: number;
-		release_frame: number;
-		end_frame: number;
-		confidence: string;
+		start_frame?: number;
+		crouch_frame?: number;
+		release_frame?: number;
+		end_frame?: number;
+		confidence?: string;
+		confidence_score?: number;
+	};
+	events?: {
+		start?: {
+			frame?: number | null;
+			timestamp?: number | null;
+			status?: string;
+			confidence?: number;
+			reason_codes?: string[];
+		};
+		crouch?: {
+			frame?: number | null;
+			timestamp?: number | null;
+			status?: string;
+			confidence?: number;
+			reason_codes?: string[];
+		};
+		release?: {
+			frame?: number | null;
+			timestamp?: number | null;
+			status?: string;
+			confidence?: number;
+			reason_codes?: string[];
+		};
+		end?: {
+			frame?: number | null;
+			timestamp?: number | null;
+			status?: string;
+			confidence?: number;
+			reason_codes?: string[];
+		};
 	};
 	angles_data: {
 		frames: number[];
 		timestamps: number[];
-		elbow: number[];
-		knee: number[];
-		wrist: number[];
+		elbow: Array<number | null>;
+		knee: Array<number | null>;
+		wrist: Array<number | null>;
 	};
 	artifacts: {
-		overlay_video: string;
-		angles_csv: string;
-		report_json: string;
+		overlay_video?: string | null;
+		angles_csv?: string;
+		report_json?: string;
+		event_candidates?: string;
+		warnings?: string;
 	};
+	key_frame_images?: {
+		start?: string;
+		crouch?: string;
+		release?: string;
+		end?: string;
+	};
+	diagnostics?: Record<string, unknown>;
+	quality_warnings?: string[];
 }
 
 export const MVPAnalysisScreen: React.FC = () => {
@@ -68,7 +107,6 @@ export const MVPAnalysisScreen: React.FC = () => {
 	const [isAnalyzing, setIsAnalyzing] = useState(false);
 	const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
 	const [showCameraRecorder, setShowCameraRecorder] = useState(false);
-	const [selectedVideoUri, setSelectedVideoUri] = useState<string | null>(null);
 	const [shootingSide, setShootingSide] = useState<'auto' | 'left' | 'right'>('auto');
 	const lastRequestRef = useRef<string | null>(null);
 	const overlayUri = useMemo(() => {
@@ -78,7 +116,6 @@ export const MVPAnalysisScreen: React.FC = () => {
 	const [isOverlayLoading, setIsOverlayLoading] = useState(false);
 	const [overlayError, setOverlayError] = useState<string | null>(null);
 	const [overlayLocalUri, setOverlayLocalUri] = useState<string | null>(null);
-	const overlayTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 	const [overlayKey, setOverlayKey] = useState(0);
 
 	const downloadOverlayToLocal = async (): Promise<string | null> => {
@@ -102,15 +139,6 @@ export const MVPAnalysisScreen: React.FC = () => {
 			setIsOverlayLoading(false);
 		}
 	};
-
-	useEffect(() => {
-		// Prefetch overlay to local cache to avoid AVFoundation streaming errors
-		if (overlayUri) {
-			setIsOverlayLoading(true);
-			downloadOverlayToLocal();
-		}
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [overlayUri]);
 
 	useEffect(() => {
 		// Load overlay once per source (prefer cached local copy)
@@ -158,7 +186,6 @@ export const MVPAnalysisScreen: React.FC = () => {
 			});
 
 			if (!result.canceled && result.assets[0]) {
-				setSelectedVideoUri(result.assets[0].uri);
 				await handleAnalyzeVideo(result.assets[0].uri);
 			}
 		} catch (error) {
@@ -174,7 +201,6 @@ export const MVPAnalysisScreen: React.FC = () => {
 
 	const handleVideoRecorded = async (videoUri: string) => {
 		setShowCameraRecorder(false);
-		setSelectedVideoUri(videoUri);
 		await handleAnalyzeVideo(videoUri);
 	};
 
@@ -213,12 +239,19 @@ export const MVPAnalysisScreen: React.FC = () => {
 						// Validate and sanitize the response
 						const validatedResult: AnalysisResult = {
 							...resultResponse,
+							run_id: resultResponse.run_id ?? '',
+							status: resultResponse.status ?? 'completed',
 							overall_score: resultResponse.overall_score ?? 0,
 							feedback_summary: resultResponse.feedback_summary || 'Analysis completed',
+							feedback_bullets: Array.isArray(resultResponse.feedback_bullets) ? resultResponse.feedback_bullets : [],
 							metrics: Array.isArray(resultResponse.metrics) ? resultResponse.metrics : [],
+							score_components: Array.isArray(resultResponse.score_components) ? resultResponse.score_components : [],
 							shot_window: resultResponse.shot_window || {},
+							events: resultResponse.events || {},
 							angles_data: resultResponse.angles_data || { frames: [], timestamps: [], elbow: [], knee: [], wrist: [] },
 							artifacts: resultResponse.artifacts || {},
+							key_frame_images: resultResponse.key_frame_images || {},
+							diagnostics: resultResponse.diagnostics || {},
 						};
 						
 						setAnalysisResult(validatedResult);
@@ -232,6 +265,12 @@ export const MVPAnalysisScreen: React.FC = () => {
 								const metric = validatedResult.metrics.find(m => m.name?.toLowerCase().includes(key));
 								return Number.isFinite(metric?.value) ? (metric?.value as number) : 0;
 							};
+							const findComponentValue = (key: string) => {
+								const component = validatedResult.score_components?.find(c =>
+									c.name?.toLowerCase().includes(key),
+								)
+								return Number.isFinite(component?.value) ? (component?.value as number) : 0
+							}
 							const analysisRecord = {
 								id: `${Date.now()}`,
 								userId: user?.id || 'local',
@@ -239,17 +278,32 @@ export const MVPAnalysisScreen: React.FC = () => {
 								runId: validatedResult.run_id || undefined,
 								scores: {
 									elbow: findMetricValue('elbow'),
-									balance: findMetricValue('balance'),
-									release: findMetricValue('release'),
-									alignment: findMetricValue('alignment'),
+									balance: findComponentValue('balance'),
+									release: findComponentValue('release'),
+									alignment: findComponentValue('loading'),
 									total: validatedResult.overall_score ?? 0,
 								},
-								feedback: validatedResult.feedback_summary ? [validatedResult.feedback_summary] : [],
+								feedback: validatedResult.feedback_bullets?.length
+									? validatedResult.feedback_bullets
+									: validatedResult.feedback_summary
+										? [validatedResult.feedback_summary]
+										: [],
 								angles: {
 									elbow: findMetricValue('elbow'),
 									knee: findMetricValue('knee'),
-									release: findMetricValue('release'),
-									bodyAlignment: findMetricValue('alignment'),
+									release: findMetricValue('wrist'),
+									bodyAlignment: findComponentValue('balance'),
+								},
+								mvp: {
+									scoreComponents: validatedResult.score_components?.map(c => ({
+										name: c.name,
+										value: c.value,
+										weight: c.weight,
+									})),
+									keyFrameImages: validatedResult.key_frame_images,
+									shotWindow: validatedResult.shot_window,
+									events: validatedResult.events,
+									diagnostics: validatedResult.diagnostics,
 								},
 							};
 							storageService.saveAnalysisResult(analysisRecord as any).catch(err => {
@@ -448,6 +502,11 @@ export const MVPAnalysisScreen: React.FC = () => {
 									<Text style={styles.scoreMax}>/100</Text>
 								</View>
 								<Text style={styles.feedbackSummary}>{analysisResult.feedback_summary}</Text>
+							{analysisResult.quality_warnings && analysisResult.quality_warnings.length > 0 ? (
+								<Text style={styles.overlayError}>
+									Warnings: {analysisResult.quality_warnings.join(', ')}
+								</Text>
+							) : null}
 							</View>
 
 							{/* Three Core Metrics */}
@@ -554,11 +613,13 @@ export const MVPAnalysisScreen: React.FC = () => {
 											const elbow = analysisResult.angles_data.elbow[idx]
 											const knee = analysisResult.angles_data.knee[idx]
 											const wrist = analysisResult.angles_data.wrist[idx]
+											const toNum = (v: number | null | undefined) =>
+												typeof v === 'number' && Number.isFinite(v) ? v : 0
 											return {
 												frame_number: frame,
-												elbow_angle: Number.isFinite(elbow) ? elbow : 0,
-												knee_angle: Number.isFinite(knee) ? knee : 0,
-												release_angle: Number.isFinite(wrist) ? wrist : 0,
+												elbow_angle: toNum(elbow),
+												knee_angle: toNum(knee),
+												release_angle: toNum(wrist),
 												body_alignment: 0,
 											}
 										})}

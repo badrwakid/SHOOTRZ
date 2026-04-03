@@ -18,6 +18,7 @@ import { SHOOTRZ_THEME } from '../constants/theme'
 import { apiService } from '../services/api.service'
 import { useAuth } from '../context/AuthContext'
 import { MetricsTable, Metric } from '../components/MetricsTable'
+import type { HistorySession } from '../types/contracts'
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window')
 const CHART_WIDTH = SCREEN_WIDTH - 32
@@ -52,15 +53,26 @@ export const ProgressScreen: React.FC = () => {
 		if (!user?.id) return
 
 		try {
-			// Fetch sessions from Supabase via API
-			// This would call backend/routers/history.py endpoint
-			
-			// Mock structure - replace with actual API call
-			const mockSessions: Session[] = []
-			setSessions(mockSessions)
-			
-			// Calculate metric trends
-			calculateMetricTrends(mockSessions)
+			const history = await apiService.getHistory(user.id, 100, 0)
+			const mappedSessions: Session[] = (history.sessions || []).map(
+				(serverSession: HistorySession) => ({
+					id: serverSession.session_id,
+					date: serverSession.timestamp || serverSession.date,
+					title: serverSession.title || undefined,
+					shot_count: serverSession.shot_count || 0,
+					average_score: serverSession.average_score ?? undefined,
+					metrics: (serverSession.metrics || []).map((metric) => ({
+						metric_name: metric.metric_name,
+						value: metric.value,
+						unit: metric.unit || undefined,
+						confidence: metric.confidence ?? 0,
+						phase: metric.phase || undefined,
+						frame_idx: metric.frame_idx || undefined,
+					})),
+				}),
+			)
+			setSessions(mappedSessions)
+			calculateMetricTrends(mappedSessions)
 		} catch (error) {
 			console.error('Error loading sessions:', error)
 		} finally {

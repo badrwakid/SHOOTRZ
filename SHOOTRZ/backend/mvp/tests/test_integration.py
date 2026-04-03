@@ -54,6 +54,11 @@ class TestIntegration:
             "pose_keypoints_smoothed.csv",
             "angles.csv",
             "shot_window.json",
+            "event_candidates.json",
+            "event_confidence.json",
+            "feature_table.csv",
+            "signals_smoothed.csv",
+            "warnings.json",
             "confidence_summary.json",
             "report.json",
             "run_metadata.json"

@@ -1,15 +1,15 @@
 from fastapi import APIRouter, HTTPException
-from typing import List, Dict, Any, Optional
-from datetime import datetime, timedelta
+from typing import Optional
+from datetime import datetime
 
-from ..utils.schemas import HistoryResponse, SessionSummary
+from ..contracts.history import HistoryResponse, HistoryStatsResponse
 from ..storage.db import get_user_history, get_video_metrics
 
 
 router = APIRouter(prefix="", tags=["history"])
 
 
-@router.get("/history/{user_id}")
+@router.get("/history/{user_id}", response_model=HistoryResponse)
 async def history(
 	user_id: str,
 	limit: Optional[int] = 50,
@@ -81,7 +81,7 @@ async def history(
 		raise HTTPException(status_code=500, detail=f"Error fetching history: {str(e)}")
 
 
-@router.get("/history/{user_id}/stats")
+@router.get("/history/{user_id}/stats", response_model=HistoryStatsResponse)
 async def get_history_stats(user_id: str):
 	"""
 	Get aggregated statistics from user's history.

@@ -10,14 +10,8 @@ import pandas as pd
 import json
 from pathlib import Path
 from typing import Dict, Any, List, Optional, Tuple
-import sys
 
-# Add backend to path for imports
-backend_path = Path(__file__).parent.parent.parent
-if str(backend_path) not in sys.path:
-    sys.path.insert(0, str(backend_path))
-
-from inference.pose_2d import MediaPipePoseDetector, BASKETBALL_KEYPOINTS
+from backend.inference.pose_2d import MediaPipePoseDetector, BASKETBALL_KEYPOINTS
 
 
 class MVPPoseEstimator:
@@ -69,20 +63,30 @@ class MVPPoseEstimator:
         self.pose_results = []
         
         for processed_idx, frame in enumerate(frames):
-            result = self.detector.process_frame(frame)
-            
-            if result is not None:
-                # Get timestamp from mapping
-                timestamp = frame_mapping.loc[
-                    frame_mapping["processed_idx"] == processed_idx,
-                    "timestamp"
-                ].values[0]
-                
-                original_idx = frame_mapping.loc[
-                    frame_mapping["processed_idx"] == processed_idx,
-                    "original_idx"
-                ].values[0]
-                
+            # VideoLoader passes RGB frames; avoid double BGR->RGB in pose_2d
+            result = self.detector.process_frame(frame, input_is_rgb=True)
+
+            # Get timestamp from mapping
+            timestamp = frame_mapping.loc[
+                frame_mapping["processed_idx"] == processed_idx,
+                "timestamp"
+            ].values[0]
+
+            original_idx = frame_mapping.loc[
+                frame_mapping["processed_idx"] == processed_idx,
+                "original_idx"
+            ].values[0]
+
+            if result is None:
+                # Keep timeline dense to avoid downstream frame-index drift.
+                self.pose_results.append({
+                    "frame_idx": int(original_idx),
+                    "processed_idx": processed_idx,
+                    "timestamp": float(timestamp),
+                    "landmarks": np.zeros((33, 3), dtype=np.float32),
+                    "confidence": np.zeros((33,), dtype=np.float32),
+                })
+            else:
                 self.pose_results.append({
                     "frame_idx": int(original_idx),
                     "processed_idx": processed_idx,

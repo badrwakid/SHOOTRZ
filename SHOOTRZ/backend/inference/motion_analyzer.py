@@ -134,7 +134,7 @@ def compute_knee_angles(
 	Returns:
 		Array of knee angles in degrees [N]
 	"""
-	from backend.metrics.biomechanics import joint_angle
+	from metrics.biomechanics import joint_angle
 	
 	angles = []
 	min_len = min(len(hip_positions), len(knee_positions), len(ankle_positions))
@@ -240,7 +240,7 @@ def compute_arm_extension(
 	Returns:
 		Array of arm extension angles in degrees [N]
 	"""
-	from backend.metrics.biomechanics import joint_angle
+	from metrics.biomechanics import joint_angle
 	
 	angles = []
 	min_len = min(len(shoulder_positions), len(elbow_positions), len(wrist_positions))

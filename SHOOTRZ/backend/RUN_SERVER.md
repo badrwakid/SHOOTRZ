@@ -5,7 +5,7 @@
 Run from the **SHOOTRZ directory** (parent of backend):
 
 ```bash
-cd d:\Users\Badr\myprojects\Grad\SHOOTRZ
+cd D:\Users\Badr\Grad\SHOOTRZ
 python -m uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
