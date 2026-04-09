@@ -18,8 +18,13 @@ export const chatStorageService = {
 
 	async saveConversation(messages: ChatMessageDto[]): Promise<void> {
 		try {
-			await AsyncStorage.setItem(KEY, JSON.stringify(messages))
-		} catch {}
+			// BUG FIX: Cap stored messages to prevent unbounded AsyncStorage growth
+			const capped = messages.slice(-200)
+			await AsyncStorage.setItem(KEY, JSON.stringify(capped))
+		} catch (error) {
+			// BUG FIX: Log save errors instead of fully swallowing them
+			console.error('Error saving chat conversation:', error)
+		}
 	},
 
 	async clearConversation(): Promise<void> {

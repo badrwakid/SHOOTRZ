@@ -1,9 +1,20 @@
 import axios, { AxiosResponse } from 'axios';
+import { supabase } from './supabase.client'
+// BUG FIX: Import canonical types from contracts.ts instead of duplicating them locally
 import type {
 	HealthResponse as ApiHealthResponse,
 	HistoryResponse,
 	HistoryStatsResponse,
 	MVPResultResponse as ApiMVPResultResponse,
+	MVPMetric as ApiMVPMetric,
+	MVPScoreComponent as ApiMVPScoreComponent,
+	MVPEvent as ApiMVPEvent,
+	UserProfile,
+	UserStats,
+	UserStreak,
+	DrillCompletion,
+	WorkoutProgress,
+	ChatHistoryMessage,
 } from '../types/contracts';
 
 // FastAPI Backend (port 8000)
@@ -163,96 +174,13 @@ export interface PhaseData {
   feedback: string[];
 }
 
-export interface HealthResponse {
-  status: string;
-  service: string;
-  version: string;
-  timestamp: string;
-  uptime: number;
-}
-
-export interface MVPMetric {
-	name: string
-	value: number
-	unit: string
-	verdict: 'Good' | 'Needs Work' | 'Low Confidence'
-	explanation: string
-	confidence: number
-	frame_range?: [number, number]
-}
-
-export interface MVPScoreComponent {
-	name: string
-	value: number
-	unit: string
-	weight: number
-	explanation: string
-}
-
-export interface MVPResultResponse {
-	status: 'queued' | 'processing' | 'completed' | 'failed'
-	contract_version?: string
-	run_id?: string
-	overall_score?: number
-	feedback_summary?: string
-	feedback_bullets?: string[]
-	metrics?: MVPMetric[]
-	score_components?: MVPScoreComponent[]
-	shot_window?: {
-		start_frame?: number
-		crouch_frame?: number
-		release_frame?: number
-		end_frame?: number
-		confidence?: string
-		confidence_score?: number
-	}
-	events?: {
-		start?: MVPEvent
-		crouch?: MVPEvent
-		release?: MVPEvent
-		end?: MVPEvent
-	}
-	angles_data?: {
-		frames: number[]
-		timestamps: number[]
-		elbow: Array<number | null>
-		knee: Array<number | null>
-		wrist: Array<number | null>
-	}
-	artifacts?: {
-		overlay_video?: string | null
-		angles_csv?: string
-		report_json?: string
-		event_candidates?: string
-		event_confidence?: string
-		feature_table?: string
-		signals_smoothed?: string
-		warnings?: string
-	}
-	key_frame_images?: {
-		start?: string
-		crouch?: string
-		release?: string
-		end?: string
-	}
-	diagnostics?: Record<string, unknown>
-	quality_warnings?: string[]
-	error?: string
-	error_detail?: string
-}
-
-export interface MVPEvent {
-	frame?: number | null
-	timestamp?: number | null
-	status?: 'detected' | 'estimated' | 'missing' | string
-	confidence?: number
-	reason_codes?: string[]
-	alternatives?: Array<{
-		frame_id: number
-		score: number
-		kind: string
-	}>
-}
+// BUG FIX: Duplicate HealthResponse, MVPMetric, MVPScoreComponent, MVPResultResponse, MVPEvent
+// removed — now imported from contracts.ts (single source of truth)
+export type HealthResponse = ApiHealthResponse
+export type MVPMetric = ApiMVPMetric
+export type MVPScoreComponent = ApiMVPScoreComponent
+export type MVPResultResponse = ApiMVPResultResponse
+export type MVPEvent = ApiMVPEvent
 
 export interface PerformanceResponse {
   success: boolean;
@@ -295,12 +223,14 @@ class ApiService {
   constructor() {
     this.baseURL = API_BASE_URL;
     this.timeout = 120000; // 2 minutes timeout for video processing
-    
-    // Log the API URL in development for debugging
-    if (__DEV__) {
-      console.log(`🔗 API Base URL: ${this.baseURL}`);
-      console.log(`🔗 Environment variable EXPO_PUBLIC_API_URL: ${process.env.EXPO_PUBLIC_API_URL || 'NOT SET'}`);
+  }
+
+  private async getAuthHeaders(): Promise<Record<string, string>> {
+    const { data, error } = await supabase.auth.getSession()
+    if (error || !data?.session?.access_token) {
+      return {}
     }
+    return { Authorization: `Bearer ${data.session.access_token}` }
   }
 
 
@@ -324,10 +254,6 @@ class ApiService {
         name: filename,
       } as any);
 
-      if (__DEV__) {
-        console.log('📹 MVP Analysis - Uploading video:', { filename, shootingSide });
-      }
-
       let response;
       try {
         response = await axios.post(
@@ -343,10 +269,6 @@ class ApiService {
             timeout: this.timeout,
           }
         );
-
-        if (__DEV__) {
-          console.log('✅ MVP Analysis queued:', response.data);
-        }
 
         return { job_id: response.data.job_id, status: response.data.status };
       } catch (axiosError: any) {
@@ -408,19 +330,12 @@ class ApiService {
   async checkHealth(): Promise<boolean> {
     try {
       const healthUrl = `${this.baseURL}/health`;
-      if (__DEV__) {
-        console.log(`🏥 Health check: GET ${healthUrl}`);
-      }
       
       const response: AxiosResponse<ApiHealthResponse> = await axios.get(healthUrl, {
         timeout: 5000,
         validateStatus: (status) => status < 500, // Don't throw on 404, just return false
       });
 
-      if (__DEV__) {
-        console.log(`✅ Health check response: ${response.status}`, response.data);
-      }
-      
       return response.status === 200 && response.data?.status === 'healthy';
     } catch (error: any) {
       // Suppress network errors - they're expected if backend is unavailable
@@ -573,6 +488,130 @@ class ApiService {
       console.error('Error creating session:', error)
       throw new Error(error.response?.data?.detail || 'Failed to create session')
     }
+  }
+
+  // ---------------------------------------------------------------------------
+  // New Supabase-backed endpoints (authenticated)
+  // ---------------------------------------------------------------------------
+
+  async getUserProfile(): Promise<any> {
+    const headers = await this.getAuthHeaders()
+    const response = await axios.get(`${this.baseURL}/api/user/profile`, {
+      headers, timeout: 15000,
+    })
+    return response.data
+  }
+
+  async updateUserProfile(data: Partial<UserProfile>): Promise<any> {
+    const headers = await this.getAuthHeaders()
+    const snaked: Record<string, any> = {}
+    if (data.primaryGoal !== undefined) snaked.primary_goal = data.primaryGoal
+    if (data.trainingFrequency !== undefined) snaked.training_frequency = data.trainingFrequency
+    if (data.preferredDrillDuration !== undefined) snaked.preferred_drill_duration = data.preferredDrillDuration
+    if (data.age !== undefined) snaked.age = data.age
+    if (data.heightCm !== undefined) snaked.height_cm = data.heightCm
+    if (data.weightKg !== undefined) snaked.weight_kg = data.weightKg
+    if (data.dominantHand !== undefined) snaked.dominant_hand = data.dominantHand
+    if (data.yearsPlaying !== undefined) snaked.years_playing = data.yearsPlaying
+    if (data.notificationsEnabled !== undefined) snaked.notifications_enabled = data.notificationsEnabled
+    if (data.coachingStyle !== undefined) snaked.coaching_style = data.coachingStyle
+    const response = await axios.put(`${this.baseURL}/api/user/profile`, snaked, {
+      headers, timeout: 15000,
+    })
+    return response.data
+  }
+
+  async getUserStats(): Promise<UserStats> {
+    const headers = await this.getAuthHeaders()
+    const response = await axios.get(`${this.baseURL}/api/user/stats`, {
+      headers, timeout: 15000,
+    })
+    const d = response.data
+    return {
+      totalSessions: d.total_sessions ?? 0,
+      avgScore: d.avg_score ?? undefined,
+      bestScore: d.best_score ?? undefined,
+      totalShots: d.total_shots ?? undefined,
+      currentStreak: d.current_streak ?? 0,
+      longestStreak: d.longest_streak ?? 0,
+      lastSessionDate: d.last_session_date ?? undefined,
+    }
+  }
+
+  async getUserStreak(): Promise<UserStreak> {
+    const headers = await this.getAuthHeaders()
+    const response = await axios.get(`${this.baseURL}/api/user/streak`, {
+      headers, timeout: 15000,
+    })
+    const d = response.data
+    return {
+      currentStreak: d.current_streak ?? 0,
+      longestStreak: d.longest_streak ?? 0,
+      lastActivityDate: d.last_activity_date ?? undefined,
+    }
+  }
+
+  async getSessionsAuth(limit: number = 20, offset: number = 0): Promise<any> {
+    const headers = await this.getAuthHeaders()
+    const response = await axios.get(`${this.baseURL}/api/sessions`, {
+      headers, timeout: 15000,
+      params: { limit, offset },
+    })
+    return response.data
+  }
+
+  async getSessionDetail(sessionId: string): Promise<any> {
+    const headers = await this.getAuthHeaders()
+    const response = await axios.get(`${this.baseURL}/api/sessions/${sessionId}`, {
+      headers, timeout: 15000,
+    })
+    return response.data
+  }
+
+  async getDrillCompletions(limit: number = 50): Promise<{ completions: DrillCompletion[]; count: number }> {
+    const headers = await this.getAuthHeaders()
+    const response = await axios.get(`${this.baseURL}/api/drills/completions`, {
+      headers, timeout: 15000,
+      params: { limit },
+    })
+    return response.data
+  }
+
+  async completeDrill(data: {
+    drillId: string; drillName: string;
+    durationSeconds?: number; userRating?: number; notes?: string
+  }): Promise<any> {
+    const headers = await this.getAuthHeaders()
+    const response = await axios.post(`${this.baseURL}/api/drills/complete`, {
+      drill_id: data.drillId,
+      drill_name: data.drillName,
+      duration_seconds: data.durationSeconds,
+      user_rating: data.userRating,
+      notes: data.notes,
+    }, { headers, timeout: 15000 })
+    return response.data
+  }
+
+  async getWorkoutProgress(): Promise<{ workouts: WorkoutProgress[]; count: number }> {
+    const headers = await this.getAuthHeaders()
+    const response = await axios.get(`${this.baseURL}/api/workouts/progress`, {
+      headers, timeout: 15000,
+    })
+    return response.data
+  }
+
+  async updateWorkoutProgress(workoutId: string, data: {
+    workoutName: string; status?: string;
+    drillsCompleted?: number; drillsTotal?: number;
+  }): Promise<any> {
+    const headers = await this.getAuthHeaders()
+    const response = await axios.put(`${this.baseURL}/api/workouts/${workoutId}/progress`, {
+      workout_name: data.workoutName,
+      status: data.status,
+      drills_completed: data.drillsCompleted,
+      drills_total: data.drillsTotal,
+    }, { headers, timeout: 15000 })
+    return response.data
   }
 }
 

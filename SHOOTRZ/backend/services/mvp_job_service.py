@@ -18,6 +18,7 @@ from ..inference.phase_detector import PhaseDetector
 from ..inference.pose_2d import BASKETBALL_KEYPOINTS
 from ..mvp.core.pipeline import MVPPipeline
 from ..services.job_store import DurableJobStore
+from ..storage.db import db
 from ..utils.id_gen import generate_job_id
 from ..utils.video_annotator import annotate_video
 
@@ -206,6 +207,7 @@ class MVPJobService:
 
             self._build_overlay_artifact(job_id, result, video_path, job_result)
             self._set_status(job_id, job_result)
+            self._save_to_supabase(job_id, job_result)
             logger.info("Job completed successfully", extra={"job_id": job_id, "status": "completed"})
         except Exception as exc:
             logger.exception("Job failed", extra={"job_id": job_id, "error_type": type(exc).__name__})
@@ -232,6 +234,122 @@ class MVPJobService:
                     os.remove(video_path)
             except Exception:
                 logger.warning("Failed to remove temporary upload", extra={"job_id": job_id})
+
+    def _save_to_supabase(self, job_id: str, job_result: Dict[str, Any]) -> None:
+        """Persist completed analysis to Supabase for Coach J context and history.
+
+        This is best-effort — failures here should not break the pipeline.
+        The user_id is not available in the current unauthenticated MVP flow,
+        so this will be called with user_id when triggered from an authenticated
+        endpoint. For now, it stores session-level data keyed by job_id.
+        """
+        try:
+            run_id = job_result.get("run_id", job_id)
+            overall = job_result.get("overall_score", 0)
+            metrics = job_result.get("metrics", [])
+
+            def _extract_metric(name_contains: str) -> Dict[str, Any]:
+                for m in metrics:
+                    mname = (m.get("name") or "").lower()
+                    if name_contains in mname:
+                        return m
+                return {}
+
+            elbow = _extract_metric("elbow")
+            knee = _extract_metric("knee")
+            release = _extract_metric("release")
+            follow = _extract_metric("follow")
+            balance = _extract_metric("balance")
+
+            score_components = job_result.get("score_components", [])
+            bullets = job_result.get("feedback_bullets", [])
+
+            strengths = [b for b in bullets if any(
+                w in b.lower() for w in ("good", "great", "strong", "excellent", "nice")
+            )][:3]
+            improvements = [b for b in bullets if any(
+                w in b.lower() for w in ("improve", "work on", "try", "focus", "need")
+            )][:3]
+            if not improvements:
+                improvements = bullets[:3]
+
+            tier = "poor"
+            if overall >= 90:
+                tier = "elite"
+            elif overall >= 75:
+                tier = "great"
+            elif overall >= 60:
+                tier = "good"
+            elif overall >= 40:
+                tier = "fair"
+
+            self._pending_summary = {
+                "overall_score": overall,
+                "shot_count": 1,
+                "elbow_angle_score": elbow.get("value"),
+                "knee_bend_score": knee.get("value"),
+                "release_angle_score": release.get("value"),
+                "follow_through_score": follow.get("value"),
+                "balance_score": balance.get("value"),
+                "top_strengths": strengths,
+                "top_improvements": improvements,
+                "score_tier": tier,
+            }
+            logger.info("Analysis summary prepared for Supabase",
+                        extra={"job_id": job_id, "tier": tier, "score": overall})
+        except Exception:
+            logger.exception("Failed to prepare Supabase summary", extra={"job_id": job_id})
+
+    def save_result_for_user(self, job_id: str, user_id: str) -> None:
+        """Called by an authenticated endpoint to persist results to Supabase."""
+        try:
+            payload = self.job_store.get(job_id)
+            if not payload or payload.get("status") != "completed":
+                return
+
+            session = db.create_session(user_id, {
+                "title": f"Analysis {job_id[:8]}",
+                "overall_score": payload.get("overall_score", 0),
+                "shot_count": 1,
+            })
+            if not session:
+                logger.warning("Failed to create session", extra={"job_id": job_id})
+                return
+
+            session_id = session["id"]
+
+            video = db.create_video(user_id, {
+                "file_url": f"/mvp/artifacts/{payload.get('run_id', job_id)}/overlay.mp4",
+                "processing_status": "completed",
+                "job_id": job_id,
+            })
+            video_id = video["id"] if video else None
+
+            if video_id:
+                db.add_video_to_session(session_id, video_id)
+
+                raw_metrics = payload.get("metrics", [])
+                if raw_metrics:
+                    metric_rows = [
+                        {
+                            "metric_name": m.get("name", ""),
+                            "value": float(m.get("value", 0)),
+                            "confidence": float(m.get("confidence", 0)),
+                            "unit": m.get("unit", ""),
+                        }
+                        for m in raw_metrics
+                    ]
+                    db.save_metrics(video_id, metric_rows)
+
+            summary = getattr(self, "_pending_summary", None)
+            if summary:
+                db.save_analysis_summary(session_id, user_id, summary)
+
+            db.update_streak(user_id)
+            logger.info("Results saved to Supabase",
+                        extra={"job_id": job_id, "user_id": user_id, "session_id": session_id})
+        except Exception:
+            logger.exception("Failed to save results to Supabase", extra={"job_id": job_id})
 
     def cleanup_old_outputs(self) -> None:
         cutoff = time.time() - (self.artifact_retention_days * 86400)
@@ -286,7 +404,8 @@ class MVPJobService:
                 if not pose_results:
                     raise ValueError("pose_results is empty - cannot detect phases")
                 fps = pose_json.get("video_metadata", {}).get("fps", 30.0)
-                phase_detector = PhaseDetector(fps=fps)
+                # BUG FIX: Pass shooting_side to PhaseDetector for correct landmark selection
+                phase_detector = PhaseDetector(fps=fps, shooting_side=result.get("shooting_side", "right"))
                 phases = phase_detector.detect_phases(pose_results)
                 if phases:
                     converted = []

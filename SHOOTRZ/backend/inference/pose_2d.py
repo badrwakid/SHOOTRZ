@@ -7,8 +7,9 @@ Provides 33 landmarks per frame for body pose estimation.
 import cv2
 import numpy as np
 import mediapipe as mp
-from typing import Dict, List, Optional, Tuple
-from pathlib import Path
+# BUG FIX: Import Any from typing (was using builtin `any` in type annotations)
+from typing import Any, Dict, List, Optional, Tuple
+
 
 
 # Basketball-specific keypoint mapping from MediaPipe landmarks
@@ -115,7 +116,7 @@ class MediaPipePoseDetector:
 		video_path: str,
 		frame_skip: int = 1,
 		max_frames: Optional[int] = None,
-	) -> List[Dict[str, any]]:
+	) -> List[Dict[str, Any]]:
 		"""
 		Process entire video to extract pose landmarks for each frame.
 		
@@ -229,7 +230,7 @@ class MediaPipePoseDetector:
 		self.pose.close()
 
 
-def run_pose_2d_on_frames(frames: List[np.ndarray]) -> Dict[str, any]:
+def run_pose_2d_on_frames(frames: List[np.ndarray]) -> Dict[str, Any]:
 	"""
 	Process list of frames with MediaPipe Pose.
 	

@@ -251,7 +251,9 @@ class StorageService {
     try {
       const history = await this.getWorkoutHistory();
       history.push(session);
-      await AsyncStorage.setItem(this.KEYS.WORKOUT_HISTORY, JSON.stringify(history));
+      // BUG FIX: Cap workout history to prevent unbounded AsyncStorage growth
+      const capped = history.slice(-200);
+      await AsyncStorage.setItem(this.KEYS.WORKOUT_HISTORY, JSON.stringify(capped));
     } catch (error) {
       console.error('Error saving workout session:', error);
       throw error;
@@ -276,7 +278,9 @@ class StorageService {
         drillId,
         completedAt: new Date().toISOString(),
       });
-      await AsyncStorage.setItem('@shootrz_drill_completions', JSON.stringify(completions));
+      // BUG FIX: Cap drill completions to prevent unbounded AsyncStorage growth
+      const capped = completions.slice(-500);
+      await AsyncStorage.setItem('@shootrz_drill_completions', JSON.stringify(capped));
     } catch (error) {
       console.error('Error marking drill completed:', error);
       throw error;
@@ -344,10 +348,53 @@ class StorageService {
         '@shootrz_onboarding_completed',
       ]);
 
-      console.log('All app data cleared successfully');
     } catch (error) {
       console.error('Error clearing all data:', error);
       throw error;
+    }
+  }
+
+  /**
+   * One-time migration: push locally-cached data to Supabase via API, then
+   * clear the local copies.  Gated by a flag so it runs at most once.
+   */
+  async migrateToSupabase(apiService: any): Promise<void> {
+    try {
+      const flag = await AsyncStorage.getItem('@shootrz_supabase_migration_v1_complete')
+      if (flag === 'true') return
+
+      const [drills, workouts] = await Promise.all([
+        this.getDrillCompletions(),
+        this.getWorkoutHistory(),
+      ])
+
+      for (const drill of drills) {
+        try {
+          await apiService.completeDrill({
+            drillId: drill.drillId,
+            drillName: drill.drillId,
+          })
+        } catch { /* best-effort */ }
+      }
+
+      for (const workout of workouts) {
+        try {
+          await apiService.updateWorkoutProgress(
+            workout.workoutId || workout.id || 'unknown',
+            { workoutName: workout.workoutName || workout.name || 'Migrated Workout' },
+          )
+        } catch { /* best-effort */ }
+      }
+
+      await AsyncStorage.multiRemove([
+        '@shootrz_drill_completions',
+        this.KEYS.WORKOUT_HISTORY,
+        this.KEYS.ANALYSIS_HISTORY,
+      ])
+
+      await AsyncStorage.setItem('@shootrz_supabase_migration_v1_complete', 'true')
+    } catch (error) {
+      console.error('Supabase migration failed (will retry next launch):', error)
     }
   }
 

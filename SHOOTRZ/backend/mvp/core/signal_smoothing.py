@@ -10,7 +10,6 @@ import pandas as pd
 from pathlib import Path
 from typing import Dict, Any, List
 from scipy.signal import savgol_filter
-from scipy.interpolate import interp1d
 
 
 class SignalSmoother:

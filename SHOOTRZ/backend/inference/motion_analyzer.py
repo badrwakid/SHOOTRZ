@@ -345,6 +345,7 @@ def detect_local_maxima(
 def analyze_motion_patterns(
 	pose_results: List[Dict[str, Any]],
 	fps: float = 30.0,
+	shooting_side: str = "right",
 ) -> MotionSignals:
 	"""
 	Analyze motion patterns from pose results.
@@ -354,10 +355,19 @@ def analyze_motion_patterns(
 	Args:
 		pose_results: List of pose detection results with landmarks
 		fps: Video frames per second
+		shooting_side: "left" or "right" — selects which body landmarks to use
 		
 	Returns:
 		MotionSignals object containing all computed signals
 	"""
+	# BUG FIX: Select landmark indices based on shooting_side instead of hardcoding right
+	if shooting_side == "left":
+		hip_idx, knee_idx, ankle_idx = 23, 25, 27
+		shoulder_idx, elbow_idx, wrist_idx = 11, 13, 15
+	else:
+		hip_idx, knee_idx, ankle_idx = 24, 26, 28
+		shoulder_idx, elbow_idx, wrist_idx = 12, 14, 16
+
 	# Extract joint positions
 	hip_positions = []
 	knee_positions = []
@@ -378,14 +388,12 @@ def analyze_motion_patterns(
 			wrist_positions.append(np.array([0.5, 0.5, 0.0]))
 			continue
 		
-		# MediaPipe pose indices
-		# Right side (assuming right-handed shot)
-		hip_positions.append(landmarks[24])  # right_hip
-		knee_positions.append(landmarks[26])  # right_knee
-		ankle_positions.append(landmarks[28])  # right_ankle
-		shoulder_positions.append(landmarks[12])  # right_shoulder
-		elbow_positions.append(landmarks[14])  # right_elbow
-		wrist_positions.append(landmarks[16])  # right_wrist
+		hip_positions.append(landmarks[hip_idx])
+		knee_positions.append(landmarks[knee_idx])
+		ankle_positions.append(landmarks[ankle_idx])
+		shoulder_positions.append(landmarks[shoulder_idx])
+		elbow_positions.append(landmarks[elbow_idx])
+		wrist_positions.append(landmarks[wrist_idx])
 	
 	# Compute all signals
 	hip_y, hip_velocity = compute_hip_vertical_velocity(hip_positions, fps)

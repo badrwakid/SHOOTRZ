@@ -1,8 +1,0 @@
-{
-  "warnings": [
-    "release_weak_evidence",
-    "low_event_confidence",
-    "crouch_ambiguous",
-    "release_weak_evidence"
-  ]
-}

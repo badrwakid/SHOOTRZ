@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 import json
 from pathlib import Path
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, List, Optional
 
 from backend.inference.pose_2d import MediaPipePoseDetector, BASKETBALL_KEYPOINTS
 

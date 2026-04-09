@@ -1,21 +1,29 @@
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, List
+import logging
+import time
+from typing import Any, Dict, Generator, List
 
 from fastapi import APIRouter, Depends
-from ..chat.context_builder import ContextBuildOptions, build_user_context
-from ..chat.openai_client import generate_chat_completion
-from ..contracts.chat import ChatRequest, ChatResponse
-from ..utils.supabase_auth import get_authenticated_user
+from fastapi.responses import StreamingResponse
 
+from ..chat.context_builder import (
+    ContextBuildOptions,
+    build_user_context,
+    sanitize_context_for_llm,
+)
+from ..chat import llm_provider
+from ..contracts.chat import ChatRequest, ChatResponse
+from ..storage.db import db
+from ..utils.supabase_auth import AuthenticatedUser, get_authenticated_user
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="", tags=["chat"])
 
 
 def _build_system_prompt(context: Dict[str, Any]) -> str:
-    # Keep this deterministic and explicit: coach persona + how to use data.
-    # Important: keep it short enough to not balloon tokens.
     context_json = json.dumps(context, ensure_ascii=False)
     return (
         "You are Coach J, an elite basketball shooting coach inside the SHOOTRZ app.\n"
@@ -32,32 +40,49 @@ def _build_system_prompt(context: Dict[str, Any]) -> str:
     )
 
 
-@router.post("/chat", response_model=ChatResponse)
-async def chat(
-    payload: ChatRequest,
-    user=Depends(get_authenticated_user),
-):
-    # Build full context (server + client local)
-    context, context_used = build_user_context(
+def _build_context(payload: ChatRequest, user: AuthenticatedUser):
+    return build_user_context(
         user_id=user.user_id,
         user_local_context=payload.user_local_context,
         options=ContextBuildOptions(
             include_raw_artifacts=payload.include_raw_artifacts,
-            max_videos=8,
-            max_metrics_per_video=25,
+            max_recent_summaries=5,
+            max_chat_history=20,
         ),
     )
 
+
+# ---------------------------------------------------------------------------
+# Batch endpoint
+# ---------------------------------------------------------------------------
+
+@router.post("/chat", response_model=ChatResponse)
+async def chat(
+    payload: ChatRequest,
+    user: AuthenticatedUser = Depends(get_authenticated_user),
+):
+    context, context_used = _build_context(payload, user)
+    context = sanitize_context_for_llm(context)
     system_prompt = _build_system_prompt(context)
 
-    # Only pass a bounded number of messages to the model
     trimmed = payload.messages[-20:] if payload.messages else []
     llm_messages = [{"role": m.role, "content": m.content} for m in trimmed]
 
-    llm_resp = generate_chat_completion(
+    start_ms = time.time()
+    llm_resp = llm_provider.generate(
         system_prompt=system_prompt,
         messages=llm_messages,
         model=payload.model,
+    )
+    elapsed_ms = int((time.time() - start_ms) * 1000)
+
+    _persist_exchange(
+        user_id=user.user_id,
+        user_message=trimmed[-1].content if trimmed else "",
+        assistant_message=llm_resp.text.strip(),
+        model=llm_resp.model,
+        usage=llm_resp.usage,
+        elapsed_ms=elapsed_ms,
     )
 
     return ChatResponse(
@@ -68,4 +93,131 @@ async def chat(
     )
 
 
+# ---------------------------------------------------------------------------
+# Streaming (SSE) endpoint
+# ---------------------------------------------------------------------------
 
+def _sse_generator(
+    system_prompt: str,
+    messages: List[Dict[str, str]],
+    context_used: Dict[str, Any],
+    model: str | None,
+    user_id: str,
+    user_message: str,
+) -> Generator[str, None, None]:
+    full_response: List[str] = []
+    response_model = ""
+    response_usage: Dict[str, Any] | None = None
+    start_ms = time.time()
+
+    try:
+        for event_type, payload in llm_provider.stream(
+            system_prompt=system_prompt,
+            messages=messages,
+            model=model,
+        ):
+            if event_type == "delta":
+                full_response.append(payload.get("text", ""))
+                yield f"event: delta\ndata: {json.dumps(payload)}\n\n"
+            elif event_type == "done":
+                response_model = payload.get("model", "")
+                response_usage = payload.get("usage")
+                payload["context_used"] = context_used
+                yield f"event: done\ndata: {json.dumps(payload)}\n\n"
+            elif event_type == "error":
+                yield f"event: error\ndata: {json.dumps(payload)}\n\n"
+    except Exception as exc:
+        yield f"event: error\ndata: {json.dumps({'message': str(exc)})}\n\n"
+
+    elapsed_ms = int((time.time() - start_ms) * 1000)
+    assistant_text = "".join(full_response).strip()
+    if assistant_text:
+        _persist_exchange(
+            user_id=user_id,
+            user_message=user_message,
+            assistant_message=assistant_text,
+            model=response_model,
+            usage=response_usage,
+            elapsed_ms=elapsed_ms,
+        )
+
+
+@router.post("/chat/stream")
+async def chat_stream(
+    payload: ChatRequest,
+    user: AuthenticatedUser = Depends(get_authenticated_user),
+):
+    context, context_used = _build_context(payload, user)
+    context = sanitize_context_for_llm(context)
+    system_prompt = _build_system_prompt(context)
+
+    trimmed = payload.messages[-20:] if payload.messages else []
+    llm_messages = [{"role": m.role, "content": m.content} for m in trimmed]
+    user_message = trimmed[-1].content if trimmed else ""
+
+    return StreamingResponse(
+        _sse_generator(
+            system_prompt, llm_messages, context_used,
+            payload.model, user.user_id, user_message,
+        ),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+# ---------------------------------------------------------------------------
+# Chat history endpoints
+# ---------------------------------------------------------------------------
+
+@router.get("/chat/history")
+async def get_chat_history(
+    user: AuthenticatedUser = Depends(get_authenticated_user),
+    limit: int = 50,
+):
+    messages = db.get_chat_history(user.user_id, limit=limit)
+    return {"messages": messages}
+
+
+@router.delete("/chat/history")
+async def clear_chat_history(
+    user: AuthenticatedUser = Depends(get_authenticated_user),
+):
+    success = db.clear_chat_history(user.user_id)
+    if success:
+        return {"status": "cleared"}
+    return {"status": "error", "message": "Failed to clear chat history"}
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _persist_exchange(
+    *,
+    user_id: str,
+    user_message: str,
+    assistant_message: str,
+    model: str,
+    usage: Dict[str, Any] | None,
+    elapsed_ms: int,
+) -> None:
+    """Save both the user and assistant messages to chat_history."""
+    try:
+        if user_message:
+            db.save_chat_message(user_id, "user", user_message)
+        token_count = None
+        if isinstance(usage, dict):
+            token_count = usage.get("total_tokens") or usage.get("completion_tokens")
+        db.save_chat_message(
+            user_id, "assistant", assistant_message,
+            metadata={
+                "model": model,
+                "tokens": token_count,
+                "response_time_ms": elapsed_ms,
+            },
+        )
+    except Exception:
+        logger.exception("Failed to persist chat exchange", extra={"user_id": user_id})

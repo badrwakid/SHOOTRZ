@@ -8,7 +8,6 @@ import cv2
 import numpy as np
 from pathlib import Path
 from typing import List, Dict, Optional, Any, Tuple
-import os
 
 
 # MediaPipe pose connections (33 keypoints)
@@ -264,7 +263,6 @@ def annotate_video(
 		fourcc = cv2.VideoWriter_fourcc(*codec)
 		out = cv2.VideoWriter(str(output_path), fourcc, fps, (target_width, target_height))
 		if out.isOpened():
-			print(f"[overlay] using codec={codec}, size={target_width}x{target_height}, fps={fps}, output={output_path}")
 			break
 	if out is None or not out.isOpened():
 		raise RuntimeError("Failed to open video writer for overlay. Tried codecs: mp4v, avc1, H264")
@@ -283,7 +281,7 @@ def annotate_video(
 				# Handle ShootingPhase enum
 				try:
 					phase_name = phase_obj.value if hasattr(phase_obj, 'value') else str(phase_obj).lower().split('.')[-1]
-				except:
+				except Exception:
 					phase_name = str(phase_obj).lower().split('.')[-1]
 			
 			start_frame = phase.get("start_frame", 0)
@@ -293,49 +291,47 @@ def annotate_video(
 			for f in range(start_frame, end_frame + 1):
 				phase_map[f] = phase_name
 	
-	# Process frames
-	while True:
-		ret, frame = cap.read()
-		if not ret:
-			break
-		
-		# Get pose result for this frame
-		if frame_idx < len(pose_results):
-			pose_result = pose_results[frame_idx]
-			landmarks = pose_result.get("landmarks")
-			confidence = pose_result.get("confidence")
+	# BUG FIX: Wrap in try/finally to ensure OpenCV resources are released on exception
+	try:
+		# Process frames
+		while True:
+			ret, frame = cap.read()
+			if not ret:
+				break
 			
-			if landmarks is not None:
-				# Convert landmarks to numpy array if needed
-				if not isinstance(landmarks, np.ndarray):
-					landmarks = np.array(landmarks)
+			# Get pose result for this frame
+			if frame_idx < len(pose_results):
+				pose_result = pose_results[frame_idx]
+				landmarks = pose_result.get("landmarks")
+				confidence = pose_result.get("confidence")
 				
-				# Draw skeleton
-				frame = draw_skeleton(frame, landmarks, confidence)
-		
-		# Draw ball trajectory (if available and frame is in trajectory range)
-		if ball_trajectory:
-			# Draw full trajectory up to current frame
-			trajectory_up_to_frame = ball_trajectory[:frame_idx + 1] if frame_idx < len(ball_trajectory) else ball_trajectory
-			if trajectory_up_to_frame:
-				frame = draw_ball_trajectory(frame, trajectory_up_to_frame)
-		
-		# Draw phase label
-		current_phase = phase_map.get(frame_idx)
-		if current_phase:
-			frame = draw_phase_label(frame, current_phase)
-		
-		# Write frame
-		out.write(frame)
-		
-		frame_idx += 1
-		# Lightweight progress logging every ~10%
-		if total_frames > 0 and frame_idx % max(1, total_frames // 10) == 0:
-			print(f"Annotate progress: {frame_idx}/{total_frames} frames ({(frame_idx/total_frames)*100:.1f}%)")
-	
-	# Cleanup
-	cap.release()
-	out.release()
+				if landmarks is not None:
+					# Convert landmarks to numpy array if needed
+					if not isinstance(landmarks, np.ndarray):
+						landmarks = np.array(landmarks)
+					
+					# Draw skeleton
+					frame = draw_skeleton(frame, landmarks, confidence)
+			
+			# Draw ball trajectory (if available and frame is in trajectory range)
+			if ball_trajectory:
+				# Draw full trajectory up to current frame
+				trajectory_up_to_frame = ball_trajectory[:frame_idx + 1] if frame_idx < len(ball_trajectory) else ball_trajectory
+				if trajectory_up_to_frame:
+					frame = draw_ball_trajectory(frame, trajectory_up_to_frame)
+			
+			# Draw phase label
+			current_phase = phase_map.get(frame_idx)
+			if current_phase:
+				frame = draw_phase_label(frame, current_phase)
+			
+			# Write frame
+			out.write(frame)
+			
+			frame_idx += 1
+	finally:
+		cap.release()
+		out.release()
 	
 	return output_path
 

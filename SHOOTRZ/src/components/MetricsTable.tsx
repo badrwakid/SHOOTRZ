@@ -1,13 +1,12 @@
-import React from 'react'
 import {
 	View,
 	Text,
 	StyleSheet,
-	ScrollView,
+	// BUG FIX: Removed unused ScrollView import
 	TouchableOpacity,
 	FlatList,
 } from 'react-native'
-import { LinearGradient } from 'expo-linear-gradient'
+// BUG FIX: Removed unused LinearGradient import
 import { Ionicons } from '@expo/vector-icons'
 import { SHOOTRZ_THEME } from '../constants/theme'
 

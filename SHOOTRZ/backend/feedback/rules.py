@@ -12,10 +12,11 @@ from pathlib import Path
 # Load normative ranges
 NORMATIVE_RANGES_PATH = Path(__file__).parent.parent / "metrics" / "normative_ranges.json"
 
+# BUG FIX: Also catch JSONDecodeError to prevent import-time crash on invalid JSON
 try:
 	with open(NORMATIVE_RANGES_PATH, "r") as f:
 		NORMATIVE_RANGES = json.load(f)
-except FileNotFoundError:
+except (FileNotFoundError, json.JSONDecodeError):
 	NORMATIVE_RANGES = {}
 
 

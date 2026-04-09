@@ -11,7 +11,7 @@ import numpy as np
 from typing import Dict, List, Optional, Tuple, Any
 from enum import Enum
 from dataclasses import dataclass
-from scipy.signal import find_peaks, savgol_filter
+from scipy.signal import find_peaks
 
 from .motion_analyzer import (
 	analyze_motion_patterns,
@@ -71,6 +71,7 @@ class PhaseDetector:
 		self,
 		fps: float = 30.0,
 		min_phase_frames: int = 3,
+		shooting_side: str = "right",
 	):
 		"""
 		Initialize phase detector.
@@ -78,9 +79,11 @@ class PhaseDetector:
 		Args:
 			fps: Video frames per second
 			min_phase_frames: Minimum frames required for a phase
+			shooting_side: "left" or "right" — forwarded to motion analyzer
 		"""
 		self.fps = fps
 		self.min_phase_frames = min_phase_frames
+		self.shooting_side = shooting_side
 
 	def _calculate_adaptive_thresholds(
 		self,
@@ -519,7 +522,9 @@ class PhaseDetector:
 		else:
 			weighted_frame = sum(f * c * w for f, c, w in candidates if c > 0.5) / total_weight
 			release_frame = int(weighted_frame)
-			confidence = sum(c * w for _, c, w in candidates) / sum(w for _, _, w in candidates)
+			# BUG FIX: Guard against division by zero when all weights are zero
+			weight_sum = sum(w for _, _, w in candidates)
+			confidence = sum(c * w for _, c, w in candidates) / weight_sum if weight_sum > 0 else 0.5
 		
 		# Validate player is in the air (knees should be relatively extended)
 		if release_frame < len(motion_signals.knee_angles):
@@ -694,7 +699,8 @@ class PhaseDetector:
 			return []
 		
 		# Step 1: Analyze motion patterns
-		motion_signals = analyze_motion_patterns(pose_results, self.fps)
+		# BUG FIX: Pass shooting_side so the correct body landmarks are used
+		motion_signals = analyze_motion_patterns(pose_results, self.fps, self.shooting_side)
 
 		# Step 1b: Validate motion pattern to ensure this looks like a shot
 		is_valid, reason = self._validate_shooting_motion(motion_signals)

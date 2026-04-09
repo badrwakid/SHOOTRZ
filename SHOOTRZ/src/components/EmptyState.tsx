@@ -1,135 +1,90 @@
-import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated, ColorValue } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
-import { SHOOTRZ_THEME, COMPONENT_STYLES } from '../constants/theme';
+import React, { useEffect, useRef } from 'react'
+import { View, Text, StyleSheet, Animated } from 'react-native'
+import { Ionicons } from '@expo/vector-icons'
+import { colors, typography, spacing, animation } from '../constants/theme'
+import { PrimaryButton } from './PrimaryButton'
 
 interface EmptyStateProps {
-  icon: string;
-  title: string;
-  message: string;
-  actionText?: string;
-  onAction?: () => void;
+	icon: string
+	title: string
+	message: string
+	actionText?: string
+	onAction?: () => void
+	action?: { label: string; onPress: () => void }
 }
 
 export const EmptyState: React.FC<EmptyStateProps> = ({
-  icon,
-  title,
-  message,
-  actionText,
-  onAction,
+	icon,
+	title,
+	message,
+	actionText,
+	onAction,
+	action,
 }) => {
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(20)).current;
-  const iconScale = useRef(new Animated.Value(0)).current;
+	const fadeAnim = useRef(new Animated.Value(0)).current
+	const slideAnim = useRef(new Animated.Value(20)).current
 
-  useEffect(() => {
-    Animated.sequence([
-      Animated.parallel([
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: SHOOTRZ_THEME.animations.slow,
-          useNativeDriver: true,
-        }),
-        Animated.timing(slideAnim, {
-          toValue: 0,
-          duration: SHOOTRZ_THEME.animations.slow,
-          useNativeDriver: true,
-        }),
-      ]),
-      Animated.spring(iconScale, {
-        toValue: 1,
-        tension: 50,
-        friction: 5,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, []);
+	useEffect(() => {
+		Animated.parallel([
+			Animated.timing(fadeAnim, {
+				toValue: 1,
+				duration: animation.duration.slow,
+				useNativeDriver: true,
+			}),
+			Animated.timing(slideAnim, {
+				toValue: 0,
+				duration: animation.duration.slow,
+				useNativeDriver: true,
+			}),
+		]).start()
+	}, [])
 
-  return (
-    <Animated.View
-      style={[
-        styles.container,
-        {
-          opacity: fadeAnim,
-          transform: [{ translateY: slideAnim }],
-        },
-      ]}
-    >
-      <LinearGradient
-        colors={[SHOOTRZ_THEME.colors.surface, SHOOTRZ_THEME.colors.surfaceElevated]}
-        style={styles.card}
-      >
-        <Animated.View
-          style={[
-            styles.iconContainer,
-            {
-              transform: [{ scale: iconScale }],
-            },
-          ]}
-        >
-          <Ionicons name={icon as any} size={64} color={SHOOTRZ_THEME.colors.primary} />
-        </Animated.View>
+	const resolvedAction = action ?? (actionText && onAction ? { label: actionText, onPress: onAction } : null)
 
-        <Text style={styles.title}>{title}</Text>
-        <Text style={styles.message}>{message}</Text>
-
-        {actionText && onAction && (
-          <TouchableOpacity style={styles.actionButton} onPress={onAction}>
-            <LinearGradient
-              colors={SHOOTRZ_THEME.gradients.primary as [ColorValue, ColorValue]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.buttonGradient}
-            >
-              <Text style={styles.actionText}>{actionText}</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-        )}
-      </LinearGradient>
-    </Animated.View>
-  );
-};
+	return (
+		<Animated.View
+			style={[
+				styles.container,
+				{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
+			]}
+		>
+			<Ionicons name={icon as any} size={64} color={colors.brand.chrome} />
+			<Text style={styles.title}>{title}</Text>
+			<Text style={styles.message}>{message}</Text>
+			{resolvedAction ? (
+				<PrimaryButton
+					label={resolvedAction.label}
+					onPress={resolvedAction.onPress}
+					style={styles.actionButton}
+				/>
+			) : null}
+		</Animated.View>
+	)
+}
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: SHOOTRZ_THEME.spacing.xl,
-  },
-  card: {
-    width: '100%',
-    maxWidth: 400,
-    padding: SHOOTRZ_THEME.spacing.xxl,
-    borderRadius: SHOOTRZ_THEME.borderRadius.lg,
-    alignItems: 'center',
-  },
-  iconContainer: {
-    marginBottom: SHOOTRZ_THEME.spacing.lg,
-  },
-  title: {
-    ...SHOOTRZ_THEME.typography.heading2,
-    textAlign: 'center',
-    marginBottom: SHOOTRZ_THEME.spacing.md,
-  },
-  message: {
-    ...SHOOTRZ_THEME.typography.body,
-    color: SHOOTRZ_THEME.colors.textSecondary,
-    textAlign: 'center',
-    lineHeight: 24,
-    marginBottom: SHOOTRZ_THEME.spacing.xl,
-  },
-  actionButton: {
-    borderRadius: SHOOTRZ_THEME.borderRadius.xl,
-    overflow: 'hidden',
-  },
-  buttonGradient: {
-    paddingHorizontal: SHOOTRZ_THEME.spacing.xl,
-    paddingVertical: SHOOTRZ_THEME.spacing.md,
-  },
-  actionText: {
-    ...SHOOTRZ_THEME.typography.button,
-    textAlign: 'center',
-  },
-});
+	container: {
+		flex: 1,
+		justifyContent: 'center',
+		alignItems: 'center',
+		padding: spacing[8],
+	},
+	title: {
+		fontSize: typography.size.lg,
+		fontWeight: typography.weight.semibold,
+		color: colors.text.primary,
+		textAlign: 'center',
+		marginTop: spacing[4],
+	},
+	message: {
+		fontSize: typography.size.base,
+		color: colors.text.secondary,
+		textAlign: 'center',
+		maxWidth: 280,
+		marginTop: spacing[2],
+		lineHeight: typography.size.base * typography.lineHeight.normal,
+	},
+	actionButton: {
+		marginTop: spacing[6],
+	},
+})

@@ -3,7 +3,7 @@ Feedback endpoints for retrieving and managing feedback.
 """
 
 from fastapi import APIRouter, HTTPException
-from typing import List, Optional
+
 
 from ..storage.db import get_video_feedback, get_video_metrics
 from ..feedback.engine import generate_feedback

@@ -1,704 +1,408 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react'
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  ActivityIndicator,
-  RefreshControl,
-  Animated,
-} from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-import { SHOOTRZ_THEME, COMPONENT_STYLES } from '../constants/theme';
-import { getActivityIcon } from '../utils/iconMapper';
-import { ShootrzLogo } from '../components/ShootrzLogo';
-import { AnimatedStatCard } from '../components/AnimatedStatCard';
-import { GradientCard } from '../components/GradientCard';
-import { LoadingBasketball } from '../components/LoadingBasketball';
-import { EmptyState } from '../components/EmptyState';
-import { useAuth } from '../context/AuthContext';
-import { storageService } from '../services/storage.service';
-import { hapticFeedback } from '../utils/hapticFeedback';
+	View,
+	Text,
+	StyleSheet,
+	ScrollView,
+	TouchableOpacity,
+	RefreshControl,
+	FlatList,
+	Dimensions,
+} from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
+import { Ionicons } from '@expo/vector-icons'
+import { colors, typography, spacing, radius, glass, shadows, getScoreTier } from '../constants/theme'
+import { ScoreRing } from '../components/ScoreRing'
+import { StatCard } from '../components/StatCard'
+import { StreakBadge } from '../components/StreakBadge'
+import { TierBadge } from '../components/TierBadge'
+import { SectionHeader } from '../components/SectionHeader'
+import { AnalysisCard } from '../components/AnalysisCard'
+import { PrimaryButton } from '../components/PrimaryButton'
+import { SkeletonLoader } from '../components/SkeletonLoader'
+import { EmptyState } from '../components/EmptyState'
+import { useAuth } from '../context/AuthContext'
+import { apiService } from '../services/api.service'
+import { storageService } from '../services/storage.service'
+import { hapticFeedback } from '../utils/hapticFeedback'
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window')
 
 interface HomeScreenProps {
-  navigation: any;
+	navigation: any
+}
+
+function getGreeting(): string {
+	const h = new Date().getHours()
+	if (h < 12) return 'Good morning'
+	if (h < 17) return 'Good afternoon'
+	return 'Good evening'
 }
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
-  const { user, logout } = useAuth();
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [stats, setStats] = useState({
-    dayStreak: 0,
-    totalAnalyses: 0,
-    averageScore: 0,
-  });
-  const [recentActivity, setRecentActivity] = useState<any[]>([]);
+	const { user } = useAuth()
+	const [loading, setLoading] = useState(true)
+	const [refreshing, setRefreshing] = useState(false)
+	const [stats, setStats] = useState({ dayStreak: 0, totalAnalyses: 0, averageScore: 0, bestScore: 0 })
+	const [lastSession, setLastSession] = useState<{ score: number; date: string } | null>(null)
+	const [recentSessions, setRecentSessions] = useState<any[]>([])
 
-  const quickActions = [
-    {
-      title: 'Analyze Shot',
-      icon: 'analytics',
-      color: SHOOTRZ_THEME.colors.primary,
-      screen: 'Analyze',
-    },
-    {
-      title: 'Browse Drills',
-      icon: 'basketball',
-      color: SHOOTRZ_THEME.colors.secondary,
-      screen: 'Drills',
-    },
-    {
-      title: 'Start Workout',
-      icon: 'barbell',
-      color: SHOOTRZ_THEME.colors.accent,
-      screen: 'Workouts',
-    },
-    {
-      title: 'Chat with Coach J',
-      icon: 'chatbubbles',
-      color: SHOOTRZ_THEME.colors.primaryLight,
-      screen: 'Coach J',
-    },
-  ];
+	useEffect(() => { loadData() }, [])
+	useEffect(() => {
+		const unsub = navigation.addListener('focus', () => loadData())
+		return unsub
+	}, [navigation])
 
-  useEffect(() => {
-    loadDashboardData();
-  }, []);
+	const loadData = async () => {
+		try {
+			let serverStats: any = null
+			let serverStreak: any = null
+			try {
+				[serverStats, serverStreak] = await Promise.all([
+					apiService.getUserStats(),
+					apiService.getUserStreak(),
+				])
+			} catch { /* fall back to local data */ }
 
-  // Refresh data when user returns to home screen
-  useEffect(() => {
-    const unsubscribe = navigation.addListener('focus', () => {
-      console.log('🏠 Home screen focused, refreshing data...');
-      loadDashboardData();
-    });
+			if (serverStats && (serverStats.totalSessions ?? 0) > 0) {
+				setStats({
+					dayStreak: serverStreak?.currentStreak ?? 0,
+					totalAnalyses: serverStats.totalSessions ?? 0,
+					averageScore: Math.round(serverStats.avgScore ?? 0),
+					bestScore: Math.round(serverStats.bestScore ?? 0),
+				})
 
-    return unsubscribe;
-  }, [navigation]);
+				if (serverStats.lastSessionDate) {
+					setLastSession({
+						score: Math.round(serverStats.bestScore ?? serverStats.avgScore ?? 0),
+						date: fmtDate(serverStats.lastSessionDate),
+					})
+				} else {
+					setLastSession(null)
+				}
+			} else {
+				const [analysisHistory, workoutHistory, drillCompletions] = await Promise.all([
+					storageService.getAnalysisHistory(),
+					storageService.getWorkoutHistory(),
+					storageService.getDrillCompletions(),
+				])
 
-  const loadDashboardData = async () => {
-    try {
-      console.log('📊 Loading dashboard data...');
-      const [analysisHistory, workoutHistory, drillCompletions] = await Promise.all([
-        storageService.getAnalysisHistory(),
-        storageService.getWorkoutHistory(),
-        storageService.getDrillCompletions(),
-      ]);
+				const totalScore = analysisHistory.reduce((s, a) => s + a.scores.total, 0)
+				const avg = analysisHistory.length > 0 ? Math.round(totalScore / analysisHistory.length) : 0
+				const best = analysisHistory.length > 0 ? Math.max(...analysisHistory.map(a => a.scores.total)) : 0
+				const streak = calcStreak(analysisHistory, workoutHistory, drillCompletions)
 
-      console.log('📈 Analysis history:', analysisHistory.length);
-      console.log('💪 Workout history:', workoutHistory.length);
-      console.log('🏀 Drill completions:', drillCompletions.length);
+				setStats({ dayStreak: streak, totalAnalyses: analysisHistory.length, averageScore: avg, bestScore: best })
 
-      // Calculate stats
-      const totalScore = analysisHistory.reduce((sum, a) => sum + a.scores.total, 0);
-      const avgScore =
-        analysisHistory.length > 0 ? Math.round(totalScore / analysisHistory.length) : 0;
+				if (analysisHistory.length > 0) {
+					const latest = analysisHistory[0]
+					setLastSession({ score: latest.scores.total, date: fmtDate(latest.timestamp) })
+				} else {
+					setLastSession(null)
+				}
 
-      // Calculate day streak from all activities
-      const dayStreak = calculateDayStreak(analysisHistory, workoutHistory, drillCompletions);
+				setRecentSessions(
+					analysisHistory.slice(0, 3).map(a => ({
+						id: a.id,
+						score: a.scores.total,
+						date: fmtDate(a.timestamp),
+					})),
+				)
+			}
+		} catch (e) {
+			console.error('Error loading dashboard:', e)
+		} finally {
+			setLoading(false)
+		}
+	}
 
-      console.log('📊 Calculated stats:', {
-        dayStreak,
-        totalAnalyses: analysisHistory.length,
-        averageScore: avgScore,
-      });
+	const calcStreak = (ah: any[], wh: any[], dc: any[]) => {
+		const dates = new Set<string>()
+		ah.forEach(a => dates.add(new Date(a.timestamp).toDateString()))
+		wh.forEach(w => dates.add(new Date(w.completedAt).toDateString()))
+		dc.forEach(d => dates.add(new Date(d.completedAt).toDateString()))
+		if (dates.size === 0) return 0
+		const sorted = Array.from(dates).sort((a, b) => new Date(b).getTime() - new Date(a).getTime())
+		let streak = 0
+		const today = new Date(); today.setHours(0, 0, 0, 0)
+		for (let i = 0; i < sorted.length; i++) {
+			const d = new Date(sorted[i]); d.setHours(0, 0, 0, 0)
+			if (Math.floor((today.getTime() - d.getTime()) / 86400000) === i) streak++
+			else break
+		}
+		return streak
+	}
 
-      setStats({
-        dayStreak,
-        totalAnalyses: analysisHistory.length,
-        averageScore: avgScore,
-      });
+	const fmtDate = (iso: string) => {
+		const d = new Date(iso)
+		const now = new Date()
+		const diff = Math.floor((now.getTime() - d.getTime()) / 86400000)
+		if (diff === 0) return 'Today'
+		if (diff === 1) return 'Yesterday'
+		if (diff < 7) return `${diff} days ago`
+		return d.toLocaleDateString()
+	}
 
-      // Build recent activity
-      const activities: any[] = [];
+	const onRefresh = async () => {
+		setRefreshing(true)
+		await loadData()
+		setRefreshing(false)
+	}
 
-      // Add recent analyses
-      analysisHistory.slice(0, 2).forEach((analysis) => {
-        activities.push({
-          type: 'Analysis',
-          score: analysis.scores.total,
-          date: getRelativeDate(analysis.timestamp),
-        });
-      });
+	if (loading) {
+		return (
+			<SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+				<View style={styles.skeletonHeader}>
+					<SkeletonLoader width={200} height={24} />
+					<SkeletonLoader width={120} height={16} />
+				</View>
+				<View style={styles.skeletonHero}>
+					<SkeletonLoader width="100%" height={140} radius={16} />
+				</View>
+				<View style={styles.skeletonStats}>
+					<SkeletonLoader width="30%" height={100} radius={16} />
+					<SkeletonLoader width="30%" height={100} radius={16} />
+					<SkeletonLoader width="30%" height={100} radius={16} />
+				</View>
+			</SafeAreaView>
+		)
+	}
 
-      // Add recent workouts
-      workoutHistory.slice(0, 1).forEach((workout) => {
-        activities.push({
-          type: 'Workout',
-          name: workout.workoutName,
-          date: getRelativeDate(workout.completedAt),
-        });
-      });
+	return (
+		<SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+			<ScrollView
+				showsVerticalScrollIndicator={false}
+				refreshControl={
+					<RefreshControl
+						refreshing={refreshing}
+						onRefresh={onRefresh}
+						tintColor={colors.brand.orange}
+					/>
+				}
+			>
+				{/* Header */}
+				<View style={styles.header}>
+					<View>
+						<Text style={styles.greeting}>
+							{getGreeting()}, {user?.name?.split(' ')[0] || 'Player'}
+						</Text>
+						<Text style={styles.tagline}>PERFECT THE GAME</Text>
+					</View>
+					{stats.dayStreak > 0 ? <StreakBadge count={stats.dayStreak} /> : null}
+				</View>
 
-      // Add recent drills
-      if (drillCompletions.length > 0) {
-        const lastDrill = drillCompletions[drillCompletions.length - 1];
-        activities.push({
-          type: 'Drill',
-          name: 'Drill Completed',
-          date: getRelativeDate(lastDrill.completedAt),
-        });
-      }
+				{/* Hero Stat Card */}
+				<View style={styles.heroCard}>
+					{lastSession ? (
+						<View style={styles.heroInner}>
+							<ScoreRing score={lastSession.score} size="lg" animated />
+							<View style={styles.heroInfo}>
+								<Text style={styles.heroLabel}>LAST SESSION</Text>
+								<Text style={styles.heroScore}>{lastSession.score}</Text>
+								<TierBadge tier={getScoreTier(lastSession.score)} />
+								<Text style={styles.heroDate}>{lastSession.date}</Text>
+							</View>
+						</View>
+					) : (
+						<EmptyState
+							icon="basketball-outline"
+							title="Your journey starts here"
+							message="Analyze your first shot to see your score"
+						/>
+					)}
+				</View>
 
-      setRecentActivity(activities.slice(0, 3));
-    } catch (error) {
-      console.error('Error loading dashboard data:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+				{/* Quick Stats */}
+				<View style={styles.statsRow}>
+					<StatCard icon="basketball" label="Sessions" value={stats.totalAnalyses} color="orange" />
+					<StatCard icon="stats-chart" label="Avg Score" value={stats.averageScore} color="cyan" />
+					<StatCard icon="trophy" label="Best" value={stats.bestScore} color="default" />
+				</View>
 
-  const calculateDayStreak = (
-    analysisHistory: any[],
-    workoutHistory: any[],
-    drillCompletions: any[]
-  ): number => {
-    console.log('🔥 Calculating day streak...');
+				{/* Primary CTA */}
+				<View style={styles.ctaWrap}>
+					<PrimaryButton
+						label="Analyze Shot"
+						icon="camera"
+						onPress={() => { hapticFeedback.medium(); navigation.navigate('Analyze') }}
+						size="lg"
+						fullWidth
+					/>
+				</View>
 
-    // Combine all activities with timestamps
-    const allActivities: { date: Date; type: string }[] = [];
+				{/* Coach J Card */}
+				<TouchableOpacity
+					style={styles.coachCard}
+					onPress={() => navigation.navigate('Coach J')}
+					activeOpacity={0.85}
+				>
+					<View style={styles.coachAvatar}>
+						<Text style={styles.coachAvatarText}>J</Text>
+					</View>
+					<View style={styles.coachInfo}>
+						<Text style={styles.coachName}>Coach J</Text>
+						<Text style={styles.coachHint}>Ask me anything about your game...</Text>
+					</View>
+					<Ionicons name="chevron-forward" size={18} color={colors.brand.cyan} />
+				</TouchableOpacity>
 
-    // Add analyses
-    analysisHistory.forEach((analysis) => {
-      allActivities.push({
-        date: new Date(analysis.timestamp),
-        type: 'analysis',
-      });
-    });
+				{/* Recent Sessions */}
+				{recentSessions.length > 0 ? (
+					<View style={styles.section}>
+						<SectionHeader
+							title="Recent Sessions"
+							action={{ label: 'See all', onPress: () => navigation.navigate('Progress') }}
+						/>
+						{recentSessions.map(s => (
+							<View key={s.id} style={styles.sessionItem}>
+								<AnalysisCard
+									sessionId={s.id}
+									date={s.date}
+									score={s.score}
+									onPress={() => navigation.navigate('Progress')}
+								/>
+							</View>
+						))}
+					</View>
+				) : null}
 
-    // Add workouts
-    workoutHistory.forEach((workout) => {
-      allActivities.push({
-        date: new Date(workout.completedAt),
-        type: 'workout',
-      });
-    });
-
-    // Add drill completions
-    drillCompletions.forEach((drill) => {
-      allActivities.push({
-        date: new Date(drill.completedAt),
-        type: 'drill',
-      });
-    });
-
-    if (allActivities.length === 0) {
-      console.log('❌ No activities found, streak = 0');
-      return 0;
-    }
-
-    // Sort by date (most recent first)
-    allActivities.sort((a, b) => b.date.getTime() - a.date.getTime());
-
-    // Get unique dates (one activity per day counts)
-    const uniqueDates = new Set<string>();
-    allActivities.forEach((activity) => {
-      const dateStr = activity.date.toDateString();
-      uniqueDates.add(dateStr);
-    });
-
-    const sortedDates = Array.from(uniqueDates).sort(
-      (a, b) => new Date(b).getTime() - new Date(a).getTime()
-    );
-
-    console.log('📅 Unique activity dates:', sortedDates);
-
-    // Calculate consecutive days from today
-    let streak = 0;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    for (let i = 0; i < sortedDates.length; i++) {
-      const activityDate = new Date(sortedDates[i]);
-      activityDate.setHours(0, 0, 0, 0);
-
-      const daysDiff = Math.floor(
-        (today.getTime() - activityDate.getTime()) / (1000 * 60 * 60 * 24)
-      );
-
-      if (daysDiff === i) {
-        streak++;
-      } else {
-        break;
-      }
-    }
-
-    console.log('🔥 Calculated streak:', streak);
-    return streak;
-  };
-
-  const getRelativeDate = (dateString: string): string => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffTime = Math.abs(now.getTime() - date.getTime());
-    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-
-    if (diffDays === 0) return 'Today';
-    if (diffDays === 1) return 'Yesterday';
-    if (diffDays < 7) return `${diffDays} days ago`;
-    return date.toLocaleDateString();
-  };
-
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await loadDashboardData();
-    setRefreshing(false);
-  };
-
-  if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <LoadingBasketball message="Loading your training data..." size="large" />
-      </View>
-    );
-  }
-
-  return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-      <ScrollView
-        style={styles.scrollView}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={SHOOTRZ_THEME.colors.primary}
-          />
-        }
-      >
-        {/* Header */}
-        <View style={styles.header}>
-          <View style={styles.logoContainer}>
-            <ShootrzLogo size="medium" showTagline={false} />
-          </View>
-          <View style={styles.headerRight}>
-            <Text style={styles.greeting}>Welcome back!</Text>
-            <Text style={styles.subtitle}>Ready to improve your game?</Text>
-          </View>
-        </View>
-
-        {/* Animated Stats Cards */}
-        <View style={styles.statsContainer}>
-          <AnimatedStatCard
-            value={stats.dayStreak}
-            label="Day Streak"
-            icon="flame"
-            color={SHOOTRZ_THEME.colors.primary}
-            delay={0}
-          />
-          <AnimatedStatCard
-            value={stats.totalAnalyses}
-            label="Analyses"
-            icon="basketball"
-            color={SHOOTRZ_THEME.colors.secondary}
-            delay={100}
-          />
-          <AnimatedStatCard
-            value={stats.averageScore}
-            label="Avg Score"
-            icon="star"
-            color={SHOOTRZ_THEME.colors.accent}
-            delay={200}
-            isPercentage={true}
-          />
-        </View>
-
-        {/* Quick Actions */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Quick Actions</Text>
-          <View style={styles.actionsGrid}>
-            <View style={styles.actionRow}>
-              <GradientCard
-                onPress={() => {
-                  hapticFeedback.medium();
-                  navigation.navigate(quickActions[0].screen);
-                }}
-                style={styles.actionCard}
-                glowColor={quickActions[0].color}
-              >
-                <View
-                  style={[
-                    styles.actionIconContainer,
-                    { backgroundColor: quickActions[0].color + '20' },
-                  ]}
-                >
-                  <Ionicons
-                    name={quickActions[0].icon as any}
-                    size={28}
-                    color={quickActions[0].color}
-                  />
-                </View>
-                <Text
-                  style={styles.actionTitle}
-                  numberOfLines={2}
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.85}
-                >
-                  {quickActions[0].title}
-                </Text>
-                <View style={[styles.actionAccent, { backgroundColor: quickActions[0].color }]} />
-              </GradientCard>
-              <GradientCard
-                onPress={() => {
-                  hapticFeedback.medium();
-                  navigation.navigate(quickActions[1].screen);
-                }}
-                style={styles.actionCard}
-                glowColor={quickActions[1].color}
-              >
-                <View
-                  style={[
-                    styles.actionIconContainer,
-                    { backgroundColor: quickActions[1].color + '20' },
-                  ]}
-                >
-                  <Ionicons
-                    name={quickActions[1].icon as any}
-                    size={28}
-                    color={quickActions[1].color}
-                  />
-                </View>
-                <Text
-                  style={styles.actionTitle}
-                  numberOfLines={2}
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.85}
-                >
-                  {quickActions[1].title}
-                </Text>
-                <View style={[styles.actionAccent, { backgroundColor: quickActions[1].color }]} />
-              </GradientCard>
-            </View>
-            <View style={styles.actionRow}>
-              <GradientCard
-                onPress={() => {
-                  hapticFeedback.medium();
-                  navigation.navigate(quickActions[2].screen);
-                }}
-                style={styles.actionCard}
-                glowColor={quickActions[2].color}
-              >
-                <View
-                  style={[
-                    styles.actionIconContainer,
-                    { backgroundColor: quickActions[2].color + '20' },
-                  ]}
-                >
-                  <Ionicons
-                    name={quickActions[2].icon as any}
-                    size={28}
-                    color={quickActions[2].color}
-                  />
-                </View>
-                <Text
-                  style={styles.actionTitle}
-                  numberOfLines={2}
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.85}
-                >
-                  {quickActions[2].title}
-                </Text>
-                <View style={[styles.actionAccent, { backgroundColor: quickActions[2].color }]} />
-              </GradientCard>
-              <GradientCard
-                onPress={() => {
-                  hapticFeedback.medium();
-                  navigation.navigate(quickActions[3].screen);
-                }}
-                style={styles.actionCard}
-                glowColor={quickActions[3].color}
-              >
-                <View
-                  style={[
-                    styles.actionIconContainer,
-                    { backgroundColor: quickActions[3].color + '20' },
-                  ]}
-                >
-                  <Ionicons
-                    name={quickActions[3].icon as any}
-                    size={28}
-                    color={quickActions[3].color}
-                  />
-                </View>
-                <Text
-                  style={styles.actionTitle}
-                  numberOfLines={2}
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.85}
-                >
-                  {quickActions[3].title}
-                </Text>
-                <View style={[styles.actionAccent, { backgroundColor: quickActions[3].color }]} />
-              </GradientCard>
-            </View>
-          </View>
-        </View>
-
-        {/* Recent Activity */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Recent Activity</Text>
-          {recentActivity.length === 0 ? (
-            <EmptyState
-              icon="stats-chart"
-              title="No Activity Yet"
-              message="Start training to see your activity here!"
-            />
-          ) : (
-            recentActivity.map((activity, index) => (
-              <GradientCard key={index} style={styles.activityItem}>
-                <View style={styles.activityIcon}>
-                  <Ionicons
-                    name={getActivityIcon(activity.type) as any}
-                    size={20}
-                    color={SHOOTRZ_THEME.colors.primary}
-                  />
-                </View>
-                <View style={styles.activityContent}>
-                  <Text style={styles.activityTitle}>
-                    {activity.type === 'Analysis'
-                      ? `Shot Analysis - ${activity.score}%`
-                      : activity.type === 'Drill'
-                        ? activity.name
-                        : activity.name}
-                  </Text>
-                  <Text style={styles.activityDate}>{activity.date}</Text>
-                </View>
-                {activity.score != null && activity.score > 0 ? (
-                  <View
-                    style={[
-                      styles.scoreBadge,
-                      {
-                        backgroundColor:
-                          activity.score >= 80
-                            ? '#4CAF50'
-                            : activity.score >= 60
-                              ? '#FF9800'
-                              : '#F44336',
-                      },
-                    ]}
-                  >
-                    <Text style={styles.scoreText}>{activity.score}%</Text>
-                  </View>
-                ) : null}
-              </GradientCard>
-            ))
-          )}
-        </View>
-
-        {/* Daily Tip with Gradient */}
-        <LinearGradient
-          colors={[SHOOTRZ_THEME.colors.surface, SHOOTRZ_THEME.colors.surfaceElevated]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.tipCard}
-        >
-          <View style={styles.tipIconContainer}>
-            <Text style={styles.tipIcon}>💡</Text>
-          </View>
-          <View style={styles.tipContent}>
-            <Text style={styles.tipTitle}>Coach's Daily Tip</Text>
-            <Text style={styles.tipText}>
-              Keep your elbow aligned with the basket and follow through with your shooting hand for
-              better accuracy.
-            </Text>
-          </View>
-          <View style={[styles.tipBorder, { borderColor: SHOOTRZ_THEME.colors.secondary }]} />
-        </LinearGradient>
-      </ScrollView>
-    </SafeAreaView>
-  );
-};
+				<View style={styles.bottomPad} />
+			</ScrollView>
+		</SafeAreaView>
+	)
+}
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: SHOOTRZ_THEME.colors.background,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  loadingContainer: {
-    flex: 1,
-    backgroundColor: SHOOTRZ_THEME.colors.background,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  header: {
-    paddingHorizontal: SHOOTRZ_THEME.spacing.md,
-    paddingVertical: SHOOTRZ_THEME.spacing.xs,
-    backgroundColor: SHOOTRZ_THEME.colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: SHOOTRZ_THEME.colors.surfaceElevated,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  logoContainer: {
-    flex: 1.2,
-    alignItems: 'flex-start',
-    paddingLeft: 8,
-  },
-  headerRight: {
-    flex: 0.8,
-    alignItems: 'flex-end',
-  },
-  greeting: {
-    ...SHOOTRZ_THEME.typography.heading3,
-    fontSize: 15,
-    fontWeight: '600',
-    marginBottom: 2,
-    textAlign: 'right',
-    lineHeight: 18,
-  },
-  subtitle: {
-    ...SHOOTRZ_THEME.typography.caption,
-    fontSize: 11,
-    color: SHOOTRZ_THEME.colors.textSecondary,
-    textAlign: 'right',
-    lineHeight: 13,
-  },
-  statsContainer: {
-    flexDirection: 'row',
-    padding: SHOOTRZ_THEME.spacing.lg,
-    justifyContent: 'space-between',
-  },
-  section: {
-    padding: SHOOTRZ_THEME.spacing.lg,
-  },
-  sectionTitle: {
-    ...SHOOTRZ_THEME.typography.heading3,
-    marginBottom: SHOOTRZ_THEME.spacing.md,
-  },
-  actionsGrid: {
-    flexDirection: 'column',
-    gap: SHOOTRZ_THEME.spacing.md,
-    alignItems: 'center',
-  },
-  actionRow: {
-    flexDirection: 'row',
-    gap: SHOOTRZ_THEME.spacing.md,
-    width: '100%',
-    justifyContent: 'center',
-  },
-  actionCard: {
-    flex: 1,
-    aspectRatio: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: SHOOTRZ_THEME.spacing.lg,
-    maxWidth: 240,
-    minWidth: 160,
-  },
-  actionIconContainer: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: SHOOTRZ_THEME.spacing.md,
-  },
-  actionIcon: {
-    fontSize: 32,
-  },
-  actionTitle: {
-    ...SHOOTRZ_THEME.typography.body,
-    fontWeight: '600',
-    textAlign: 'center',
-    fontSize: 16,
-    lineHeight: 20,
-  },
-  actionAccent: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 3,
-    borderBottomLeftRadius: SHOOTRZ_THEME.borderRadius.lg,
-    borderBottomRightRadius: SHOOTRZ_THEME.borderRadius.lg,
-  },
-  activityItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: SHOOTRZ_THEME.spacing.md,
-  },
-  activityIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: SHOOTRZ_THEME.colors.surfaceElevated,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: SHOOTRZ_THEME.spacing.md,
-  },
-  activityEmoji: {
-    fontSize: 18,
-  },
-  activityContent: {
-    flex: 1,
-  },
-  activityTitle: {
-    ...SHOOTRZ_THEME.typography.body,
-    fontWeight: '600',
-    marginBottom: 2,
-  },
-  activityDate: {
-    ...SHOOTRZ_THEME.typography.bodySmall,
-    color: SHOOTRZ_THEME.colors.textSecondary,
-  },
-  scoreBadge: {
-    paddingHorizontal: SHOOTRZ_THEME.spacing.sm,
-    paddingVertical: SHOOTRZ_THEME.spacing.xs,
-    borderRadius: SHOOTRZ_THEME.borderRadius.md,
-  },
-  scoreText: {
-    ...SHOOTRZ_THEME.typography.caption,
-    color: SHOOTRZ_THEME.colors.textPrimary,
-    fontWeight: 'bold',
-  },
-  tipCard: {
-    margin: SHOOTRZ_THEME.spacing.lg,
-    padding: SHOOTRZ_THEME.spacing.lg,
-    borderRadius: SHOOTRZ_THEME.borderRadius.lg,
-    position: 'relative',
-    borderWidth: 1,
-    borderColor: SHOOTRZ_THEME.colors.surfaceElevated,
-  },
-  tipIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: SHOOTRZ_THEME.colors.secondary + '20',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: SHOOTRZ_THEME.spacing.md,
-  },
-  tipIcon: {
-    fontSize: 20,
-  },
-  tipContent: {
-    flex: 1,
-  },
-  tipTitle: {
-    ...SHOOTRZ_THEME.typography.heading3,
-    fontSize: 18,
-    color: SHOOTRZ_THEME.colors.secondary,
-    marginBottom: SHOOTRZ_THEME.spacing.sm,
-  },
-  tipText: {
-    ...SHOOTRZ_THEME.typography.body,
-    color: SHOOTRZ_THEME.colors.textSecondary,
-    lineHeight: 22,
-  },
-  tipBorder: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 2,
-    borderTopLeftRadius: SHOOTRZ_THEME.borderRadius.lg,
-    borderTopRightRadius: SHOOTRZ_THEME.borderRadius.lg,
-    borderTopWidth: 2,
-  },
-});
+	container: {
+		flex: 1,
+		backgroundColor: colors.bg.primary,
+	},
+	header: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+		paddingHorizontal: spacing.screenPadding,
+		paddingTop: spacing[4],
+		paddingBottom: spacing[3],
+	},
+	greeting: {
+		fontSize: typography.size.xl,
+		fontWeight: typography.weight.bold,
+		color: colors.text.primary,
+	},
+	tagline: {
+		fontSize: typography.size.xs,
+		fontWeight: typography.weight.medium,
+		color: colors.brand.cyan,
+		letterSpacing: typography.tracking.widest,
+		marginTop: 2,
+	},
+	heroCard: {
+		marginHorizontal: spacing.screenPadding,
+		marginTop: spacing[3],
+		backgroundColor: glass.orange.bg,
+		borderWidth: 1,
+		borderColor: glass.orange.border,
+		borderRadius: radius.card,
+		padding: spacing.cardPadding,
+		minHeight: 140,
+	},
+	heroInner: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: spacing[5],
+	},
+	heroInfo: {
+		flex: 1,
+	},
+	heroLabel: {
+		fontSize: typography.size.xs,
+		fontWeight: typography.weight.medium,
+		color: colors.text.secondary,
+		letterSpacing: typography.tracking.widest,
+		marginBottom: spacing[1],
+	},
+	heroScore: {
+		fontSize: typography.size['3xl'],
+		fontWeight: typography.weight.black,
+		color: colors.brand.chrome,
+		marginBottom: spacing[2],
+	},
+	heroDate: {
+		fontSize: typography.size.xs,
+		color: colors.text.tertiary,
+		marginTop: spacing[2],
+	},
+	statsRow: {
+		flexDirection: 'row',
+		gap: spacing[3],
+		paddingHorizontal: spacing.screenPadding,
+		marginTop: spacing.sectionGap,
+	},
+	ctaWrap: {
+		paddingHorizontal: spacing.screenPadding,
+		marginTop: spacing.sectionGap,
+	},
+	coachCard: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: spacing[3],
+		marginHorizontal: spacing.screenPadding,
+		marginTop: spacing[4],
+		backgroundColor: glass.cyan.bg,
+		borderWidth: 1,
+		borderColor: glass.cyan.border,
+		borderRadius: radius.card,
+		padding: spacing.cardPadding,
+	},
+	coachAvatar: {
+		width: 40,
+		height: 40,
+		borderRadius: 20,
+		backgroundColor: colors.brand.cyan,
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+	coachAvatarText: {
+		fontSize: typography.size.md,
+		fontWeight: typography.weight.bold,
+		color: colors.bg.primary,
+	},
+	coachInfo: {
+		flex: 1,
+	},
+	coachName: {
+		fontSize: typography.size.base,
+		fontWeight: typography.weight.semibold,
+		color: colors.text.primary,
+	},
+	coachHint: {
+		fontSize: typography.size.sm,
+		color: colors.text.secondary,
+		marginTop: 2,
+	},
+	section: {
+		paddingHorizontal: spacing.screenPadding,
+		marginTop: spacing.sectionGap,
+	},
+	sessionItem: {
+		marginBottom: spacing.itemGap,
+	},
+	bottomPad: {
+		height: spacing.tabBarHeight,
+	},
+	skeletonHeader: {
+		padding: spacing.screenPadding,
+		gap: spacing[2],
+	},
+	skeletonHero: {
+		paddingHorizontal: spacing.screenPadding,
+		marginTop: spacing[3],
+	},
+	skeletonStats: {
+		flexDirection: 'row',
+		paddingHorizontal: spacing.screenPadding,
+		gap: spacing[3],
+		marginTop: spacing[4],
+	},
+})

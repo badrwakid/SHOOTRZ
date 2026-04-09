@@ -87,9 +87,8 @@ async def test_database():
         video_id = record_video(
             user_id=test_user_id,
             file_url=test_file_url,
-            angle="45",
+            camera_angle="side",
             fps=30,
-            device="test"
         )
         results["operations_test"]["record_video"] = f"✅ Success (video_id: {video_id[:8]}...)"
     except Exception as e:
@@ -97,6 +96,8 @@ async def test_database():
         results["status"] = "partial"
         return results
     
+    # BUG FIX: Initialize metric_ids before try block to prevent NameError if record_metrics fails
+    metric_ids = None
     try:
         # Test 2: Insert metrics
         metric_ids = record_metrics(

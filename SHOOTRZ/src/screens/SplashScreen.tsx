@@ -1,118 +1,128 @@
-import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Animated } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { SHOOTRZ_THEME } from '../constants/theme';
-import { ShootrzLogo } from '../components/ShootrzLogo';
+import React, { useEffect, useRef } from 'react'
+import { View, Text, StyleSheet, Animated } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
+import { colors, typography, spacing, animation } from '../constants/theme'
+import { ShootrzLogo } from '../components/ShootrzLogo'
 
 interface SplashScreenProps {
-  onFinish: () => void;
+	onFinish: () => void
 }
 
 export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const scaleAnim = useRef(new Animated.Value(0.8)).current;
+	const fadeAnim = useRef(new Animated.Value(0)).current
+	const scaleAnim = useRef(new Animated.Value(0.85)).current
+	const dots = useRef([
+		new Animated.Value(0.3),
+		new Animated.Value(0.3),
+		new Animated.Value(0.3),
+	]).current
 
-  useEffect(() => {
-    // Animate logo entrance
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 800,
-        useNativeDriver: true,
-      }),
-      Animated.spring(scaleAnim, {
-        toValue: 1,
-        tension: 50,
-        friction: 7,
-        useNativeDriver: true,
-      }),
-    ]).start();
+	useEffect(() => {
+		Animated.parallel([
+			Animated.timing(fadeAnim, {
+				toValue: 1,
+				duration: 600,
+				useNativeDriver: true,
+			}),
+			Animated.spring(scaleAnim, {
+				toValue: 1,
+				damping: animation.easing.spring.damping,
+				stiffness: animation.easing.spring.stiffness,
+				useNativeDriver: true,
+			}),
+		]).start()
 
-    // Auto-proceed after 2 seconds
-    const timer = setTimeout(() => {
-      Animated.timing(fadeAnim, {
-        toValue: 0,
-        duration: 500,
-        useNativeDriver: true,
-      }).start(() => onFinish());
-    }, 2000);
+		const dotAnims = dots.map((dot, i) =>
+			Animated.loop(
+				Animated.sequence([
+					Animated.delay(i * 200),
+					Animated.timing(dot, {
+						toValue: 1,
+						duration: 400,
+						useNativeDriver: true,
+					}),
+					Animated.timing(dot, {
+						toValue: 0.3,
+						duration: 400,
+						useNativeDriver: true,
+					}),
+				]),
+			),
+		)
+		dotAnims.forEach(a => a.start())
 
-    return () => clearTimeout(timer);
-  }, []);
+		const timer = setTimeout(() => {
+			Animated.timing(fadeAnim, {
+				toValue: 0,
+				duration: animation.duration.normal,
+				useNativeDriver: true,
+			}).start(() => onFinish())
+		}, 2000)
 
-  return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right', 'bottom']}>
-      <Animated.View
-        style={[
-          styles.content,
-          {
-            opacity: fadeAnim,
-            transform: [{ scale: scaleAnim }],
-          },
-        ]}
-      >
-        <View style={styles.logoContainer}>
-          <ShootrzLogo size="large" showTagline={false} />
-        </View>
-        <Text style={styles.loadingText}>Loading your training data...</Text>
-        <View style={styles.loadingBar}>
-          <Animated.View
-            style={[
-              styles.loadingProgress,
-              {
-                transform: [
-                  {
-                    scaleX: fadeAnim,
-                  },
-                ],
-              },
-            ]}
-          />
-        </View>
-      </Animated.View>
-    </SafeAreaView>
-  );
-};
+		return () => {
+			clearTimeout(timer)
+			dotAnims.forEach(a => a.stop())
+		}
+	}, [onFinish])
+
+	return (
+		<SafeAreaView style={styles.container} edges={['top', 'left', 'right', 'bottom']}>
+			<Animated.View
+				style={[
+					styles.content,
+					{
+						opacity: fadeAnim,
+						transform: [{ scale: scaleAnim }],
+					},
+				]}
+			>
+				<View style={styles.logoContainer}>
+					<ShootrzLogo size="large" showTagline={false} />
+				</View>
+
+				<View style={styles.dotsRow}>
+					{dots.map((opacity, i) => (
+						<Animated.View
+							key={i}
+							style={[styles.dot, { opacity }]}
+						/>
+					))}
+				</View>
+
+				<Text style={styles.tagline}>PERFECT THE GAME</Text>
+			</Animated.View>
+		</SafeAreaView>
+	)
+}
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: SHOOTRZ_THEME.colors.background,
-    justifyContent: 'flex-start',
-    alignItems: 'center',
-  },
-  content: {
-    alignItems: 'center',
-    width: '100%',
-    paddingHorizontal: SHOOTRZ_THEME.spacing.lg,
-    paddingTop: SHOOTRZ_THEME.spacing.xl,
-  },
-  logoContainer: {
-    width: '100%',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    marginBottom: SHOOTRZ_THEME.spacing.xl,
-  },
-  loadingText: {
-    ...SHOOTRZ_THEME.typography.body,
-    color: SHOOTRZ_THEME.colors.textSecondary,
-    marginTop: SHOOTRZ_THEME.spacing.xl,
-    marginBottom: SHOOTRZ_THEME.spacing.lg,
-    textAlign: 'center',
-    alignSelf: 'center',
-  },
-  loadingBar: {
-    width: '80%',
-    height: 4,
-    backgroundColor: SHOOTRZ_THEME.colors.surfaceElevated,
-    borderRadius: SHOOTRZ_THEME.borderRadius.sm,
-    overflow: 'hidden',
-    alignSelf: 'center',
-  },
-  loadingProgress: {
-    height: '100%',
-    width: '100%',
-    backgroundColor: SHOOTRZ_THEME.colors.primary,
-    transformOrigin: 'left',
-  },
-});
+	container: {
+		flex: 1,
+		backgroundColor: colors.bg.void,
+		justifyContent: 'center',
+		alignItems: 'center',
+	},
+	content: {
+		alignItems: 'center',
+	},
+	logoContainer: {
+		marginBottom: spacing[8],
+	},
+	dotsRow: {
+		flexDirection: 'row',
+		gap: spacing[2],
+		marginBottom: spacing[6],
+	},
+	dot: {
+		width: 8,
+		height: 8,
+		borderRadius: 4,
+		backgroundColor: colors.brand.orange,
+	},
+	tagline: {
+		fontSize: typography.size.xs,
+		fontWeight: typography.weight.medium,
+		color: colors.brand.cyan,
+		letterSpacing: typography.tracking.widest,
+	},
+})

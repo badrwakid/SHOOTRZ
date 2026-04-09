@@ -151,3 +151,114 @@ export interface ChatResponseDto {
 	model: string
 	usage?: Record<string, unknown>
 }
+
+export interface ChatStreamDelta {
+	text: string
+}
+
+export interface ChatStreamDone {
+	context_used: Record<string, unknown>
+	model: string
+	usage?: Record<string, unknown>
+}
+
+export interface ChatStreamError {
+	message: string
+}
+
+export interface StreamCallbacks {
+	onChunk: (text: string) => void
+	onDone: (metadata: ChatStreamDone) => void
+	onError: (error: Error) => void
+}
+
+// ---------------------------------------------------------------------------
+// New DB-backed types (Supabase schema)
+// ---------------------------------------------------------------------------
+
+export interface UserProfile {
+	id: string
+	userId: string
+	primaryGoal?: string
+	trainingFrequency?: string
+	preferredDrillDuration?: number
+	age?: number
+	heightCm?: number
+	weightKg?: number
+	dominantHand?: 'left' | 'right'
+	yearsPlaying?: number
+	notificationsEnabled?: boolean
+	coachingStyle?: 'encouraging' | 'direct' | 'analytical' | 'balanced'
+	createdAt: string
+	updatedAt: string
+}
+
+export interface AnalysisSummary {
+	id: string
+	sessionId: string
+	userId: string
+	overallScore?: number
+	shotCount?: number
+	elbowAngleScore?: number
+	kneeBendScore?: number
+	releaseAngleScore?: number
+	followThroughScore?: number
+	balanceScore?: number
+	elbowAngleValue?: number
+	kneeBendValue?: number
+	releaseAngleValue?: number
+	phasesDetected?: string[]
+	dominantPhaseIssue?: string
+	topStrengths?: string[]
+	topImprovements?: string[]
+	scoreTier?: 'elite' | 'great' | 'good' | 'fair' | 'poor'
+	createdAt: string
+}
+
+export interface ChatHistoryMessage {
+	id: string
+	userId: string
+	role: 'user' | 'assistant'
+	content: string
+	sessionId?: string
+	modelUsed?: string
+	createdAt: string
+}
+
+export interface DrillCompletion {
+	id: string
+	userId: string
+	drillId: string
+	drillName: string
+	completedAt: string
+	durationSeconds?: number
+	userRating?: number
+}
+
+export interface WorkoutProgress {
+	id: string
+	userId: string
+	workoutId: string
+	workoutName: string
+	status: 'not_started' | 'in_progress' | 'completed'
+	drillsCompleted: number
+	drillsTotal: number
+	startedAt?: string
+	completedAt?: string
+}
+
+export interface UserStreak {
+	currentStreak: number
+	longestStreak: number
+	lastActivityDate?: string
+}
+
+export interface UserStats {
+	totalSessions: number
+	avgScore?: number
+	bestScore?: number
+	totalShots?: number
+	currentStreak: number
+	longestStreak: number
+	lastSessionDate?: string
+}

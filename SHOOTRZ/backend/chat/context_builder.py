@@ -1,90 +1,32 @@
 from __future__ import annotations
 
+import copy
 from dataclasses import dataclass
-from datetime import datetime
-from pathlib import Path
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
-from ..storage import db
-
-
-def _safe_iso(dt_str: Optional[str]) -> Optional[str]:
-    if not dt_str:
-        return None
-    try:
-        return datetime.fromisoformat(dt_str.replace("Z", "+00:00")).isoformat()
-    except Exception:
-        return dt_str
-
-
-def _summarize_metrics(metrics: List[Dict[str, Any]], max_items: int = 20) -> List[Dict[str, Any]]:
-    items: List[Dict[str, Any]] = []
-    for m in metrics[:max_items]:
-        items.append(
-            {
-                "metric_name": m.get("metric_name"),
-                "value": m.get("value"),
-                "unit": m.get("unit"),
-                "confidence": m.get("confidence"),
-                "phase": m.get("phase"),
-                "frame_idx": m.get("frame_idx"),
-            }
-        )
-    return items
-
-
-def _aggregate_recent_scores(video_metrics: List[List[Dict[str, Any]]]) -> Dict[str, Any]:
-    # Very simple aggregation: average of metric values across all metrics we saw.
-    values: List[float] = []
-    for metrics in video_metrics:
-        for m in metrics:
-            v = m.get("value")
-            if isinstance(v, (int, float)):
-                values.append(float(v))
-    if not values:
-        return {"average_metric_value": None, "count": 0}
-    avg = sum(values) / len(values)
-    return {"average_metric_value": round(avg, 2), "count": len(values)}
-
-
-def _read_recent_artifact_summaries(run_id: str, max_bytes: int = 50_000) -> Dict[str, Any]:
-    """
-    Best-effort artifact summarizer for locally stored MVP outputs.
-    NOTE: This only works if the server has the outputs directory and the run_id exists.
-    """
-    backend_dir = Path(__file__).parent.parent
-    base = backend_dir / "outputs" / run_id
-    if not base.exists():
-        return {"available": False}
-
-    def _read_json(name: str) -> Optional[Dict[str, Any]]:
-        p = base / name
-        if not p.exists():
-            return None
-        raw = p.read_text(encoding="utf-8", errors="ignore")
-        if len(raw) > max_bytes:
-            raw = raw[:max_bytes]
-        try:
-            import json
-
-            return json.loads(raw)
-        except Exception:
-            return None
-
-    return {
-        "available": True,
-        "shot_window": _read_json("shot_window.json"),
-        "report": _read_json("report.json"),
-        "confidence_summary": _read_json("confidence_summary.json"),
-        "video_metadata": _read_json("video_metadata.json"),
-    }
+from ..storage.db import db
 
 
 @dataclass(frozen=True)
 class ContextBuildOptions:
     include_raw_artifacts: bool = False
-    max_videos: int = 8
-    max_metrics_per_video: int = 25
+    max_recent_summaries: int = 5
+    max_chat_history: int = 20
+
+
+def _score_tier(score: Optional[float]) -> Optional[str]:
+    if score is None:
+        return None
+    if score >= 90:
+        return "elite"
+    if score >= 75:
+        return "great"
+    if score >= 60:
+        return "good"
+    if score >= 40:
+        return "fair"
+    return "poor"
 
 
 def build_user_context(
@@ -93,77 +35,86 @@ def build_user_context(
     user_local_context: Optional[Dict[str, Any]],
     options: ContextBuildOptions,
 ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    """Build a compact context object for Coach J.
+
+    Uses server-side Supabase data (analysis_summaries, user_profiles,
+    user_streaks) instead of raw video/metric trees. This prevents the
+    Gemini 429 token explosion that occurred when full MVP payloads were
+    sent in the system prompt.
     """
-    Build a context object for the LLM using BOTH:
-    - server-side Supabase data (trusted, scoped by user_id)
-    - client-side local context (goals, preferences, drill completions, cached analyses)
-    """
+    user = db.get_user(user_id)
     profile = db.get_user_profile(user_id)
-    videos = db.get_user_history(user_id)[: options.max_videos]
+    stats = db.get_user_stats(user_id)
+    summaries = db.get_recent_summaries(user_id, limit=options.max_recent_summaries)
 
-    video_summaries: List[Dict[str, Any]] = []
-    all_video_metrics: List[List[Dict[str, Any]]] = []
+    user_section: Dict[str, Any] = {}
+    if user:
+        user_section = {
+            "name": user.get("name"),
+            "skill_level": user.get("skill_level"),
+            "position": user.get("position"),
+            "dominant_hand": user.get("dominant_hand"),
+        }
+    if profile:
+        user_section["coaching_style"] = profile.get("coaching_style", "balanced")
+        user_section["primary_goal"] = profile.get("primary_goal")
+        user_section["training_frequency"] = profile.get("training_frequency")
+        user_section["years_playing"] = profile.get("years_playing")
 
-    for v in videos:
-        vid = v.get("id")
-        metrics = db.get_video_metrics(vid) if vid else []
-        all_video_metrics.append(metrics)
-        video_summaries.append(
-            {
-                "video_id": vid,
-                "created_at": _safe_iso(v.get("created_at")),
-                "angle": v.get("angle") or v.get("camera_angle"),
-                "fps": v.get("fps"),
-                "device": v.get("device"),
-                "file_url": v.get("file_url"),
-                "metrics": _summarize_metrics(metrics, max_items=options.max_metrics_per_video),
-            }
-        )
+    recent_sessions: List[Dict[str, Any]] = []
+    for s in summaries:
+        recent_sessions.append({
+            "date": s.get("created_at"),
+            "overall_score": s.get("overall_score"),
+            "score_tier": s.get("score_tier") or _score_tier(s.get("overall_score")),
+            "top_improvements": (s.get("top_improvements") or [])[:3],
+            "top_strengths": (s.get("top_strengths") or [])[:3],
+        })
 
-    aggregates = _aggregate_recent_scores(all_video_metrics)
+    goals: List[str] = []
+    if user and user.get("goals"):
+        goals = user["goals"][:10]
+    if isinstance(user_local_context, dict):
+        local_goals = user_local_context.get("goals")
+        if isinstance(local_goals, list) and not goals:
+            goals = [
+                g.get("title", str(g)) if isinstance(g, dict) else str(g)
+                for g in local_goals[:10]
+            ]
 
-    artifacts_summary = None
-    artifacts_available = False
-    artifacts_reason = None
-    
-    if options.include_raw_artifacts:
-        # We don't have a stable mapping of user->run_id today.
-        # If the client provides a run_id in local context, we can summarize it best-effort.
-        run_id = None
-        if isinstance(user_local_context, dict):
-            run_id = user_local_context.get("latest_run_id") or user_local_context.get("run_id")
-        if isinstance(run_id, str) and run_id.strip():
-            artifacts_summary = _read_recent_artifact_summaries(run_id.strip())
-            artifacts_available = artifacts_summary.get("available", False)
-            if not artifacts_available:
-                artifacts_reason = f"Run outputs not found for run_id={run_id[:16]}"
-        else:
-            artifacts_summary = {"available": False, "reason": "No run_id provided by client"}
-            artifacts_reason = "No run_id provided by client"
+    primary_goal = profile.get("primary_goal") if profile else None
 
     context: Dict[str, Any] = {
-        "user_profile": profile,
-        "server_history": {
-            "recent_videos": video_summaries,
-            "aggregates": aggregates,
-        },
-        "client_local": user_local_context or {},
-        "artifacts_summary": artifacts_summary,
-        "generated_at": datetime.utcnow().isoformat() + "Z",
+        "user": user_section,
+        "stats": stats if isinstance(stats, dict) else {},
+        "recent_sessions": recent_sessions,
+        "goals": goals,
+        "primary_goal": primary_goal,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
     }
 
     context_used = {
-        "profile": bool(profile),
-        "recent_videos_count": len(video_summaries),
-        "include_raw_artifacts": options.include_raw_artifacts,
+        "profile": bool(user),
+        "user_profile": bool(profile),
+        "recent_summaries_count": len(recent_sessions),
+        "stats_available": bool(stats),
         "has_client_local_context": bool(user_local_context),
-        "artifacts_requested": options.include_raw_artifacts,
-        "artifacts_available": artifacts_available,
-        "artifacts_reason": artifacts_reason,
+        "include_raw_artifacts": options.include_raw_artifacts,
     }
+
     return context, context_used
 
 
+def sanitize_context_for_llm(context: Dict[str, Any]) -> Dict[str, Any]:
+    """Ensure the context is within safe size bounds for the LLM prompt."""
+    out = copy.deepcopy(context)
 
+    sessions = out.get("recent_sessions")
+    if isinstance(sessions, list):
+        out["recent_sessions"] = sessions[:5]
 
+    goals = out.get("goals")
+    if isinstance(goals, list):
+        out["goals"] = goals[:10]
 
+    return out

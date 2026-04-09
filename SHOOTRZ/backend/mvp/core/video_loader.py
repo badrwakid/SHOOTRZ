@@ -167,6 +167,12 @@ class VideoLoader:
         # Create frame mapping
         frame_mapping_df = self.create_frame_mapping()
         
+        # BUG FIX: Truncate frame_mapping to match actual loaded frame count
+        # CAP_PROP_FRAME_COUNT can over-report, causing IndexError in pose_estimation
+        if len(frame_mapping_df) > len(frames):
+            frame_mapping_df = frame_mapping_df.iloc[:len(frames)].reset_index(drop=True)
+            self.frame_mapping = self.frame_mapping[:len(frames)]
+        
         return frames, frame_mapping_df
     
     def save_metadata(self, output_path: Path):

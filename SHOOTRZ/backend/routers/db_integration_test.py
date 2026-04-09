@@ -45,9 +45,8 @@ async def integration_test():
         video_id = record_video(
             user_id=test_user_id,
             file_url=test_file_url,
-            angle="45",
+            camera_angle="side",
             fps=30,
-            device="mobile"
         )
         
         results["steps"]["video_record"] = {
@@ -61,6 +60,8 @@ async def integration_test():
         return results
     
     # Step 3: Record metrics (what backend does after processing)
+    # BUG FIX: Initialize metric_ids before try block to prevent NameError if record_metrics fails
+    metric_ids = None
     try:
         metric_ids = record_metrics(
             video_id,

@@ -222,21 +222,12 @@ export const AngleGraph: React.FC<AngleGraphProps> = ({
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.title}>Angle Consistency</Text>
-        <TouchableOpacity
-          style={styles.toggleButton}
-          onPress={() => setShowAllMetrics(!showAllMetrics)}
-        >
-          <Ionicons
-            name={showAllMetrics ? 'eye-off' : 'eye'}
-            size={20}
-            color={SHOOTRZ_THEME.colors.primary}
-          />
-          <Text style={styles.toggleText}>{showAllMetrics ? 'Single' : 'All'}</Text>
-        </TouchableOpacity>
+        {/* BUG FIX: Removed "All" toggle — the multi-metric overlay was never implemented
+            so the toggle was misleading (graph always showed the single selected metric) */}
       </View>
 
       {/* Metric selector */}
-      {!showAllMetrics && availableMetrics.length > 0 && (
+      {availableMetrics.length > 0 && (
         <View style={styles.metricSelector}>
           {availableMetrics.map((metric) => (
             <TouchableOpacity

@@ -8,7 +8,7 @@ using existing biomechanics functions.
 import numpy as np
 import pandas as pd
 from pathlib import Path
-from typing import Dict, Any, List
+from typing import Dict, Any
 
 from backend.metrics.biomechanics import joint_angle
 from backend.inference.pose_2d import BASKETBALL_KEYPOINTS
@@ -118,8 +118,13 @@ class AngleComputer:
         }
         
         for joint_name, joint_idx in joint_mapping.items():
-            # Find row for this joint
-            joint_rows = frame_data[frame_data["joint"].str.contains(joint_name, case=False, na=False)]
+            # BUG FIX: Use exact side-prefixed joint name to avoid matching wrong side
+            # str.contains("hip") would match both "left_hip" and "right_hip"
+            side_joint_name = f"{self.shooting_side}_{joint_name}"
+            joint_rows = frame_data[frame_data["joint"].str.lower() == side_joint_name.lower()]
+            
+            if len(joint_rows) == 0:
+                joint_rows = frame_data[frame_data["joint"].str.contains(joint_name, case=False, na=False)]
             
             if len(joint_rows) == 0:
                 return None  # Missing critical joint

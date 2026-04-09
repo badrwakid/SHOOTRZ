@@ -52,8 +52,7 @@ async def history(
 			# Calculate average score from metrics
 			avg_score = None
 			if metrics:
-				# Compute average of all metric values (normalized 0-100)
-				values = [m.get("value", 0) for m in metrics if m.get("value")]
+				values = [m.get("value", 0) for m in metrics if m.get("value") is not None]
 				if values:
 					avg_score = sum(values) / len(values)
 			
@@ -61,13 +60,13 @@ async def history(
 				"session_id": video_id,
 				"timestamp": video["created_at"],
 				"title": None,
-				"date": video["created_at"][:10],  # YYYY-MM-DD
-				"shot_count": 1,  # Each video is one shot
+				"date": video["created_at"][:10],
+				"shot_count": 1,
 				"average_score": avg_score,
 				"metrics": metrics,
-				"angle": video.get("angle"),
+				"angle": video.get("camera_angle"),
 				"fps": video.get("fps"),
-				"device": video.get("device"),
+				"device": None,
 			})
 		
 		return {
@@ -119,7 +118,7 @@ async def get_history_stats(user_id: str):
 			}
 		
 		# Calculate statistics
-		metric_values = [m.get("value", 0) for m in all_metrics if m.get("value")]
+		metric_values = [m.get("value", 0) for m in all_metrics if m.get("value") is not None]
 		average_score = sum(metric_values) / len(metric_values) if metric_values else None
 		best_score = max(metric_values) if metric_values else None
 		
@@ -156,10 +155,10 @@ async def get_history_stats(user_id: str):
 		return {
 			"total_sessions": len(videos),
 			"total_shots": len(videos),
-			"average_score": round(average_score, 2) if average_score else None,
-			"best_score": round(best_score, 2) if best_score else None,
-			"improvement_percentage": round(improvement_percentage, 2) if improvement_percentage else None,
-			"consistency_score": round(consistency_score, 2) if consistency_score else None,
+			"average_score": round(average_score, 2) if average_score is not None else None,
+			"best_score": round(best_score, 2) if best_score is not None else None,
+			"improvement_percentage": round(improvement_percentage, 2) if improvement_percentage is not None else None,
+			"consistency_score": round(consistency_score, 2) if consistency_score is not None else None,
 		}
 	except Exception as e:
 		raise HTTPException(status_code=500, detail=f"Error calculating stats: {str(e)}")
