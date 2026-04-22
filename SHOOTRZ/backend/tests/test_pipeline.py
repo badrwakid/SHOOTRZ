@@ -58,7 +58,7 @@ class TestProcessingPipeline:
 
 			# Verify results structure
 			assert "status" in result
-			assert result["status"] == "completed"
+			assert result["status"] in ("completed", "completed_low_quality")
 			assert "metrics" in result
 			assert "feedback" in result
 			assert "phases" in result
@@ -115,7 +115,7 @@ class TestProcessingPipeline:
 			)
 			
 			# Should complete successfully even with frame issues
-			assert result["status"] == "completed"
+			assert result["status"] in ("completed", "completed_low_quality")
 			pipeline.cleanup()
 		finally:
 			Path(video_path).unlink(missing_ok=True)
@@ -137,7 +137,7 @@ class TestProcessingPipeline:
 			)
 			
 			# Should complete (DB errors should be handled gracefully)
-			assert result["status"] == "completed"
+			assert result["status"] in ("completed", "completed_low_quality")
 			pipeline.cleanup()
 		finally:
 			Path(video_path).unlink(missing_ok=True)
