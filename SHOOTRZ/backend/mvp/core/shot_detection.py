@@ -8,11 +8,13 @@ Legacy path available via shot_detection.use_legacy_detector in config.
 """
 
 import json
+import os
 import numpy as np
 import pandas as pd
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 from scipy.signal import find_peaks
+from statistics import median
 
 
 def _series_for_joint(
@@ -61,6 +63,7 @@ class ShotDetector:
         angles_df: pd.DataFrame,
         pose_keypoints_df: pd.DataFrame,
         shooting_side: str,
+        output_dir: Optional[Path] = None,
     ) -> Dict[str, Any]:
         angles_df = angles_df.sort_values("frame_id").reset_index(drop=True)
         frame_ids = angles_df["frame_id"].values.astype(int)
@@ -125,6 +128,43 @@ class ShotDetector:
         end_frame = min(fid_max, max(end_frame, int(release_frame)))
 
         overall_confidence = float(max(0.05, min(1.0, min(crouch_conf, release_conf))))
+        warnings = list(diagnostics.get("warnings", []))
+        crouch_min_lead = int(os.getenv("SHOOTRZ_CROUCH_MIN_LEAD_FRAMES", "5"))
+        if int(crouch_frame) < crouch_min_lead:
+            warnings.append("crouch_lt_lead_frames")
+
+        elbow_peak = self._elbow_extension_peak(angles_df, int(crouch_frame))
+        wrist_apex = self._wrist_apex(pose_keypoints_df, shooting_side, y_col, int(crouch_frame))
+        vel_zero = self._wrist_velocity_zero_cross(
+            pose_keypoints_df, shooting_side, y_col, int(crouch_frame)
+        )
+        heuristic_frames = [h for h in (elbow_peak, wrist_apex, vel_zero) if h is not None]
+        consensus_frame = int(median(heuristic_frames)) if heuristic_frames else int(release_frame)
+        heuristic_deviation = abs(int(release_frame) - consensus_frame)
+        heuristic_max_spread = (
+            int(max(heuristic_frames) - min(heuristic_frames)) if heuristic_frames else 0
+        )
+        high_confidence_agreement = heuristic_max_spread <= 5
+
+        frame_selection = {
+            "chosen_release": int(release_frame),
+            "elbow_peak_frame": elbow_peak,
+            "wrist_apex_frame": wrist_apex,
+            "vel_zero_frame": vel_zero,
+            "consensus_frame": consensus_frame,
+            "heuristic_deviation": int(heuristic_deviation),
+            "heuristic_max_spread": int(heuristic_max_spread),
+            "heuristics_n": len(heuristic_frames),
+            "high_confidence_agreement": bool(high_confidence_agreement),
+            "confidence_score": float(release_conf),
+            "crouch_frame": int(crouch_frame),
+            "warnings": warnings,
+            "candidates": diagnostics.get("candidates", {}).get("release", {}).get("candidates", []),
+        }
+        if output_dir is not None:
+            frame_log_path = Path(output_dir) / "frame_selection_log.json"
+            with open(frame_log_path, "w") as ff:
+                json.dump(frame_selection, ff, indent=2)
 
         return {
             "start_frame": int(start_frame),
@@ -143,7 +183,54 @@ class ShotDetector:
             "start_confidence": float(start_diag.get("confidence", 0.5)),
             "end_confidence": float(end_diag.get("confidence", 0.5)),
             "diagnostics": diagnostics,
+            "frame_selection": frame_selection,
+            "warnings": warnings,
         }
+
+    def _elbow_extension_peak(self, angles_df: pd.DataFrame, crouch_frame: int) -> Optional[int]:
+        post = angles_df[angles_df["frame_id"] > crouch_frame]
+        if post.empty:
+            return None
+        elbow = post["elbow_angle"]
+        if elbow.isna().all():
+            return None
+        idx = elbow.idxmax()
+        return int(post.loc[idx, "frame_id"])
+
+    def _wrist_apex(
+        self,
+        pose_keypoints_df: pd.DataFrame,
+        shooting_side: str,
+        y_col: str,
+        crouch_frame: int,
+    ) -> Optional[int]:
+        wrist_joint = f"{shooting_side}_wrist"
+        wrist_df = pose_keypoints_df[pose_keypoints_df["joint"] == wrist_joint].sort_values("frame_id")
+        wrist_df = wrist_df[wrist_df["frame_id"] > crouch_frame]
+        if wrist_df.empty or wrist_df[y_col].isna().all():
+            return None
+        idx = wrist_df[y_col].idxmin()
+        return int(wrist_df.loc[idx, "frame_id"])
+
+    def _wrist_velocity_zero_cross(
+        self,
+        pose_keypoints_df: pd.DataFrame,
+        shooting_side: str,
+        y_col: str,
+        crouch_frame: int,
+    ) -> Optional[int]:
+        wrist_joint = f"{shooting_side}_wrist"
+        wrist_df = pose_keypoints_df[pose_keypoints_df["joint"] == wrist_joint].sort_values("frame_id")
+        wrist_df = wrist_df[wrist_df["frame_id"] > crouch_frame]
+        if len(wrist_df) < 3:
+            return None
+        y_vals = wrist_df[y_col].astype(float).values
+        fids = wrist_df["frame_id"].astype(int).values
+        dy = np.diff(y_vals)
+        for i in range(len(dy) - 1):
+            if dy[i] < 0 <= dy[i + 1]:
+                return int(fids[min(i + 1, len(fids) - 1)])
+        return None
 
     def _legacy_shot_window(
         self,
@@ -486,6 +573,6 @@ def detect_shot_window(
     angles_df = pd.read_csv(angles_csv)
     pose_df = pd.read_csv(pose_keypoints_csv)
     detector = ShotDetector(config)
-    shot_window = detector.detect_shot_window(angles_df, pose_df, shooting_side)
+    shot_window = detector.detect_shot_window(angles_df, pose_df, shooting_side, output_path.parent)
     detector.export_shot_window_json(shot_window, output_path)
     return shot_window

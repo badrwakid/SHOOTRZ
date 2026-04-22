@@ -2,10 +2,14 @@
 
 from typing import Optional
 import json
+import os
+import asyncio
 
 import numpy as np
-from fastapi import APIRouter, UploadFile, File, HTTPException, BackgroundTasks
+from fastapi import APIRouter, UploadFile, File, HTTPException, BackgroundTasks, Request
 from fastapi.responses import FileResponse
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 from ..contracts.mvp import MVPAnalyzeQueuedResponse, MVPResultResponse
 from ..inference.phase_detector import PhaseDetector
@@ -15,15 +19,29 @@ from ..services.mvp_job_service import MVPJobService
 
 router = APIRouter(prefix="/mvp", tags=["mvp"])
 service = MVPJobService()
+limiter = Limiter(key_func=get_remote_address)
+_analysis_semaphore = asyncio.Semaphore(int(os.getenv("SHOOTRZ_MAX_CONCURRENT", "8")))
 
 
 @router.post("/analyze", response_model=MVPAnalyzeQueuedResponse)
+@limiter.limit("30/minute")
 async def analyze_video(
+    request: Request,
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     shooting_side: Optional[str] = "auto"
 ):
-    return service.queue_job(background_tasks, file, shooting_side or "auto")
+    if os.getenv("SHOOTRZ_DISABLE_RATE_LIMIT", "0") == "1":
+        return service.queue_job(background_tasks, file, shooting_side or "auto")
+
+    try:
+        await asyncio.wait_for(_analysis_semaphore.acquire(), timeout=2.0)
+    except asyncio.TimeoutError as exc:
+        raise HTTPException(status_code=503, detail="Server saturated — retry shortly") from exc
+    try:
+        return service.queue_job(background_tasks, file, shooting_side or "auto")
+    finally:
+        _analysis_semaphore.release()
 
 
 @router.get("/result/{job_id}", response_model=MVPResultResponse)

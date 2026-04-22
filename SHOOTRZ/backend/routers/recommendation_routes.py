@@ -30,7 +30,9 @@ async def recommend(payload: dict):
         labels=rec["labels"],
         tiers=rec["tiers"],
         faiss_index=rec["faiss_index"],
-        bandit=rec["bandit"]
+        bandit=rec["bandit"],
+        weak_areas=payload.get("weak_areas"),
+        user_level=payload.get("user_level"),
     )
 
     return result

@@ -106,11 +106,17 @@ export interface HistoryMetric {
 
 export interface HistorySession {
 	session_id: string
+	video_id?: string | null
 	timestamp: string
 	title?: string | null
 	date: string
 	shot_count: number
 	average_score?: number | null
+	/** MVP overall score from analysis_summaries when available */
+	overall_score?: number | null
+	score_tier?: string | null
+	top_strengths?: string[]
+	top_improvements?: string[]
 	metrics: HistoryMetric[]
 	angle?: string | null
 	fps?: number | null

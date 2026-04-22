@@ -1,0 +1,89 @@
+{
+  "overall_score": 50,
+  "feedback_summary": "Overall 50/100 \u2014 biggest gap: release mechanics (0/100).",
+  "metrics": [
+    {
+      "name": "elbow_extension",
+      "value": 141.78137663867463,
+      "unit": "degrees",
+      "verdict": "Needs Work",
+      "explanation": "Elbow at 141.8\u00b0 is quite bent \u2014 extend more through release.",
+      "confidence": 0.40855785857142857,
+      "frame_range": [
+        13,
+        19
+      ]
+    },
+    {
+      "name": "knee_bend",
+      "value": 44.21476095561734,
+      "unit": "degrees",
+      "verdict": "Low Confidence",
+      "explanation": "Insufficient data to evaluate knee bend.",
+      "confidence": 0.34450176,
+      "frame_range": [
+        8,
+        8
+      ]
+    },
+    {
+      "name": "wrist_follow_through",
+      "value": 25.833269739937464,
+      "unit": "degrees",
+      "verdict": "Low Confidence",
+      "explanation": "Insufficient data to evaluate wrist follow-through.",
+      "confidence": 0.39892054,
+      "frame_range": [
+        16,
+        27
+      ]
+    }
+  ],
+  "scoring_method": "component_weighted",
+  "component_weights": {
+    "loading_quality": 0.3,
+    "release_mechanics": 0.35,
+    "follow_through_control": 0.2,
+    "balance_stability": 0.15
+  },
+  "legacy_weights": {
+    "elbow": 0.4,
+    "knee": 0.3,
+    "wrist": 0.3
+  },
+  "score_components": [
+    {
+      "name": "loading_quality",
+      "value": 79.1,
+      "unit": "score",
+      "weight": 0.3,
+      "explanation": "Leg load depth and smoothness into the motion."
+    },
+    {
+      "name": "release_mechanics",
+      "value": 0.0,
+      "unit": "score",
+      "weight": 0.35,
+      "explanation": "Elbow extension and timing near release."
+    },
+    {
+      "name": "follow_through_control",
+      "value": 99.9,
+      "unit": "score",
+      "weight": 0.2,
+      "explanation": "Controlled wrist movement after release."
+    },
+    {
+      "name": "balance_stability",
+      "value": 45.0,
+      "unit": "score",
+      "weight": 0.15,
+      "explanation": "Stability proxy from knee consistency around release."
+    }
+  ],
+  "feedback_bullets": [
+    "Prioritize release mechanics \u2014 component score 0/100.",
+    "Prioritize balance \u2014 component score 45/100.",
+    "Strength: follow-through looks solid (100/100)."
+  ]
+}

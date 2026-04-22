@@ -24,6 +24,7 @@ import { EmptyState } from '../components/EmptyState'
 import { useAuth } from '../context/AuthContext'
 import { apiService } from '../services/api.service'
 import { storageService } from '../services/storage.service'
+import type { HistorySession } from '../types/contracts'
 import { hapticFeedback } from '../utils/hapticFeedback'
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window')
@@ -47,7 +48,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 	const [lastSession, setLastSession] = useState<{ score: number; date: string } | null>(null)
 	const [recentSessions, setRecentSessions] = useState<any[]>([])
 
-	useEffect(() => { loadData() }, [])
+	useEffect(() => { loadData() }, [user?.id])
 	useEffect(() => {
 		const unsub = navigation.addListener('focus', () => loadData())
 		return unsub
@@ -55,30 +56,98 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
 	const loadData = async () => {
 		try {
-			let serverStats: any = null
-			let serverStreak: any = null
-			try {
-				[serverStats, serverStreak] = await Promise.all([
-					apiService.getUserStats(),
-					apiService.getUserStreak(),
-				])
-			} catch { /* fall back to local data */ }
+			if (user?.id) {
+				let serverStats: any = null
+				let serverStreak: any = null
+				let histSessions: HistorySession[] = []
+				try {
+					;[serverStats, serverStreak] = await Promise.all([
+						apiService.getUserStats(),
+						apiService.getUserStreak(),
+					])
+					try {
+						const hist = await apiService.getAnalysisHistory(5, 0)
+						histSessions = hist?.sessions ?? []
+					} catch {
+						/* history optional if token/network fails */
+					}
+				} catch {
+					/* stats may fail offline; still try local cache below */
+				}
 
-			if (serverStats && (serverStats.totalSessions ?? 0) > 0) {
-				setStats({
-					dayStreak: serverStreak?.currentStreak ?? 0,
-					totalAnalyses: serverStats.totalSessions ?? 0,
-					averageScore: Math.round(serverStats.avgScore ?? 0),
-					bestScore: Math.round(serverStats.bestScore ?? 0),
-				})
+				if (serverStats) {
+					setStats({
+						dayStreak: serverStreak?.currentStreak ?? 0,
+						totalAnalyses: serverStats.totalSessions ?? 0,
+						averageScore: Math.round(serverStats.avgScore ?? 0),
+						bestScore: Math.round(serverStats.bestScore ?? 0),
+					})
+				}
 
-				if (serverStats.lastSessionDate) {
+				if (histSessions.length > 0) {
+					const latest = histSessions[0]
+					const score = Math.round(
+						latest.overall_score ??
+							latest.average_score ??
+							serverStats?.bestScore ??
+							serverStats?.avgScore ??
+							0,
+					)
+					setLastSession({
+						score,
+						date: fmtDate(latest.timestamp || latest.date),
+					})
+					setRecentSessions(
+						histSessions.slice(0, 3).map(h => ({
+							id: h.session_id,
+							score: Math.round(
+								h.overall_score ?? h.average_score ?? 0,
+							),
+							date: fmtDate(h.timestamp || h.date),
+						})),
+					)
+				} else if (serverStats?.lastSessionDate) {
 					setLastSession({
 						score: Math.round(serverStats.bestScore ?? serverStats.avgScore ?? 0),
 						date: fmtDate(serverStats.lastSessionDate),
 					})
+					setRecentSessions([])
 				} else {
-					setLastSession(null)
+					const local = await storageService.getAnalysisHistory(user.id)
+					if (local.length > 0) {
+						const latest = local[0]
+						setLastSession({
+							score: latest.scores.total,
+							date: fmtDate(latest.timestamp),
+						})
+						setRecentSessions(
+							local.slice(0, 3).map(a => ({
+								id: a.id,
+								score: a.scores.total,
+								date: fmtDate(a.timestamp),
+							})),
+						)
+					} else {
+						setLastSession(null)
+						setRecentSessions([])
+					}
+					if (!serverStats) {
+						setStats({
+							dayStreak: 0,
+							totalAnalyses: local.length,
+							averageScore:
+								local.length > 0
+									? Math.round(
+											local.reduce((s, a) => s + a.scores.total, 0) /
+												local.length,
+										)
+									: 0,
+							bestScore:
+								local.length > 0
+									? Math.max(...local.map(a => a.scores.total))
+									: 0,
+						})
+					}
 				}
 			} else {
 				const [analysisHistory, workoutHistory, drillCompletions] = await Promise.all([

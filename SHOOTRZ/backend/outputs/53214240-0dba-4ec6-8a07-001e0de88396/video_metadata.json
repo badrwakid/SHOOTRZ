@@ -1,0 +1,15 @@
+{
+  "video_path": "backend\\outputs\\bc288548-1bfc-4768-be05-d2cabc81abac\\input_video.mp4",
+  "fps": 30.0,
+  "frame_count": 60,
+  "width": 640,
+  "height": 480,
+  "duration_seconds": 2.0,
+  "resolution": "640x480",
+  "quality_warnings": [],
+  "frame_sampling": {
+    "frame_skip": 1,
+    "max_frames": null,
+    "total_processed_frames": 60
+  }
+}

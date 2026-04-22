@@ -354,12 +354,14 @@ def get_grip_quality_feedback(value: float, confidence: float) -> Optional[Dict]
 	return None
 
 
-def rules_from_metrics(metrics: List[Dict]) -> List[Dict]:
+def rules_from_metrics(metrics: List[Dict], enrich: bool = False) -> List[Dict]:
 	"""
 	Generate feedback rules from computed metrics.
 	
 	Args:
 		metrics: List of metric dictionaries with 'metric_name', 'value', 'confidence', etc.
+		enrich: When True, pass rule-based feedback through Gemini for
+			natural-language rephrasing. Falls back to rule text on failure.
 	
 	Returns:
 		List of feedback dictionaries with 'message', 'severity', 'details'
@@ -367,14 +369,12 @@ def rules_from_metrics(metrics: List[Dict]) -> List[Dict]:
 	feedback_list = []
 	metrics_dict = {m.get("metric_name"): m for m in metrics}
 
-	# Forearm verticality
 	if "forearm_verticality" in metrics_dict:
 		m = metrics_dict["forearm_verticality"]
 		fb = get_forearm_verticality_feedback(m.get("value", 0), m.get("confidence", 0))
 		if fb:
 			feedback_list.append(fb)
 
-	# Elbow flexion (preparatory)
 	if "elbow_flexion_preparatory" in metrics_dict:
 		m = metrics_dict["elbow_flexion_preparatory"]
 		fb = get_elbow_flexion_feedback(
@@ -385,7 +385,6 @@ def rules_from_metrics(metrics: List[Dict]) -> List[Dict]:
 		if fb:
 			feedback_list.append(fb)
 
-	# Elbow flexion (release)
 	if "elbow_flexion_release" in metrics_dict:
 		m = metrics_dict["elbow_flexion_release"]
 		fb = get_elbow_flexion_feedback(
@@ -396,14 +395,12 @@ def rules_from_metrics(metrics: List[Dict]) -> List[Dict]:
 		if fb:
 			feedback_list.append(fb)
 
-	# Knee flexion
 	if "knee_flexion" in metrics_dict:
 		m = metrics_dict["knee_flexion"]
 		fb = get_knee_flexion_feedback(m.get("value", 0), m.get("confidence", 0))
 		if fb:
 			feedback_list.append(fb)
 
-	# Release angle
 	if "release_angle" in metrics_dict:
 		m = metrics_dict["release_angle"]
 		fb = get_release_angle_feedback(
@@ -414,25 +411,46 @@ def rules_from_metrics(metrics: List[Dict]) -> List[Dict]:
 		if fb:
 			feedback_list.append(fb)
 
-	# Entry angle
 	if "entry_angle" in metrics_dict:
 		m = metrics_dict["entry_angle"]
 		fb = get_entry_angle_feedback(m.get("value", 0), m.get("confidence", 0))
 		if fb:
 			feedback_list.append(fb)
 
-	# Wrist angular velocity
 	if "wrist_angular_velocity" in metrics_dict:
 		m = metrics_dict["wrist_angular_velocity"]
 		fb = get_wrist_velocity_feedback(m.get("value", 0), m.get("confidence", 0))
 		if fb:
 			feedback_list.append(fb)
 
-	# Grip quality
 	if "grip_quality" in metrics_dict:
 		m = metrics_dict["grip_quality"]
 		fb = get_grip_quality_feedback(m.get("value", 0), m.get("confidence", 0))
 		if fb:
 			feedback_list.append(fb)
 
+	if enrich and feedback_list:
+		feedback_list = _enrich_with_llm(feedback_list)
+
 	return feedback_list
+
+
+def _enrich_with_llm(feedback_list: List[Dict]) -> List[Dict]:
+	"""Rephrase rule-based feedback via Gemini, falling back to originals."""
+	import logging
+	logger = logging.getLogger(__name__)
+	try:
+		from ..services.llm import llm_service
+		result = llm_service.rephrase_feedback(feedback_items=feedback_list)
+		enriched = []
+		for item in result.items:
+			enriched.append({
+				"message": item.message,
+				"severity": item.severity,
+				"details": item.details,
+				"metric_name": item.metric_name,
+			})
+		return enriched
+	except Exception:
+		logger.warning("Feedback LLM enrichment failed, returning rule-based text", exc_info=True)
+		return feedback_list

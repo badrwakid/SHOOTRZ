@@ -310,21 +310,61 @@ CREATE OR REPLACE TRIGGER handle_user_streaks_updated_at
     BEFORE UPDATE ON public.user_streaks
     FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
 
--- Auto-create user_profile + user_streak on new user
+-- Auto-create public.users (from auth), then user_profile + user_streak via AFTER INSERT on public.users
 CREATE OR REPLACE FUNCTION public.handle_new_user()
-RETURNS trigger AS $$
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    resolved_email text;
+    v_id uuid;
 BEGIN
-    INSERT INTO public.user_profiles (user_id)
-    VALUES (NEW.id)
-    ON CONFLICT (user_id) DO NOTHING;
+    IF tg_table_schema = 'auth' AND tg_table_name = 'users' THEN
+        v_id := NEW.id;
+        resolved_email := COALESCE(
+            NULLIF(trim(NEW.email), ''),
+            NULLIF(trim(NEW.raw_user_meta_data->>'email'), ''),
+            NULLIF(trim(NEW.raw_user_meta_data->>'preferred_username'), '')
+        );
+        IF resolved_email IS NULL THEN
+            resolved_email := 'user-' || replace(v_id::text, '-', '') || '@oauth.placeholder';
+        END IF;
 
-    INSERT INTO public.user_streaks (user_id)
-    VALUES (NEW.id)
-    ON CONFLICT (user_id) DO NOTHING;
+        INSERT INTO public.users (id, email, auth_provider)
+        VALUES (
+            v_id,
+            resolved_email,
+            COALESCE(NULLIF(trim(NEW.raw_app_meta_data->>'provider'), ''), 'supabase')
+        )
+        ON CONFLICT (id) DO NOTHING;
+
+        RETURN NEW;
+
+    ELSIF tg_table_schema = 'public' AND tg_table_name = 'users' THEN
+        v_id := NEW.id;
+        INSERT INTO public.user_profiles (user_id)
+        VALUES (v_id)
+        ON CONFLICT (user_id) DO NOTHING;
+
+        INSERT INTO public.user_streaks (user_id)
+        VALUES (v_id)
+        ON CONFLICT (user_id) DO NOTHING;
+
+        RETURN NEW;
+    END IF;
 
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
+
+ALTER FUNCTION public.handle_new_user() OWNER TO postgres;
+
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+    AFTER INSERT ON auth.users
+    FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
 CREATE OR REPLACE TRIGGER on_user_created
     AFTER INSERT ON public.users

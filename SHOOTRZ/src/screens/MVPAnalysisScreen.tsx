@@ -9,7 +9,7 @@ import {
 	ActivityIndicator,
 	Animated,
 } from 'react-native'
-import { Video, ResizeMode } from 'expo-av'
+import { AnalysisOverlayVideo } from '../components/AnalysisOverlayVideo'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import * as ImagePicker from 'expo-image-picker'
 import * as FileSystem from 'expo-file-system/legacy'
@@ -150,6 +150,19 @@ export const MVPAnalysisScreen: React.FC = () => {
 						}
 						setAnalysisResult(v); hapticFeedback.success()
 						setOverlayError(null); setIsOverlayLoading(true)
+						const jobId = uploadResponse.job_id
+						if (user?.id && jobId) {
+							try {
+								await apiService.completeMVPAnalysis(jobId)
+							} catch (e) {
+								console.warn('completeMVPAnalysis failed, retrying once', e)
+								try {
+									await apiService.completeMVPAnalysis(jobId)
+								} catch (e2) {
+									console.warn('completeMVPAnalysis failed after retry', e2)
+								}
+							}
+						}
 						try {
 							const fmv = (k: string) => { const m = v.metrics.find(m2 => m2.name?.toLowerCase().includes(k)); return Number.isFinite(m?.value) ? (m?.value as number) : 0 }
 							const fcv = (k: string) => { const c = v.score_components?.find(c2 => c2.name?.toLowerCase().includes(k)); return Number.isFinite(c?.value) ? (c?.value as number) : 0 }
@@ -160,7 +173,7 @@ export const MVPAnalysisScreen: React.FC = () => {
 								feedback: v.feedback_bullets?.length ? v.feedback_bullets : v.feedback_summary ? [v.feedback_summary] : [],
 								angles: { elbow: fmv('elbow'), knee: fmv('knee'), release: fmv('wrist'), bodyAlignment: fcv('balance') },
 								mvp: { scoreComponents: v.score_components?.map(c => ({ name: c.name, value: c.value, weight: c.weight })), keyFrameImages: v.key_frame_images, shotWindow: v.shot_window, events: v.events, diagnostics: v.diagnostics },
-							} as any).catch(() => {})
+							} as any, user?.id).catch(() => {})
 						} catch {}
 						return
 					}
@@ -300,16 +313,11 @@ export const MVPAnalysisScreen: React.FC = () => {
 								{overlayError && !isOverlayLoading ? <Text style={styles.overlayErr}>{overlayError}</Text> : null}
 								<View style={styles.overlayWrap}>
 									{overlayLocalUri ? (
-										<Video
-											key={`${overlayKey}`}
-											source={{ uri: overlayLocalUri }}
+										<AnalysisOverlayVideo
+											key={`${overlayKey}-${overlayLocalUri}`}
+											localUri={overlayLocalUri}
 											style={styles.overlayVideo}
-											useNativeControls
-											resizeMode={ResizeMode.CONTAIN}
-											shouldPlay={false}
-											isLooping
-											onLoadStart={() => { setIsOverlayLoading(true); setOverlayError(null) }}
-											onLoad={() => { setIsOverlayLoading(false); setOverlayError(null) }}
+											onReady={() => { setIsOverlayLoading(false); setOverlayError(null) }}
 											onError={() => { setOverlayError('Could not load overlay.'); setIsOverlayLoading(false) }}
 										/>
 									) : <View style={styles.overlayVideo} />}

@@ -1,0 +1,25 @@
+{
+  "overall": 0.8109779953956604,
+  "per_joint": {
+    "nose": 0.9994496703147888,
+    "left_shoulder": 0.9996678829193115,
+    "right_shoulder": 0.999639630317688,
+    "left_elbow": 0.2803226113319397,
+    "right_elbow": 0.953898012638092,
+    "left_wrist": 0.35040542483329773,
+    "right_wrist": 0.8163337111473083,
+    "left_hip": 0.9974794387817383,
+    "right_hip": 0.9960154294967651,
+    "left_knee": 0.6450415253639221,
+    "right_knee": 0.951453447341919,
+    "left_ankle": 0.7326698303222656,
+    "right_ankle": 0.8842175006866455,
+    "left_heel": 0.7237743139266968,
+    "right_heel": 0.8298903703689575,
+    "left_foot_index": 0.7609191536903381,
+    "right_foot_index": 0.8654471039772034
+  },
+  "low_confidence_frames": [],
+  "total_frames": 104,
+  "confidence_threshold": 0.3
+}

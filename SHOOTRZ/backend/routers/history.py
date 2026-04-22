@@ -1,3 +1,4 @@
+import logging
 from fastapi import APIRouter, HTTPException
 from typing import Optional
 from datetime import datetime
@@ -7,6 +8,7 @@ from ..storage.db import get_user_history, get_video_metrics
 
 
 router = APIRouter(prefix="", tags=["history"])
+logger = logging.getLogger(__name__)
 
 
 @router.get("/history/{user_id}", response_model=HistoryResponse)
@@ -19,15 +21,16 @@ async def history(
 ):
 	"""
 	Get user's analysis history with sessions and aggregated metrics.
-	
-	Args:
-		user_id: User ID
-		limit: Maximum number of sessions to return
-		offset: Pagination offset
-		start_date: Filter sessions from this date (ISO format)
-		end_date: Filter sessions to this date (ISO format)
+
+	Deprecated for clients: prefer ``GET /api/user/analysis-history`` with a
+	Bearer token (user-scoped, correct MVP scores from analysis_summaries).
+	This endpoint is unauthenticated and uses legacy video rows only.
 	"""
 	try:
+		logger.warning(
+			"legacy /history/%s used — prefer GET /api/user/analysis-history",
+			user_id,
+		)
 		videos = get_user_history(user_id)
 		
 		# Apply date filtering

@@ -11,6 +11,7 @@ from typing import Any, Dict, Optional
 
 import numpy as np
 import pandas as pd
+import psutil
 from fastapi import BackgroundTasks, HTTPException, UploadFile
 
 from ..contracts.mvp import MVPAnalyzeQueuedResponse, MVPResultResponse
@@ -18,6 +19,7 @@ from ..inference.phase_detector import PhaseDetector
 from ..inference.pose_2d import BASKETBALL_KEYPOINTS
 from ..mvp.core.pipeline import MVPPipeline
 from ..services.job_store import DurableJobStore
+from ..services.llm import llm_service
 from ..storage.db import db
 from ..utils.id_gen import generate_job_id
 from ..utils.video_annotator import annotate_video
@@ -137,7 +139,21 @@ class MVPJobService:
         self._set_status(job_id, {"status": "processing"})
         try:
             pipeline = MVPPipeline()
-            result = pipeline.process_video(video_path, shooting_side)
+            proc = psutil.Process(os.getpid())
+            mem_before_mb = proc.memory_info().rss / 1024 ** 2
+            t_total_start = time.perf_counter()
+            result = pipeline.process_video(
+                video_path,
+                shooting_side,
+                peak_memory_sampler=lambda: proc.memory_info().rss / 1024 ** 2,
+            )
+            elapsed_s = time.perf_counter() - t_total_start
+            mem_after_mb = proc.memory_info().rss / 1024 ** 2
+            peak_mem_mb = max(
+                mem_before_mb,
+                mem_after_mb,
+                float(result.get("peak_memory_mb") or 0.0),
+            )
             logger.info("Pipeline completed", extra={"job_id": job_id, "run_id": result.get("run_id")})
 
             angles_csv = Path(result["output_dir"]) / "angles.csv"
@@ -195,6 +211,10 @@ class MVPJobService:
                 "key_frame_images": {},
                 "quality_warnings": result.get("quality_warnings", []),
                 "diagnostics": job_diag,
+                "processing_time_seconds": round(elapsed_s, 3),
+                "phase_timings_seconds": result.get("phase_timings_seconds", {}),
+                "peak_memory_mb": round(peak_mem_mb, 1),
+                "pose_overall_confidence": result.get("pose_overall_confidence"),
             }
 
             key_frame_images = result.get("key_frame_images") or {}
@@ -205,9 +225,29 @@ class MVPJobService:
                             f"/mvp/artifacts/{result['run_id']}/{name}"
                         )
 
+            self._enrich_with_gemini(job_result)
             self._build_overlay_artifact(job_id, result, video_path, job_result)
-            self._set_status(job_id, job_result)
             self._save_to_supabase(job_id, job_result)
+            run_meta_path = Path(result["output_dir"]) / "run_metadata.json"
+            if run_meta_path.exists():
+                with open(run_meta_path, "r", encoding="utf-8") as rf:
+                    run_meta = json.load(rf)
+            else:
+                run_meta = {}
+            run_meta.update(
+                {
+                    "job_id": job_id,
+                    "processing_time_seconds": round(elapsed_s, 3),
+                    "phase_timings_seconds": result.get("phase_timings_seconds", {}),
+                    "memory_before_mb": round(mem_before_mb, 1),
+                    "memory_after_mb": round(mem_after_mb, 1),
+                    "peak_memory_mb": round(peak_mem_mb, 1),
+                    "pose_overall_confidence": result.get("pose_overall_confidence"),
+                }
+            )
+            with open(run_meta_path, "w", encoding="utf-8") as wf:
+                json.dump(clean_nan_for_json(run_meta), wf, indent=2)
+            self._set_status(job_id, job_result)
             logger.info("Job completed successfully", extra={"job_id": job_id, "status": "completed"})
         except Exception as exc:
             logger.exception("Job failed", extra={"job_id": job_id, "error_type": type(exc).__name__})
@@ -234,6 +274,50 @@ class MVPJobService:
                     os.remove(video_path)
             except Exception:
                 logger.warning("Failed to remove temporary upload", extra={"job_id": job_id})
+
+    def _enrich_with_gemini(self, job_result: Dict[str, Any]) -> None:
+        """Replace rule-based feedback text with Gemini-generated content.
+
+        Falls back silently to the existing rule-based values already in
+        ``job_result`` — so this is always safe to call.
+        """
+        try:
+            overall = job_result.get("overall_score", 0)
+            tier = "poor"
+            if overall >= 90:
+                tier = "elite"
+            elif overall >= 75:
+                tier = "great"
+            elif overall >= 60:
+                tier = "good"
+            elif overall >= 40:
+                tier = "fair"
+
+            fb = llm_service.get_shot_feedback(
+                metrics=job_result.get("metrics", []),
+                score_components=job_result.get("score_components", []),
+                overall_score=overall,
+                score_tier=tier,
+                feedback_summary=job_result.get("feedback_summary", ""),
+                feedback_bullets=job_result.get("feedback_bullets", []),
+            )
+
+            job_result["feedback_summary"] = fb.overall_explanation
+            job_result["feedback_bullets"] = fb.feedback_bullets
+
+            for m in job_result.get("metrics", []):
+                for me in fb.metric_explanations:
+                    if me.metric_name == m.get("name"):
+                        m["explanation"] = me.explanation
+                        break
+
+            job_result["gemini_strengths"] = fb.strengths
+            job_result["gemini_improvements"] = fb.improvements
+            job_result["gemini_enriched"] = True
+            logger.info("Shot feedback enriched with Gemini")
+        except Exception:
+            logger.warning("Gemini enrichment skipped, using rule-based feedback", exc_info=True)
+            job_result["gemini_enriched"] = False
 
     def _save_to_supabase(self, job_id: str, job_result: Dict[str, Any]) -> None:
         """Persist completed analysis to Supabase for Coach J context and history.
@@ -264,12 +348,16 @@ class MVPJobService:
             score_components = job_result.get("score_components", [])
             bullets = job_result.get("feedback_bullets", [])
 
-            strengths = [b for b in bullets if any(
-                w in b.lower() for w in ("good", "great", "strong", "excellent", "nice")
-            )][:3]
-            improvements = [b for b in bullets if any(
-                w in b.lower() for w in ("improve", "work on", "try", "focus", "need")
-            )][:3]
+            if job_result.get("gemini_enriched"):
+                strengths = job_result.get("gemini_strengths", [])[:3]
+                improvements = job_result.get("gemini_improvements", [])[:3]
+            else:
+                strengths = [b for b in bullets if any(
+                    w in b.lower() for w in ("good", "great", "strong", "excellent", "nice")
+                )][:3]
+                improvements = [b for b in bullets if any(
+                    w in b.lower() for w in ("improve", "work on", "try", "focus", "need")
+                )][:3]
             if not improvements:
                 improvements = bullets[:3]
 
@@ -283,7 +371,29 @@ class MVPJobService:
             elif overall >= 40:
                 tier = "fair"
 
-            self._pending_summary = {
+            session_summary = None
+            try:
+                session_data = {
+                    "overall_score": overall,
+                    "score_tier": tier,
+                    "strengths": strengths,
+                    "improvements": improvements,
+                    "metrics": [
+                        {"name": m.get("name"), "value": m.get("value"), "verdict": m.get("verdict")}
+                        for m in metrics
+                    ],
+                }
+                session_summary = llm_service.get_session_summary(session_data=session_data)
+            except Exception:
+                logger.warning("Gemini session summary failed", exc_info=True)
+
+            summary_strengths = strengths
+            summary_improvements = improvements
+            if session_summary:
+                if session_summary.key_takeaway:
+                    summary_improvements = [session_summary.key_takeaway] + improvements[:2]
+
+            summary_dict = {
                 "overall_score": overall,
                 "shot_count": 1,
                 "elbow_angle_score": elbow.get("value"),
@@ -291,21 +401,45 @@ class MVPJobService:
                 "release_angle_score": release.get("value"),
                 "follow_through_score": follow.get("value"),
                 "balance_score": balance.get("value"),
-                "top_strengths": strengths,
-                "top_improvements": improvements,
+                "top_strengths": summary_strengths,
+                "top_improvements": summary_improvements,
                 "score_tier": tier,
             }
+            job_result["supabase_summary"] = summary_dict
             logger.info("Analysis summary prepared for Supabase",
                         extra={"job_id": job_id, "tier": tier, "score": overall})
         except Exception:
             logger.exception("Failed to prepare Supabase summary", extra={"job_id": job_id})
 
-    def save_result_for_user(self, job_id: str, user_id: str) -> None:
-        """Called by an authenticated endpoint to persist results to Supabase."""
+    def save_result_for_user(
+        self, job_id: str, user_id: str,
+    ) -> Optional[Dict[str, Any]]:
+        """Persist completed job results to Supabase for the authenticated user.
+
+        Idempotent: if this job was already saved for this user, returns the
+        stored session/video ids without inserting duplicate rows.
+        """
         try:
             payload = self.job_store.get(job_id)
             if not payload or payload.get("status") != "completed":
-                return
+                logger.warning(
+                    "save_result_for_user: job not completed",
+                    extra={"job_id": job_id, "status": payload.get("status") if payload else None},
+                )
+                return None
+
+            prev = payload.get("supabase_persisted")
+            if isinstance(prev, dict) and prev.get("user_id") == user_id:
+                logger.info(
+                    "save_result_for_user: already persisted",
+                    extra={"job_id": job_id, "user_id": user_id},
+                )
+                return {
+                    "success": True,
+                    "session_id": prev.get("session_id"),
+                    "video_id": prev.get("video_id"),
+                    "already_persisted": True,
+                }
 
             session = db.create_session(user_id, {
                 "title": f"Analysis {job_id[:8]}",
@@ -314,7 +448,7 @@ class MVPJobService:
             })
             if not session:
                 logger.warning("Failed to create session", extra={"job_id": job_id})
-                return
+                return None
 
             session_id = session["id"]
 
@@ -341,15 +475,32 @@ class MVPJobService:
                     ]
                     db.save_metrics(video_id, metric_rows)
 
-            summary = getattr(self, "_pending_summary", None)
+            summary = payload.get("supabase_summary")
             if summary:
                 db.save_analysis_summary(session_id, user_id, summary)
 
             db.update_streak(user_id)
-            logger.info("Results saved to Supabase",
-                        extra={"job_id": job_id, "user_id": user_id, "session_id": session_id})
+
+            out = {
+                "success": True,
+                "session_id": session_id,
+                "video_id": video_id,
+                "already_persisted": False,
+            }
+            payload["supabase_persisted"] = {
+                "user_id": user_id,
+                "session_id": session_id,
+                "video_id": video_id,
+            }
+            self._set_status(job_id, payload)
+            logger.info(
+                "Results saved to Supabase",
+                extra={"job_id": job_id, "user_id": user_id, "session_id": session_id},
+            )
+            return out
         except Exception:
             logger.exception("Failed to save results to Supabase", extra={"job_id": job_id})
+            return None
 
     def cleanup_old_outputs(self) -> None:
         cutoff = time.time() - (self.artifact_retention_days * 86400)

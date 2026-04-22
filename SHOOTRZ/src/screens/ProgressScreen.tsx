@@ -52,20 +52,28 @@ export const ProgressScreen: React.FC = () => {
 	const loadSessions = useCallback(async () => {
 		if (!user?.id) { setLoading(false); return }
 		try {
-			const resp = await apiService.getHistory(user.id, 100, 0)
+			const resp = await apiService.getAnalysisHistory(100, 0)
 			const sessionList = resp?.sessions ?? []
-			const mapped: Session[] = sessionList.map((h: HistorySession) => ({
-				id: h.session_id ?? String(Date.now()),
-				date: h.timestamp || h.date || new Date().toISOString(),
-				title: h.title ?? undefined,
-				shot_count: h.shot_count ?? 1,
-				average_score: h.average_score ?? undefined,
-				metrics: h.metrics?.reduce((acc: Record<string, number>, m: any) => {
-					const key = m.metric_name || m.name
-					if (key && Number.isFinite(m.value)) acc[key] = m.value
-					return acc
-				}, {}),
-			}))
+			const mapped: Session[] = sessionList.map((h: HistorySession) => {
+				const overall =
+					h.overall_score != null
+						? h.overall_score
+						: h.average_score != null
+							? h.average_score
+							: undefined
+				return {
+					id: h.session_id ?? String(Date.now()),
+					date: h.timestamp || h.date || new Date().toISOString(),
+					title: h.title ?? undefined,
+					shot_count: h.shot_count ?? 1,
+					average_score: overall,
+					metrics: h.metrics?.reduce((acc: Record<string, number>, m: any) => {
+						const key = m.metric_name || m.name
+						if (key && Number.isFinite(m.value)) acc[key] = m.value
+						return acc
+					}, {}),
+				}
+			})
 			setSessions(mapped)
 			calcTrends(mapped)
 		} catch (e) {

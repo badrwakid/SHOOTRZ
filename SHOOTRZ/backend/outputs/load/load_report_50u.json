@@ -1,0 +1,19 @@
+{
+  "num_requests": 156,
+  "num_failures": 3,
+  "error_rate_pct": 1.92,
+  "queue_p50_ms": 21000.0,
+  "queue_p95_ms": 74000.0,
+  "queue_submit_poll_p50_ms": 18000.0,
+  "queue_submit_poll_p95_ms": 76000.0,
+  "end_to_end_p50_ms": null,
+  "end_to_end_p95_ms": null,
+  "end_to_end_completed": 0,
+  "end_to_end_timeouts": 13,
+  "completion_rate_pct": 0.0,
+  "rps": 1.81,
+  "error_breakdown": {
+    "exception": 3,
+    "timeout": 13
+  }
+}

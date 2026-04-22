@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import copy
+import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 from ..storage.db import db
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -46,6 +49,11 @@ def build_user_context(
     profile = db.get_user_profile(user_id)
     stats = db.get_user_stats(user_id)
     summaries = db.get_recent_summaries(user_id, limit=options.max_recent_summaries)
+    if not summaries:
+        logger.info(
+            "build_user_context: no analysis_summaries rows for user",
+            extra={"user_id": user_id},
+        )
 
     user_section: Dict[str, Any] = {}
     if user:

@@ -9,6 +9,8 @@ from typing import Dict, Any, Optional, List
 import sys
 import shutil
 import json
+import time
+from contextlib import contextmanager
 
 import pandas as pd
 
@@ -25,6 +27,17 @@ from mvp.core.signal_smoothing import SignalSmoother
 from mvp.core.angle_computation import AngleComputer
 from mvp.core.shot_detection import ShotDetector
 from mvp.core.metrics import MetricsDerivation
+
+
+@contextmanager
+def _timed(store: Dict[str, float], phase: str, mem_sampler=None):
+    t0 = time.perf_counter()
+    try:
+        yield
+    finally:
+        store[phase] = round(time.perf_counter() - t0, 4)
+        if mem_sampler:
+            store.setdefault("_mem_samples", []).append(float(mem_sampler()))
 
 
 class MVPPipeline:
@@ -44,7 +57,8 @@ class MVPPipeline:
         self,
         video_path: str,
         shooting_side: str = "auto",
-        run_id: Optional[str] = None
+        run_id: Optional[str] = None,
+        peak_memory_sampler=None,
     ) -> Dict[str, Any]:
         """
         Process video through complete pipeline.
@@ -57,6 +71,9 @@ class MVPPipeline:
         Returns:
             Complete results dict
         """
+        phase_timings: Dict[str, float] = {}
+        total_start = time.perf_counter()
+
         # Create or restore run
         if run_id is None:
             self.run_tracker = create_run_tracker()
@@ -82,9 +99,10 @@ class MVPPipeline:
             pass
         
         # PHASE 1: Video Ingestion
-        video_loader = VideoLoader(video_path, self.config.get("video", {}))
-        video_metadata = video_loader.load_metadata()
-        frames, frame_mapping = video_loader.load_frames()
+        with _timed(phase_timings, "ingestion", peak_memory_sampler):
+            video_loader = VideoLoader(video_path, self.config.get("video", {}))
+            video_metadata = video_loader.load_metadata()
+            frames, frame_mapping = video_loader.load_frames()
         
         video_loader.save_metadata(self.run_tracker.get_output_path("video_metadata.json"))
         video_loader.save_frame_mapping(self.run_tracker.get_output_path("frame_mapping.csv"))
@@ -94,23 +112,25 @@ class MVPPipeline:
         self.run_tracker.add_metadata("quality_warnings", video_loader.quality_warnings)
         
         # PHASE 2: Pose Estimation
-        pose_estimator = MVPPoseEstimator(
-            self.config.get("pose_detection", {}),
-            video_metadata
-        )
-        pose_results = pose_estimator.process_frames(frames, frame_mapping)
-        detected_side = pose_estimator.determine_shooting_side(shooting_side)
-        
-        pose_estimator.export_pose_keypoints_csv(
-            self.run_tracker.get_output_path("pose_keypoints.csv"),
-            run_id
-        )
-        pose_estimator.export_pose_keypoints_json(
-            self.run_tracker.get_output_path("pose_keypoints.json")
-        )
-        pose_estimator.export_confidence_summary(
-            self.run_tracker.get_output_path("confidence_summary.json")
-        )
+        with _timed(phase_timings, "pose_estimation", peak_memory_sampler):
+            pose_estimator = MVPPoseEstimator(
+                self.config.get("pose_detection", {}),
+                video_metadata
+            )
+            pose_results = pose_estimator.process_frames(frames, frame_mapping)
+            detected_side = pose_estimator.determine_shooting_side(shooting_side)
+            
+            pose_estimator.export_pose_keypoints_csv(
+                self.run_tracker.get_output_path("pose_keypoints.csv"),
+                run_id
+            )
+            pose_estimator.export_pose_keypoints_json(
+                self.run_tracker.get_output_path("pose_keypoints.json")
+            )
+            pose_estimator.export_confidence_summary(
+                self.run_tracker.get_output_path("confidence_summary.json")
+            )
+            confidence_summary = pose_estimator.compute_confidence_summary()
         
         self.run_tracker.add_metadata("shooting_side", detected_side)
         self.run_tracker.add_metadata("pose_frames_detected", len(pose_results))
@@ -118,32 +138,40 @@ class MVPPipeline:
         pose_estimator.close()
         
         # PHASE 3: Signal Smoothing
-        smoother = SignalSmoother(self.config.get("smoothing", {}))
-        pose_df = pd.read_csv(self.run_tracker.get_output_path("pose_keypoints.csv"))
-        smoothed_df = smoother.smooth_keypoints(pose_df)
-        smoother.export_smoothed_csv(
-            smoothed_df,
-            self.run_tracker.get_output_path("pose_keypoints_smoothed.csv")
-        )
+        with _timed(phase_timings, "smoothing", peak_memory_sampler):
+            smoother = SignalSmoother(self.config.get("smoothing", {}))
+            pose_df = pd.read_csv(self.run_tracker.get_output_path("pose_keypoints.csv"))
+            smoothed_df = smoother.smooth_keypoints(pose_df)
+            smoother.export_smoothed_csv(
+                smoothed_df,
+                self.run_tracker.get_output_path("pose_keypoints_smoothed.csv")
+            )
         
         # PHASE 4: Angle Computation
-        angle_computer = AngleComputer(
-            detected_side,
-            self.config.get("pose_detection.confidence_threshold", 0.3)
-        )
-        angles_df = angle_computer.compute_angles_per_frame(smoothed_df)
-        angle_computer.export_angles_csv(
-            angles_df,
-            self.run_tracker.get_output_path("angles.csv")
-        )
+        with _timed(phase_timings, "angle_computation", peak_memory_sampler):
+            angle_computer = AngleComputer(
+                detected_side,
+                self.config.get("pose_detection.confidence_threshold", 0.3)
+            )
+            angles_df = angle_computer.compute_angles_per_frame(smoothed_df)
+            angle_computer.export_angles_csv(
+                angles_df,
+                self.run_tracker.get_output_path("angles.csv")
+            )
         
         # PHASE 5: Shot Detection
-        shot_detector = ShotDetector(self.config.get("shot_detection", {}))
-        shot_window = shot_detector.detect_shot_window(angles_df, smoothed_df, detected_side)
-        shot_detector.export_shot_window_json(
-            shot_window,
-            self.run_tracker.get_output_path("shot_window.json")
-        )
+        with _timed(phase_timings, "shot_detection", peak_memory_sampler):
+            shot_detector = ShotDetector(self.config.get("shot_detection", {}))
+            shot_window = shot_detector.detect_shot_window(
+                angles_df,
+                smoothed_df,
+                detected_side,
+                output_dir=self.run_tracker.get_run_dir(),
+            )
+            shot_detector.export_shot_window_json(
+                shot_window,
+                self.run_tracker.get_output_path("shot_window.json")
+            )
 
         diag = shot_window.get("diagnostics") or {}
         with open(self.run_tracker.get_output_path("event_candidates.json"), "w") as ef:
@@ -170,26 +198,32 @@ class MVPPipeline:
         self.run_tracker.add_metadata("shot_window", shot_window)
         
         # PHASE 6: Metrics Derivation
-        metrics_derivation = MetricsDerivation({
-            "metrics": self.config.get("metrics", {}),
-            "scoring": self.config.get("scoring", {})
-        })
-        metrics = metrics_derivation.derive_metrics(angles_df, shot_window)
-        overall_score, feedback_summary, feedback_bullets, score_components = (
-            metrics_derivation.compute_overall_score(metrics, angles_df, shot_window)
-        )
-        
-        metrics_derivation.export_report_json(
-            metrics,
-            overall_score,
-            feedback_summary,
-            self.run_tracker.get_output_path("report.json"),
-            score_components=score_components,
-            feedback_bullets=feedback_bullets,
-        )
+        with _timed(phase_timings, "metrics_scoring", peak_memory_sampler):
+            metrics_derivation = MetricsDerivation({
+                "metrics": self.config.get("metrics", {}),
+                "scoring": self.config.get("scoring", {})
+            })
+            metrics = metrics_derivation.derive_metrics(angles_df, shot_window)
+            overall_score, feedback_summary, feedback_bullets, score_components = (
+                metrics_derivation.compute_overall_score(metrics, angles_df, shot_window)
+            )
+            
+            metrics_derivation.export_report_json(
+                metrics,
+                overall_score,
+                feedback_summary,
+                self.run_tracker.get_output_path("report.json"),
+                score_components=score_components,
+                feedback_bullets=feedback_bullets,
+            )
         
         self.run_tracker.add_metadata("overall_score", overall_score)
         self.run_tracker.add_metadata("metrics_count", len(metrics))
+        self.run_tracker.add_metadata("phase_timings_seconds", phase_timings)
+        self.run_tracker.add_metadata("processing_time_seconds", round(time.perf_counter() - total_start, 4))
+        self.run_tracker.add_metadata("pose_overall_confidence", confidence_summary.get("overall"))
+        mem_samples = phase_timings.get("_mem_samples", [])
+        self.run_tracker.add_metadata("peak_memory_mb", round(max(mem_samples), 1) if mem_samples else None)
         
         # Save final metadata
         self.run_tracker.save_metadata()
@@ -209,6 +243,9 @@ class MVPPipeline:
             "quality_warnings": video_loader.quality_warnings,
             "output_dir": str(self.run_tracker.get_run_dir()),
             "diagnostics": build_pipeline_diagnostics(shot_window, score_components),
+            "phase_timings_seconds": {k: v for k, v in phase_timings.items() if k != "_mem_samples"},
+            "peak_memory_mb": round(max(mem_samples), 1) if mem_samples else None,
+            "pose_overall_confidence": confidence_summary.get("overall"),
         }
 
 

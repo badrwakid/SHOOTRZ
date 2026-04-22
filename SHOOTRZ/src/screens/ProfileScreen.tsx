@@ -22,7 +22,6 @@ import { useAuth } from '../context/AuthContext'
 import { apiService } from '../services/api.service'
 import { storageService } from '../services/storage.service'
 import { emailService } from '../services/email.service'
-import { supabase } from '../services/supabase.client'
 import { hapticFeedback } from '../utils/hapticFeedback'
 
 export const ProfileScreen: React.FC = () => {
@@ -43,16 +42,21 @@ export const ProfileScreen: React.FC = () => {
 		try {
 			let serverStats: any = null
 			let serverStreak: any = null
-			try {
-				[serverStats, serverStreak] = await Promise.all([
-					apiService.getUserStats(),
-					apiService.getUserStreak(),
-				])
-			} catch { /* fall back to local data */ }
+			if (user?.id) {
+				try {
+					;[serverStats, serverStreak] = await Promise.all([
+						apiService.getUserStats(),
+						apiService.getUserStreak(),
+					])
+				} catch {
+					/* offline — fall back to local below */
+				}
+			}
 
-			if (serverStats && (serverStats.totalSessions ?? 0) > 0) {
-				const goals = await storageService.getGoals()
-				const completed = goals.filter((g: any) => g.completed).length
+			const goals = await storageService.getGoals()
+			const completed = goals.filter((g: any) => g.completed).length
+
+			if (user?.id && serverStats) {
 				setStats({
 					totalSessions: serverStats.totalSessions ?? 0,
 					bestScore: Math.round(serverStats.bestScore ?? 0),
@@ -61,14 +65,10 @@ export const ProfileScreen: React.FC = () => {
 					totalGoals: goals.length,
 				})
 			} else {
-				const [analysisHistory, goals] = await Promise.all([
-					storageService.getAnalysisHistory(),
-					storageService.getGoals(),
-				])
+				const analysisHistory = await storageService.getAnalysisHistory(user?.id)
 				const best = analysisHistory.length > 0
 					? Math.max(...analysisHistory.map(a => a.scores.total))
 					: 0
-				const completed = goals.filter((g: any) => g.completed).length
 				setStats({
 					totalSessions: analysisHistory.length,
 					bestScore: best,
@@ -146,18 +146,21 @@ export const ProfileScreen: React.FC = () => {
 					onPress: async () => {
 						setLoading(true)
 						try {
-							const userId = user?.id
-							if (userId) {
-								void (async () => { try { await supabase.from('videos').delete().eq('user_id', userId) } catch {} })()
-								try { await supabase.from('sessions').delete().eq('user_id', userId) } catch {}
-								try { await supabase.from('users').delete().eq('id', userId).select() } catch {}
+							await apiService.deleteAccount()
+							try {
+								await logout()
+							} catch {
+								await storageService.clearAllData()
 							}
-							try { await storageService.clearAllData() } catch {}
-							await supabase.auth.signOut()
-							await logout()
 							Alert.alert('Account Deleted', 'Your account has been removed.')
-						} catch (e) { Alert.alert('Error', 'Failed to delete account.') }
-						finally { setLoading(false) }
+						} catch (e: any) {
+							Alert.alert(
+								'Error',
+								e?.message || 'Failed to delete account.',
+							)
+						} finally {
+							setLoading(false)
+						}
 					},
 				},
 			],

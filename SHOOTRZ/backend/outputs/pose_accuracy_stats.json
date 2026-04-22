@@ -1,0 +1,233 @@
+{
+  "overall": {
+    "n": 20,
+    "mean": 0.636548,
+    "std": 0.167236,
+    "min": 0.5,
+    "max": 0.84137
+  },
+  "per_joint": {
+    "left_ankle": {
+      "n": 20,
+      "mean": 0.618685,
+      "std": 0.145359,
+      "min": 0.5,
+      "max": 0.796713
+    },
+    "left_elbow": {
+      "n": 20,
+      "mean": 0.386337,
+      "std": 0.139208,
+      "min": 0.215842,
+      "max": 0.5
+    },
+    "left_foot_index": {
+      "n": 20,
+      "mean": 0.624657,
+      "std": 0.152673,
+      "min": 0.5,
+      "max": 0.811642
+    },
+    "left_heel": {
+      "n": 20,
+      "mean": 0.623145,
+      "std": 0.150821,
+      "min": 0.5,
+      "max": 0.807862
+    },
+    "left_hip": {
+      "n": 20,
+      "mean": 0.6997,
+      "std": 0.244581,
+      "min": 0.5,
+      "max": 0.999249
+    },
+    "left_knee": {
+      "n": 20,
+      "mean": 0.550641,
+      "std": 0.062022,
+      "min": 0.5,
+      "max": 0.626602
+    },
+    "left_shoulder": {
+      "n": 20,
+      "mean": 0.699495,
+      "std": 0.24433,
+      "min": 0.5,
+      "max": 0.998737
+    },
+    "left_wrist": {
+      "n": 20,
+      "mean": 0.432094,
+      "std": 0.083167,
+      "min": 0.330236,
+      "max": 0.5
+    },
+    "nose": {
+      "n": 20,
+      "mean": 0.699902,
+      "std": 0.244829,
+      "min": 0.5,
+      "max": 0.999756
+    },
+    "right_ankle": {
+      "n": 20,
+      "mean": 0.686179,
+      "std": 0.228022,
+      "min": 0.5,
+      "max": 0.965447
+    },
+    "right_elbow": {
+      "n": 20,
+      "mean": 0.686461,
+      "std": 0.228367,
+      "min": 0.5,
+      "max": 0.966153
+    },
+    "right_foot_index": {
+      "n": 20,
+      "mean": 0.682466,
+      "std": 0.223475,
+      "min": 0.5,
+      "max": 0.956166
+    },
+    "right_heel": {
+      "n": 20,
+      "mean": 0.676759,
+      "std": 0.216485,
+      "min": 0.5,
+      "max": 0.941899
+    },
+    "right_hip": {
+      "n": 20,
+      "mean": 0.699575,
+      "std": 0.244428,
+      "min": 0.5,
+      "max": 0.998936
+    },
+    "right_knee": {
+      "n": 20,
+      "mean": 0.692677,
+      "std": 0.23598,
+      "min": 0.5,
+      "max": 0.981692
+    },
+    "right_shoulder": {
+      "n": 20,
+      "mean": 0.699915,
+      "std": 0.244845,
+      "min": 0.5,
+      "max": 0.999787
+    },
+    "right_wrist": {
+      "n": 20,
+      "mean": 0.662627,
+      "std": 0.199176,
+      "min": 0.5,
+      "max": 0.906567
+    }
+  },
+  "per_run": [
+    {
+      "run_id": "3ec04a41-8d09-40bf-9dc3-426c9d2dbfd7",
+      "overall": 0.5,
+      "total_frames": 411
+    },
+    {
+      "run_id": "3f4b651f-2080-400b-adb6-7bd8afa50044",
+      "overall": 0.8413697481155396,
+      "total_frames": 411
+    },
+    {
+      "run_id": "4f3dc90e-0e11-4fbb-a481-7f0e76f5fa64",
+      "overall": 0.5,
+      "total_frames": 411
+    },
+    {
+      "run_id": "52c8d046-b479-434f-b8d4-56c68191eb63",
+      "overall": 0.8413697481155396,
+      "total_frames": 411
+    },
+    {
+      "run_id": "53214240-0dba-4ec6-8a07-001e0de88396",
+      "overall": 0.5,
+      "total_frames": 60
+    },
+    {
+      "run_id": "56a1e08f-204a-4e2c-95b1-2029c158caf8",
+      "overall": 0.8413697481155396,
+      "total_frames": 411
+    },
+    {
+      "run_id": "69752c07-3593-4b0c-be24-bbea323b9cd6",
+      "overall": 0.8413697481155396,
+      "total_frames": 411
+    },
+    {
+      "run_id": "6b84daec-4390-43ba-9416-0ed2202446cd",
+      "overall": 0.5,
+      "total_frames": 411
+    },
+    {
+      "run_id": "88d7da0b-ac11-41f7-8115-41b66c34e1a0",
+      "overall": 0.5,
+      "total_frames": 60
+    },
+    {
+      "run_id": "91980f65-43a0-4d79-a3c7-1e527186e6cf",
+      "overall": 0.5,
+      "total_frames": 60
+    },
+    {
+      "run_id": "9414cafc-c296-420b-9b4e-da06d44653b6",
+      "overall": 0.8413697481155396,
+      "total_frames": 411
+    },
+    {
+      "run_id": "a3c6f653-610c-4db2-96ce-3ecd7c711828",
+      "overall": 0.5,
+      "total_frames": 60
+    },
+    {
+      "run_id": "b2d5ac7e-62a9-4048-b480-f9b807d949a0",
+      "overall": 0.5,
+      "total_frames": 411
+    },
+    {
+      "run_id": "bc288548-1bfc-4768-be05-d2cabc81abac",
+      "overall": 0.5,
+      "total_frames": 60
+    },
+    {
+      "run_id": "cd941ae4-eed3-46f0-823c-5666e00d45a0",
+      "overall": 0.8413697481155396,
+      "total_frames": 411
+    },
+    {
+      "run_id": "d657e97c-9c68-4c11-a6d0-768ed8ac5a1b",
+      "overall": 0.5,
+      "total_frames": 411
+    },
+    {
+      "run_id": "dcf12c17-17d9-4ccd-9e57-70366bcace14",
+      "overall": 0.5,
+      "total_frames": 411
+    },
+    {
+      "run_id": "f1ae9d18-a8ba-4f9a-9931-8905448347fd",
+      "overall": 0.5,
+      "total_frames": 411
+    },
+    {
+      "run_id": "f3878deb-6669-4bef-8f0e-ac2847a0c387",
+      "overall": 0.8413697481155396,
+      "total_frames": 411
+    },
+    {
+      "run_id": "ff9e877c-68a6-4e9c-a471-606bf5a4f48a",
+      "overall": 0.8413697481155396,
+      "total_frames": 411
+    }
+  ],
+  "n_distinct_videos": 20
+}

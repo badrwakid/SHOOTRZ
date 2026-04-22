@@ -1,13 +1,18 @@
-"""User profile, stats, streak, drill, and workout endpoints."""
+"""User profile, stats, streak, drill, workout, and progress insight endpoints."""
 from __future__ import annotations
 
+import logging
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
+from ..services.llm import llm_service
 from ..storage.db import db
+from ..storage.supabase_client import get_service_client
 from ..utils.supabase_auth import AuthenticatedUser, get_authenticated_user
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["user"])
 
@@ -96,6 +101,39 @@ async def get_user_streak(
     return streak
 
 
+@router.get("/user/progress-insight")
+async def get_progress_insight(
+    user: AuthenticatedUser = Depends(get_authenticated_user),
+):
+    """Gemini-powered trend analysis of recent performance."""
+    stats = db.get_user_stats(user.user_id)
+    summaries = db.get_recent_summaries(user.user_id, limit=10)
+
+    if not summaries:
+        return {
+            "insight": "Record your first session to get personalized progress insights.",
+            "highlights": [],
+            "next_focus": "Start by recording a shot video for analysis.",
+        }
+
+    compact_summaries = [
+        {
+            "date": s.get("created_at"),
+            "overall_score": s.get("overall_score"),
+            "score_tier": s.get("score_tier"),
+            "top_strengths": (s.get("top_strengths") or [])[:2],
+            "top_improvements": (s.get("top_improvements") or [])[:2],
+        }
+        for s in summaries
+    ]
+
+    result = llm_service.get_progress_insight(
+        stats=stats if isinstance(stats, dict) else {},
+        recent_summaries=compact_summaries,
+    )
+    return result.model_dump()
+
+
 # ---------------------------------------------------------------------------
 # Sessions
 # ---------------------------------------------------------------------------
@@ -108,6 +146,33 @@ async def get_sessions(
 ):
     sessions = db.get_user_sessions(user.user_id, limit=limit, offset=offset)
     return {"sessions": sessions, "count": len(sessions)}
+
+
+@router.get("/user/analysis-history")
+async def get_analysis_history(
+    user: AuthenticatedUser = Depends(get_authenticated_user),
+    limit: int = 100,
+    offset: int = 0,
+):
+    """MVP shot history: sessions + analysis_summaries + metrics (authenticated)."""
+    try:
+        sessions = db.get_user_analysis_history(
+            user.user_id, limit=limit, offset=offset,
+        )
+        logger.info(
+            "analysis_history fetched",
+            extra={"user_id": user.user_id, "count": len(sessions)},
+        )
+        return {
+            "user_id": user.user_id,
+            "sessions": sessions,
+            "total": len(sessions),
+            "limit": limit,
+            "offset": offset,
+        }
+    except Exception as exc:
+        logger.exception("get_analysis_history failed", extra={"user_id": user.user_id})
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 @router.get("/sessions/{session_id}")
@@ -175,3 +240,32 @@ async def update_workout_progress(
     if result is None:
         raise HTTPException(status_code=500, detail="Failed to update workout progress")
     return result
+
+
+# ---------------------------------------------------------------------------
+# Account deletion (service role — public data + Auth admin)
+# ---------------------------------------------------------------------------
+
+
+@router.delete("/user/account")
+async def delete_user_account(
+    user: AuthenticatedUser = Depends(get_authenticated_user),
+):
+    """Delete all app data for the user, then remove the Auth user."""
+    uid = user.user_id
+    if not db.delete_all_data_for_user(uid):
+        logger.error("delete_all_data_for_user returned false", extra={"user_id": uid})
+        raise HTTPException(status_code=500, detail="Failed to delete user data")
+    try:
+        get_service_client().auth.admin.delete_user(uid)
+    except Exception as exc:
+        logger.exception(
+            "auth.admin.delete_user failed after public data removed",
+            extra={"user_id": uid},
+        )
+        raise HTTPException(
+            status_code=502,
+            detail="Stored data was removed but auth deletion failed. Contact support.",
+        ) from exc
+    logger.info("user account deleted", extra={"user_id": uid})
+    return {"status": "deleted", "user_id": uid}

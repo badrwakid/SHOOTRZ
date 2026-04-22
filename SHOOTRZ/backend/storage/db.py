@@ -508,6 +508,120 @@ class SupabaseDB:
             logger.exception("get_session_videos failed", extra={"session_id": session_id})
             return []
 
+    def get_user_analysis_history(
+        self,
+        user_id: str,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> List[Dict[str, Any]]:
+        """Return sessions with analysis_summaries and per-video metrics (MVP scores).
+
+        Ordered by analysis summary ``created_at`` descending (most recent first).
+        """
+        if limit <= 0:
+            return []
+        try:
+            sb = get_service_client()
+            resp = (
+                sb.table("analysis_summaries")
+                .select("*")
+                .eq("user_id", user_id)
+                .order("created_at", desc=True)
+                .range(offset, offset + limit - 1)
+                .execute()
+            )
+            rows = resp.data or []
+            out: List[Dict[str, Any]] = []
+            for summ in rows:
+                session_id = summ.get("session_id")
+                if not session_id:
+                    continue
+                session = self.get_session(str(session_id))
+                sv_list = self.get_session_videos(str(session_id))
+                video_id = None
+                if sv_list and isinstance(sv_list[0], dict):
+                    video_id = sv_list[0].get("video_id")
+                metrics: List[Dict[str, Any]] = []
+                if video_id:
+                    metrics = self.get_metrics(str(video_id))
+                ts = (
+                    (session or {}).get("timestamp")
+                    or summ.get("created_at")
+                    or ""
+                )
+                title = (session or {}).get("title")
+                shot_count = (session or {}).get("shot_count") or summ.get("shot_count") or 1
+                overall = summ.get("overall_score")
+                if overall is None and session:
+                    overall = session.get("overall_score")
+                out.append({
+                    "session_id": str(session_id),
+                    "video_id": str(video_id) if video_id else None,
+                    "timestamp": ts,
+                    "title": title,
+                    "date": str(ts)[:10] if ts else "",
+                    "shot_count": int(shot_count) if shot_count is not None else 1,
+                    "average_score": float(overall) if overall is not None else None,
+                    "overall_score": float(overall) if overall is not None else None,
+                    "score_tier": summ.get("score_tier"),
+                    "top_strengths": summ.get("top_strengths") or [],
+                    "top_improvements": summ.get("top_improvements") or [],
+                    "metrics": metrics,
+                })
+            return out
+        except Exception:
+            logger.exception("get_user_analysis_history failed", extra={"user_id": user_id})
+            return []
+
+    def delete_all_data_for_user(self, user_id: str) -> bool:
+        """Remove user-owned rows in public schema (service role). Order respects FKs."""
+        try:
+            sb = get_service_client()
+            sb.table("chat_history").delete().eq("user_id", user_id).execute()
+
+            vresp = (
+                sb.table("videos")
+                .select("id")
+                .eq("user_id", user_id)
+                .execute()
+            )
+            video_ids = [r["id"] for r in (vresp.data or [])]
+            if video_ids:
+                mresp = (
+                    sb.table("metrics")
+                    .select("id")
+                    .in_("video_id", video_ids)
+                    .execute()
+                )
+                metric_ids = [r["id"] for r in (mresp.data or [])]
+                if metric_ids:
+                    sb.table("feedback").delete().in_("metric_id", metric_ids).execute()
+                sb.table("metrics").delete().in_("video_id", video_ids).execute()
+
+            sresp = (
+                sb.table("sessions")
+                .select("id")
+                .eq("user_id", user_id)
+                .execute()
+            )
+            session_ids = [r["id"] for r in (sresp.data or [])]
+            if session_ids:
+                sb.table("session_videos").delete().in_("session_id", session_ids).execute()
+
+            sb.table("analysis_summaries").delete().eq("user_id", user_id).execute()
+            sb.table("videos").delete().eq("user_id", user_id).execute()
+            sb.table("sessions").delete().eq("user_id", user_id).execute()
+            sb.table("drill_completions").delete().eq("user_id", user_id).execute()
+            sb.table("workout_progress").delete().eq("user_id", user_id).execute()
+            sb.table("user_streaks").delete().eq("user_id", user_id).execute()
+            sb.table("user_profiles").delete().eq("user_id", user_id).execute()
+            sb.table("users").delete().eq("id", user_id).execute()
+            logger.info("delete_all_data_for_user completed", extra={"user_id": user_id})
+            return True
+        except Exception:
+            logger.exception("delete_all_data_for_user failed", extra={"user_id": user_id})
+            return False
+
 
 # Module-level singleton
 db = SupabaseDB()

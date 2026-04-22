@@ -2,9 +2,82 @@
 import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
 import { storageService, UserData } from '../services/storage.service';
 import { supabase } from '../services/supabase.client';
+import { apiService } from '../services/api.service';
 // BUG FIX: Removed unused openBrowserAsync import (WebBrowser.* is used instead)
 import * as AuthSession from 'expo-auth-session';
+import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
+
+/**
+ * Extract PKCE `code` and OAuth errors from Supabase/Google redirect URLs.
+ * Codes may appear in the query or in the hash (e.g. #code=...&state=...).
+ */
+function parseOAuthRedirectUrl(rawUrl: string): {
+	code: string | null;
+	oauthError: string | null;
+	oauthErrorDescription: string | null;
+} {
+	let oauthError: string | null = null;
+	let oauthErrorDescription: string | null = null;
+	try {
+		const u = new URL(rawUrl);
+		let code = u.searchParams.get('code');
+		oauthError = u.searchParams.get('error');
+		oauthErrorDescription = u.searchParams.get('error_description');
+		if (u.hash && u.hash.length > 1) {
+			const hp = new URLSearchParams(u.hash.startsWith('#') ? u.hash.slice(1) : u.hash);
+			if (!code) {
+				code = hp.get('code');
+			}
+			if (!oauthError) {
+				oauthError = hp.get('error');
+			}
+			if (!oauthErrorDescription) {
+				oauthErrorDescription = hp.get('error_description');
+			}
+		}
+		if (oauthErrorDescription) {
+			try {
+				oauthErrorDescription = decodeURIComponent(
+					oauthErrorDescription.replace(/\+/g, ' '),
+				);
+			} catch {
+				/* use raw */
+			}
+		}
+		return { code, oauthError, oauthErrorDescription };
+	} catch {
+		const codeMatch = rawUrl.match(/(?:^|[?&#])code=([^&#]+)/);
+		const errMatch = rawUrl.match(/[?&#]error=([^&#]+)/);
+		const descMatch = rawUrl.match(/[?&#]error_description=([^&#]+)/);
+		let code: string | null = null;
+		if (codeMatch) {
+			try {
+				code = decodeURIComponent(codeMatch[1]);
+			} catch {
+				code = codeMatch[1];
+			}
+		}
+		if (errMatch) {
+			try {
+				oauthError = decodeURIComponent(errMatch[1]);
+			} catch {
+				oauthError = errMatch[1];
+			}
+		}
+		if (descMatch) {
+			try {
+				oauthErrorDescription = decodeURIComponent(
+					descMatch[1].replace(/\+/g, ' '),
+				);
+			} catch {
+				oauthErrorDescription = descMatch[1];
+			}
+		}
+		return { code, oauthError, oauthErrorDescription };
+	}
+}
+
 interface AuthContextType {
   user: UserData | null;
   isLoading: boolean;
@@ -44,6 +117,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   
   // Navigation callback ref - allows direct navigation trigger from auth context
   const navigationCallbackRef = React.useRef<(() => void) | null>(null);
+  const prevAuthUserIdRef = React.useRef<string | null>(null);
   
   // Expose method to set navigation callback (used by LoginScreen)
   const setNavigationCallback = React.useCallback((callback: (() => void) | null) => {
@@ -160,6 +234,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           
           if (isNetworkError) {
             // Network error - fail silently, user is not authenticated
+            prevAuthUserIdRef.current = null;
             await storageService.clearAllData();
             setUser(null);
             setIsLoading(false);
@@ -169,11 +244,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         
         if (data?.session?.user) {
           const u = data.session.user;
+          const prior = prevAuthUserIdRef.current;
+          if (prior && prior !== u.id) {
+            await storageService.clearAnalysisHistoryForUser(prior);
+          }
+          prevAuthUserIdRef.current = u.id;
           const userData = await createUserDataFromSession(u);
           await storageService.saveUserData(userData);
           setUser(userData);
           setIsNewUser(false);
         } else {
+          prevAuthUserIdRef.current = null;
           await storageService.clearAllData();
           setUser(null);
         }
@@ -189,6 +270,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           console.warn('⚠️ Auth initialization error:', error);
         }
         
+        prevAuthUserIdRef.current = null;
         await storageService.clearAllData();
         setUser(null);
         setIsLoading(false);
@@ -199,7 +281,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       try {
         if (session?.user) {
           const u = session.user;
-          
+          const prior = prevAuthUserIdRef.current;
+          if (prior && prior !== u.id) {
+            await storageService.clearAnalysisHistoryForUser(prior);
+          }
+          prevAuthUserIdRef.current = u.id;
+
           // Create user data from session
           const userData = await createUserDataFromSession(u);
           
@@ -220,6 +307,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             setTimeout(() => navigationCallbackRef.current?.(), 50);
           }
         } else {
+          prevAuthUserIdRef.current = null;
           await storageService.clearAllData();
           setUser(null);
           setIsNewUser(false);
@@ -234,6 +322,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     initializeAuth();
     return () => { sub.data.subscription.unsubscribe(); };
   }, [createUserDataFromSession, checkAndSetIsNewUser]);
+
+  /** Warm server-backed stats/history after sign-in so Home/Progress are not empty on first paint. */
+  useEffect(() => {
+    if (!user?.id) {
+      return;
+    }
+    void Promise.allSettled([
+      apiService.getUserStats(),
+      apiService.getUserStreak(),
+      apiService.getAnalysisHistory(20, 0),
+    ]);
+  }, [user?.id]);
 
   // BUG FIX: Removed empty loadUser function (dead code)
 
@@ -549,14 +649,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           scheme: 'shootrz',
           path: 'auth/callback',
         });
-        
+        if (__DEV__) {
+          console.log('[Google OAuth] redirectUri (add exact URL to Supabase Auth → Redirect URLs):', redirectUri);
+        }
+
         // Get OAuth URL from Supabase with the redirect URI
         // Add prompt: 'select_account' to force account picker (always ask which account)
         const { data, error } = await supabase.auth.signInWithOAuth({
           provider: 'google',
           options: {
             redirectTo: redirectUri,
-            skipBrowserRedirect: false, // Let Supabase handle browser redirect
+            // RN has no window — we open the URL with WebBrowser; avoid double navigation
+            skipBrowserRedirect: true,
             queryParams: {
               prompt: 'select_account', // Force Google to show account picker
             },
@@ -576,37 +680,107 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         // Use WebBrowser to handle the OAuth flow
         // This properly handles redirects and returns the result
         WebBrowser.maybeCompleteAuthSession();
-        
-        // Open the OAuth URL in browser
-        const result = await WebBrowser.openAuthSessionAsync(
-          data.url,
-          redirectUri
-        );
-        
+
+        // Some devices return a bare scheme URL from openAuthSessionAsync while the full
+        // callback (with ?code=) arrives on Linking — subscribe before opening the browser.
+        let oauthUrlFromLinking: string | null = null;
+        const linkingSub = Linking.addEventListener('url', ({ url: incoming }) => {
+          if (
+            incoming.includes('code=') ||
+            incoming.includes('error=') ||
+            incoming.includes('auth/callback')
+          ) {
+            oauthUrlFromLinking = incoming;
+          }
+        });
+
+        let result: WebBrowser.WebBrowserAuthSessionResult;
+        try {
+          result = await WebBrowser.openAuthSessionAsync(data.url, redirectUri);
+        } finally {
+          linkingSub.remove();
+        }
+
         if (result.type === 'success') {
-          // Extract the code from the redirect URL
-          const url = result.url;
-          
-          // Parse the URL to extract the code
-          // The URL will be something like: shootrz://auth/callback?code=xxx
-          // OR the proxy URL which we need to handle
-          let code: string | null = null;
-          
-          // Try to extract code from URL (check query params and hash)
-          const queryCodeMatch = url.match(/[?&]code=([^&#]+)/);
-          const hashCodeMatch = url.match(/#.*[?&]code=([^&#]+)/);
-          
-          if (queryCodeMatch) {
-            code = decodeURIComponent(queryCodeMatch[1]);
-          } else if (hashCodeMatch) {
-            code = decodeURIComponent(hashCodeMatch[1]);
-          } else {
+          const browserUrl = result.url || '';
+          const parsedBrowser = parseOAuthRedirectUrl(browserUrl);
+          const linkingRaw = oauthUrlFromLinking;
+          const parsedLinking = linkingRaw
+            ? parseOAuthRedirectUrl(linkingRaw)
+            : null;
+
+          let url = browserUrl;
+          let parsed = parsedBrowser;
+          if (
+            parsedLinking &&
+            linkingRaw &&
+            (parsedLinking.code || parsedLinking.oauthError) &&
+            !parsedBrowser.code &&
+            !parsedBrowser.oauthError
+          ) {
+            url = linkingRaw;
+            parsed = parsedLinking;
+          } else if (
+            parsedLinking &&
+            (parsedLinking.code || parsedLinking.oauthError) &&
+            parsedBrowser.code
+          ) {
+            // Prefer WebBrowser URL when both carry a code (canonical callback)
+            url = browserUrl;
+            parsed = parsedBrowser;
+          } else if (
+            parsedLinking &&
+            linkingRaw &&
+            (parsedLinking.code || parsedLinking.oauthError)
+          ) {
+            url = linkingRaw;
+            parsed = parsedLinking;
+          }
+
+          let code = parsed.code;
+
+          if (parsed.oauthError) {
+            const msg =
+              parsed.oauthErrorDescription ||
+              parsed.oauthError ||
+              'Sign-in was cancelled or denied';
+            if (__DEV__) {
+              console.error('[Google OAuth] provider error in redirect:', parsed.oauthError, msg);
+            }
+            return { success: false, error: msg };
+          }
+
+          // Deep link handler may have exchanged the code already
+          const { data: { session: sessionAfterCallback } } = await supabase.auth.getSession();
+          if (sessionAfterCallback?.user) {
+            const u = sessionAfterCallback.user;
+            const userData: UserData = {
+              id: u.id,
+              email: u.email || '',
+              username: u.user_metadata?.username || u.email?.split('@')[0] || 'user',
+              name: u.user_metadata?.name || 'Basketball Player',
+              skillLevel: 'beginner',
+              position: 'Guard',
+              goals: [],
+              preferences: { notifications: true, darkMode: true, analytics: true, defaultWorkoutDuration: 30 },
+              createdAt: u.created_at || new Date().toISOString(),
+              authProvider: 'supabase',
+            };
+            setUser(userData);
+            setIsLoading(false);
+            if (navigationCallbackRef.current) {
+              setTimeout(() => navigationCallbackRef.current?.(), 100);
+            }
+            return { success: true };
+          }
+
+          if (!code) {
+            await new Promise<void>(resolve => setTimeout(() => resolve(), 600));
             const { data: { session }, error: sessionError } = await supabase.auth.getSession();
             if (sessionError) {
               console.error('❌ Error checking session:', sessionError);
             }
-            if (session) {
-              // Manually set user state since session exists
+            if (session?.user) {
               const u = session.user;
               const userData: UserData = {
                 id: u.id,
@@ -627,9 +801,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               }
               return { success: true };
             }
-            
+
+            if (__DEV__) {
+              console.error(
+                '❌ No code in redirect and no session. URL length=',
+                url.length,
+                'startsWith=',
+                url.slice(0, 80),
+              );
+            }
             console.error('❌ No code found in redirect URL and no existing session');
-            return { success: false, error: 'No authentication code received' };
+            return {
+              success: false,
+              error:
+                'Google sign-in did not return a session. Add the printed redirect URI to Supabase (Auth → URL Configuration → Redirect URLs) and try again.',
+            };
           }
           
           if (code) {

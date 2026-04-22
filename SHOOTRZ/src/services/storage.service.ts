@@ -147,20 +147,49 @@ class StorageService {
     }
   }
 
-  // Analysis History
-  async saveAnalysisResult(result: AnalysisResult): Promise<void> {
+  /** Local cache key: legacy global or per-user to avoid cross-account bleed. */
+  private analysisHistoryStorageKey(userId?: string | null): string {
+    if (userId) {
+      return `${this.KEYS.ANALYSIS_HISTORY}:${userId}`;
+    }
+    return this.KEYS.ANALYSIS_HISTORY;
+  }
+
+  /**
+   * Clear cached analyses for one user (e.g. account switch). Does not clear goals/prefs.
+   */
+  async clearAnalysisHistoryForUser(userId: string): Promise<void> {
     try {
-      const history = await this.getAnalysisHistory();
+      await AsyncStorage.removeItem(this.analysisHistoryStorageKey(userId));
+    } catch (error) {
+      console.error('Error clearing analysis history for user:', error);
+    }
+  }
+
+  // Analysis History
+  async saveAnalysisResult(
+    result: AnalysisResult,
+    userId?: string | null,
+  ): Promise<void> {
+    try {
+      const key = this.analysisHistoryStorageKey(userId);
+      const history = await this.getAnalysisHistory(userId);
       const updatedHistory = [result, ...history].slice(0, 100); // Keep last 100 analyses
-      await AsyncStorage.setItem(this.KEYS.ANALYSIS_HISTORY, JSON.stringify(updatedHistory));
+      await AsyncStorage.setItem(key, JSON.stringify(updatedHistory));
     } catch (error) {
       console.error('Error saving analysis result:', error);
       throw error;
     }
   }
 
-  async getAnalysisHistory(): Promise<AnalysisResult[]> {
+  async getAnalysisHistory(userId?: string | null): Promise<AnalysisResult[]> {
     try {
+      if (userId) {
+        const scoped = await AsyncStorage.getItem(this.analysisHistoryStorageKey(userId));
+        if (scoped) {
+          return JSON.parse(scoped);
+        }
+      }
       const data = await AsyncStorage.getItem(this.KEYS.ANALYSIS_HISTORY);
       return data ? JSON.parse(data) : [];
     } catch (error) {
@@ -337,17 +366,21 @@ class StorageService {
 
   async clearAllData(): Promise<void> {
     try {
-      // Clear all app data
+      const keys = await AsyncStorage.getAllKeys();
+      const analysisScoped = (keys || []).filter(
+        (k) =>
+          k === this.KEYS.ANALYSIS_HISTORY ||
+          k.startsWith(`${this.KEYS.ANALYSIS_HISTORY}:`),
+      );
       await AsyncStorage.multiRemove([
+        ...analysisScoped,
         this.KEYS.USER_DATA,
-        this.KEYS.ANALYSIS_HISTORY,
         this.KEYS.GOALS,
         this.KEYS.PREFERENCES,
         this.KEYS.WORKOUT_HISTORY,
         '@shootrz_drill_completions',
         '@shootrz_onboarding_completed',
       ]);
-
     } catch (error) {
       console.error('Error clearing all data:', error);
       throw error;
@@ -386,10 +419,16 @@ class StorageService {
         } catch { /* best-effort */ }
       }
 
+      const keys = await AsyncStorage.getAllKeys()
+      const analysisKeys = (keys || []).filter(
+        (k) =>
+          k === this.KEYS.ANALYSIS_HISTORY ||
+          k.startsWith(`${this.KEYS.ANALYSIS_HISTORY}:`),
+      )
       await AsyncStorage.multiRemove([
         '@shootrz_drill_completions',
         this.KEYS.WORKOUT_HISTORY,
-        this.KEYS.ANALYSIS_HISTORY,
+        ...analysisKeys,
       ])
 
       await AsyncStorage.setItem('@shootrz_supabase_migration_v1_complete', 'true')
@@ -400,9 +439,9 @@ class StorageService {
 
   async exportData(): Promise<string> {
     try {
-      const [userData, analysisHistory, goals, preferences, workoutHistory] = await Promise.all([
-        this.getUserData(),
-        this.getAnalysisHistory(),
+      const userData = await this.getUserData();
+      const [analysisHistory, goals, preferences, workoutHistory] = await Promise.all([
+        this.getAnalysisHistory(userData?.id),
         this.getGoals(),
         this.getPreferences(),
         this.getWorkoutHistory(),

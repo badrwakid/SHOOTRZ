@@ -16,6 +16,7 @@ import type {
 	WorkoutProgress,
 	ChatHistoryMessage,
 } from '../types/contracts';
+import { API_PATHS } from '../constants/apiEndpoints';
 
 // FastAPI Backend (port 8000)
 // - iOS Simulator: Use 'http://127.0.0.1:8000' or 'http://localhost:8000'
@@ -29,23 +30,43 @@ import type {
 // For Physical Device: Use your computer's IP (e.g., 'http://192.168.1.4:8000')
 //   To find your IP: Windows: ipconfig | Mac/Linux: ifconfig
 
+/**
+ * Root URL of the FastAPI app (no trailing slash, no trailing /api).
+ * Paths in this file already include `/api/...` where needed; a common mistake is
+ * setting EXPO_PUBLIC_API_URL to `http://host:8000/api`, which would produce
+ * `/api/api/user/...` and 404 on Progress, complete, and delete account.
+ */
+export function normalizeApiBaseUrl(url: string): string {
+	let u = url.trim().replace(/\/+$/, '')
+	if (u.endsWith('/api')) {
+		u = u.slice(0, -4).replace(/\/+$/, '')
+	}
+	return u
+}
+
 // Get API URL from environment or use defaults
 // For physical devices, set EXPO_PUBLIC_API_URL=http://YOUR_IP:8000 in .env
 const getApiBaseUrl = () => {
 	if (process.env.EXPO_PUBLIC_API_URL) {
-		return process.env.EXPO_PUBLIC_API_URL;
+		return normalizeApiBaseUrl(process.env.EXPO_PUBLIC_API_URL)
 	}
-	
+
 	if (__DEV__) {
 		// Default for iOS Simulator / Android Emulator
 		// For physical devices, you'll need to set EXPO_PUBLIC_API_URL
-		return 'http://127.0.0.1:8000';
+		return 'http://127.0.0.1:8000'
 	}
-	
-	return 'https://api.shootrz.com'; // Production
-};
 
-export const API_BASE_URL = getApiBaseUrl();
+	return 'https://api.shootrz.com' // Production
+}
+
+export const API_BASE_URL = getApiBaseUrl()
+
+/** Log legacy fallback warning at most once (prefetch + screens call history often). */
+let warnedAnalysisHistory404 = false
+
+/** In __DEV__, log resolved base URL once on first authenticated API use (debugging 404s). */
+let loggedApiBaseDevOnce = false
 
 export interface AnalysisResponse {
   success: boolean;
@@ -221,19 +242,30 @@ class ApiService {
   private timeout: number;
 
   constructor() {
-    this.baseURL = API_BASE_URL;
+    this.baseURL = normalizeApiBaseUrl(API_BASE_URL)
     this.timeout = 120000; // 2 minutes timeout for video processing
   }
 
   private async getAuthHeaders(): Promise<Record<string, string>> {
-    const { data, error } = await supabase.auth.getSession()
-    if (error || !data?.session?.access_token) {
+    let { data } = await supabase.auth.getSession()
+    let token = data?.session?.access_token
+    if (!token) {
+      const refreshed = await supabase.auth.refreshSession()
+      token = refreshed.data?.session?.access_token
+    }
+    if (!token) {
       return {}
     }
-    return { Authorization: `Bearer ${data.session.access_token}` }
+    return { Authorization: `Bearer ${token}` }
   }
 
-
+  private logResolvedBaseOnce(label: string): void {
+    if (!__DEV__ || loggedApiBaseDevOnce) {
+      return
+    }
+    loggedApiBaseDevOnce = true
+    console.log(`[api] resolved base ${this.baseURL} (first call: ${label})`)
+  }
 
   /**
    * MVP Analysis - Analyze video with deterministic pipeline
@@ -246,7 +278,7 @@ class ApiService {
 
       const formData = new FormData();
       const filename = this.getVideoFilename(videoUri);
-      const requestUrl = `${this.baseURL}/mvp/analyze`;
+      const requestUrl = `${this.baseURL}${API_PATHS.mvpAnalyze}`;
       
       formData.append('file', {
         uri: videoUri,
@@ -295,7 +327,7 @@ class ApiService {
    */
   async getMVPResult(jobId: string): Promise<ApiMVPResultResponse> {
     try {
-      const response = await axios.get(`${this.baseURL}/mvp/result/${jobId}`, {
+      const response = await axios.get(`${this.baseURL}${API_PATHS.mvpResult(jobId)}`, {
         timeout: 30000,
       });
       return response.data;
@@ -434,7 +466,50 @@ class ApiService {
   }
 
   /**
-   * Get user's analysis history
+   * Authenticated analysis history (MVP summaries + metrics). Preferred.
+   */
+  async getAnalysisHistory(
+    limit: number = 100,
+    offset: number = 0,
+  ): Promise<HistoryResponse> {
+    const headers = await this.getAuthHeaders()
+    if (!headers.Authorization) {
+      throw new Error('Not authenticated')
+    }
+    this.logResolvedBaseOnce(`GET ${API_PATHS.userAnalysisHistory}`)
+    const params = new URLSearchParams()
+    params.append('limit', String(limit))
+    params.append('offset', String(offset))
+    const url = `${this.baseURL}${API_PATHS.userAnalysisHistory}?${params.toString()}`
+    try {
+      const response = await axios.get(url, { headers, timeout: this.timeout })
+      return response.data
+    } catch (err: any) {
+      const status = err.response?.status
+      if (status === 404) {
+        const { data: userData } = await supabase.auth.getUser()
+        const uid = userData.user?.id
+        if (uid) {
+          if (__DEV__ && !warnedAnalysisHistory404) {
+            warnedAnalysisHistory404 = true
+            console.warn(
+              `[api] ${this.baseURL} returned 404 for ${API_PATHS.userAnalysisHistory}. ` +
+                'The process on this host:port is missing that route (restart uvicorn from this repo). ' +
+                `Confirm GET ${this.baseURL}/health → has_analysis_history_route: true. ` +
+                `Using legacy GET ${API_PATHS.historyLegacy('<user_id>')} until fixed.`,
+            )
+          }
+          return this.getHistory(uid, limit, offset)
+        }
+      }
+      throw new Error(
+        err.response?.data?.detail || err.message || 'Failed to fetch analysis history',
+      )
+    }
+  }
+
+  /**
+   * Legacy unauthenticated history (videos only). Avoid for logged-in users.
    */
   async getHistory(
     userId: string,
@@ -447,7 +522,7 @@ class ApiService {
       if (offset) params.append('offset', offset.toString())
       
       const response = await axios.get(
-        `${this.baseURL}/history/${userId}?${params.toString()}`,
+        `${this.baseURL}${API_PATHS.historyLegacy(userId)}?${params.toString()}`,
         { timeout: this.timeout }
       )
       return response.data
@@ -458,12 +533,87 @@ class ApiService {
   }
 
   /**
+   * Persist a completed MVP job to Supabase for the current user.
+   */
+  async completeMVPAnalysis(jobId: string): Promise<{
+    success: boolean
+    session_id?: string | null
+    video_id?: string | null
+    already_persisted?: boolean
+  }> {
+    const headers = await this.getAuthHeaders()
+    if (!headers.Authorization) {
+      throw new Error('Not authenticated')
+    }
+    const attempt = async () =>
+      axios.post(
+        `${this.baseURL}${API_PATHS.analysisComplete}`,
+        { job_id: jobId },
+        { headers, timeout: 60000 },
+      )
+    try {
+      const response = await attempt()
+      return response.data
+    } catch (first: any) {
+      if (first.response?.status === 401) {
+        await supabase.auth.refreshSession()
+        const retryAuth = await attempt()
+        return retryAuth.data
+      }
+      if (first.response?.status === 404) {
+        throw new Error(
+          'Could not reach POST /api/analysis/complete (404). Set EXPO_PUBLIC_API_URL to your API ' +
+            'host only (e.g. http://192.168.x.x:8000) with no trailing /api, restart Expo and the backend.',
+        )
+      }
+      if (first.response?.status >= 500 || first.code === 'ECONNABORTED') {
+        const retry = await attempt()
+        return retry.data
+      }
+      throw new Error(first.response?.data?.detail || first.message || 'Failed to save analysis')
+    }
+  }
+
+  /**
+   * Delete all server-side user data and the Auth user (requires Bearer token).
+   */
+  async deleteAccount(): Promise<{ status: string; user_id?: string }> {
+    const headers = await this.getAuthHeaders()
+    if (!headers.Authorization) {
+      throw new Error('Not authenticated')
+    }
+    try {
+      const response = await axios.delete(`${this.baseURL}${API_PATHS.userAccount}`, {
+        headers,
+        timeout: 60000,
+      })
+      return response.data
+    } catch (err: any) {
+      if (err.response?.status === 401) {
+        await supabase.auth.refreshSession()
+        const response = await axios.delete(`${this.baseURL}${API_PATHS.userAccount}`, {
+          headers: await this.getAuthHeaders(),
+          timeout: 60000,
+        })
+        return response.data
+      }
+      if (err.response?.status === 404) {
+        throw new Error(
+          'Delete account endpoint not found. Use EXPO_PUBLIC_API_URL without a trailing /api ' +
+            `(current base: ${this.baseURL}), and restart the FastAPI server with the latest code.`,
+        )
+      }
+      throw new Error(err.response?.data?.detail || err.message || 'Failed to delete account')
+    }
+  }
+
+  /**
    * Get history statistics
    */
   async getHistoryStats(userId: string): Promise<HistoryStatsResponse> {
     try {
       const response = await axios.get(
-        `${this.baseURL}/history/${userId}/stats`,
+        `${this.baseURL}${API_PATHS.historyLegacyStats(userId)}`,
         { timeout: this.timeout }
       )
       return response.data
@@ -496,7 +646,7 @@ class ApiService {
 
   async getUserProfile(): Promise<any> {
     const headers = await this.getAuthHeaders()
-    const response = await axios.get(`${this.baseURL}/api/user/profile`, {
+    const response = await axios.get(`${this.baseURL}${API_PATHS.userProfile}`, {
       headers, timeout: 15000,
     })
     return response.data
@@ -515,7 +665,7 @@ class ApiService {
     if (data.yearsPlaying !== undefined) snaked.years_playing = data.yearsPlaying
     if (data.notificationsEnabled !== undefined) snaked.notifications_enabled = data.notificationsEnabled
     if (data.coachingStyle !== undefined) snaked.coaching_style = data.coachingStyle
-    const response = await axios.put(`${this.baseURL}/api/user/profile`, snaked, {
+    const response = await axios.put(`${this.baseURL}${API_PATHS.userProfile}`, snaked, {
       headers, timeout: 15000,
     })
     return response.data
@@ -523,7 +673,7 @@ class ApiService {
 
   async getUserStats(): Promise<UserStats> {
     const headers = await this.getAuthHeaders()
-    const response = await axios.get(`${this.baseURL}/api/user/stats`, {
+    const response = await axios.get(`${this.baseURL}${API_PATHS.userStats}`, {
       headers, timeout: 15000,
     })
     const d = response.data
@@ -540,7 +690,7 @@ class ApiService {
 
   async getUserStreak(): Promise<UserStreak> {
     const headers = await this.getAuthHeaders()
-    const response = await axios.get(`${this.baseURL}/api/user/streak`, {
+    const response = await axios.get(`${this.baseURL}${API_PATHS.userStreak}`, {
       headers, timeout: 15000,
     })
     const d = response.data
@@ -553,7 +703,7 @@ class ApiService {
 
   async getSessionsAuth(limit: number = 20, offset: number = 0): Promise<any> {
     const headers = await this.getAuthHeaders()
-    const response = await axios.get(`${this.baseURL}/api/sessions`, {
+    const response = await axios.get(`${this.baseURL}${API_PATHS.sessions}`, {
       headers, timeout: 15000,
       params: { limit, offset },
     })
@@ -562,7 +712,7 @@ class ApiService {
 
   async getSessionDetail(sessionId: string): Promise<any> {
     const headers = await this.getAuthHeaders()
-    const response = await axios.get(`${this.baseURL}/api/sessions/${sessionId}`, {
+    const response = await axios.get(`${this.baseURL}${API_PATHS.sessionDetail(sessionId)}`, {
       headers, timeout: 15000,
     })
     return response.data

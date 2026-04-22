@@ -1,0 +1,32 @@
+{
+  "crouch": {
+    "base_frame": 0,
+    "base_confidence": 0.25,
+    "knee_min_frame": 0,
+    "fused_frame": 0,
+    "hip_boost": 0.15,
+    "wrist_boost": 0.1
+  },
+  "release": {
+    "candidates": [
+      {
+        "frame_id": 1,
+        "score": 0.4,
+        "kind": "argmax_fallback"
+      }
+    ],
+    "chosen": {
+      "frame_id": 1,
+      "score": 0.4,
+      "kind": "argmax_fallback"
+    }
+  },
+  "start": {
+    "confidence": 0.4,
+    "reason": "low_motion_window"
+  },
+  "end": {
+    "confidence": 0.75,
+    "reason": "wrist_settle"
+  }
+}

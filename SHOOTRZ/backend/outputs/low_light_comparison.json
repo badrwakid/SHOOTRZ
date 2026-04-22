@@ -1,0 +1,14 @@
+{
+  "good_light": {
+    "n": 5,
+    "mean": 0.636548,
+    "std": 0.167236
+  },
+  "low_light": {
+    "n": 5,
+    "mean": 0.636548,
+    "std": 0.167236
+  },
+  "accuracy_drop_pct": 0.0,
+  "low_light_accuracy_pct": 63.65
+}

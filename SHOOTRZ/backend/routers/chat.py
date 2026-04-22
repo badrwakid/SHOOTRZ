@@ -13,8 +13,9 @@ from ..chat.context_builder import (
     build_user_context,
     sanitize_context_for_llm,
 )
-from ..chat import llm_provider
 from ..contracts.chat import ChatRequest, ChatResponse
+from ..services.llm import llm_service
+from ..services.llm.prompt_builders import build_chat_prompt
 from ..storage.db import db
 from ..utils.supabase_auth import AuthenticatedUser, get_authenticated_user
 
@@ -24,20 +25,7 @@ router = APIRouter(prefix="", tags=["chat"])
 
 
 def _build_system_prompt(context: Dict[str, Any]) -> str:
-    context_json = json.dumps(context, ensure_ascii=False)
-    return (
-        "You are Coach J, an elite basketball shooting coach inside the SHOOTRZ app.\n"
-        "You MUST personalize advice using the user's data below.\n"
-        "Rules:\n"
-        "- Be concise and actionable. Prefer bullet points.\n"
-        "- If the user asks about progress, reference trends from history.\n"
-        "- If data is missing, ask 1 clarifying question.\n"
-        "- Never invent specific numbers not present in the data.\n"
-        "- When suggesting drills, give sets/reps and a 7-day plan.\n"
-        "\n"
-        "USER_DATA_JSON:\n"
-        f"{context_json}\n"
-    )
+    return build_chat_prompt(user_context=context, messages=[])
 
 
 def _build_context(payload: ChatRequest, user: AuthenticatedUser):
@@ -69,7 +57,7 @@ async def chat(
     llm_messages = [{"role": m.role, "content": m.content} for m in trimmed]
 
     start_ms = time.time()
-    llm_resp = llm_provider.generate(
+    llm_resp = llm_service.chat(
         system_prompt=system_prompt,
         messages=llm_messages,
         model=payload.model,
@@ -111,7 +99,7 @@ def _sse_generator(
     start_ms = time.time()
 
     try:
-        for event_type, payload in llm_provider.stream(
+        for event_type, payload in llm_service.chat_stream(
             system_prompt=system_prompt,
             messages=messages,
             model=model,
