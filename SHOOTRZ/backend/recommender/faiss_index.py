@@ -1,13 +1,16 @@
-import faiss
-import numpy as np
+# recommender/faiss_index.py
 from pathlib import Path
+from .dummy_data import generate_dummy_storage
 
-# Get the directory containing this file, then navigate to storage
 _BASE_DIR = Path(__file__).parent.parent
-FAISS_PATH = _BASE_DIR / "storage" / "faiss_index.bin"
+STORAGE_DIR = _BASE_DIR / "storage"
+FAISS_PATH = STORAGE_DIR / "faiss_index.bin"
 
 def load_faiss_index():
+    import faiss
+
     if not FAISS_PATH.exists():
-        raise FileNotFoundError(f"FAISS index not found: {FAISS_PATH}")
-    index = faiss.read_index(str(FAISS_PATH))
-    return index
+        # generate dummy data (includes FAISS index)
+        generate_dummy_storage(STORAGE_DIR)
+
+    return faiss.read_index(str(FAISS_PATH))

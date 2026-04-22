@@ -3,18 +3,23 @@ from mabwiser.mab import MAB, LearningPolicy
 
 def initialize_bandit(arms):
     """
-    Create a LinUCB contextual bandit and fit it with a dummy point.
+    Initialize a LinUCB contextual bandit with safe dummy training.
     """
+    unique_arms = list(set(arms))
+
     bandit = MAB(
-        arms=list(set(arms)),
+        arms=unique_arms,
         learning_policy=LearningPolicy.LinUCB(alpha=1.4)
     )
 
-    # Initial dummy training data
+    # Dummy warm-start (required by mabwiser)
     dummy_context = np.array([[3, 0.4, 0.7, 0.2, 12]], dtype="float32")
+    dummy_decision = unique_arms[0]
+    dummy_reward = 0.5
+
     bandit.fit(
-        decisions=[arms[0]],
-        rewards=[0.5],
+        decisions=[dummy_decision],
+        rewards=[dummy_reward],
         contexts=dummy_context
     )
 
