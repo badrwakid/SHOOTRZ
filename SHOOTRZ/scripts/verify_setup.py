@@ -131,7 +131,7 @@ def main():
 	if all_checks_passed:
 		print(f"{GREEN}✓ All checks passed! Setup is complete.{RESET}")
 		print("\n🚀 Next steps:")
-		print("  1. Start backend: cd backend && python -m uvicorn main:create_app --factory --reload")
+		print("  1. Start backend: cd SHOOTRZ && python -m uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000")
 		print("  2. Start frontend: cd SHOOTRZ && npm start")
 		print("  3. Visit API docs: http://127.0.0.1:8000/docs")
 	else:

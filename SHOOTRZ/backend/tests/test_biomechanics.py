@@ -96,10 +96,19 @@ class TestKneeFlexion:
 	"""Test knee flexion computation."""
 
 	def test_bent_knee(self):
-		"""Test typical crouch position (~108°)."""
+		"""Test light knee bend (~135°)."""
 		hip = np.array([0.0, 1.0, 0.0])
 		knee = np.array([0.0, 0.5, 0.0])
 		ankle = np.array([0.2, 0.3, 0.0])  # Bent
+
+		result = compute_knee_flexion(hip, knee, ankle)
+		assert 130 <= result["angle_degrees"] <= 140, f"Expected 130-140°, got {result['angle_degrees']}°"
+
+	def test_deep_crouch_knee(self):
+		"""Test deep crouch knee bend (~108°)."""
+		hip = np.array([0.0, 1.0, 0.0])
+		knee = np.array([0.0, 0.5, 0.0])
+		ankle = np.array([0.6, 0.3, 0.0])  # Deeper bend
 
 		result = compute_knee_flexion(hip, knee, ankle)
 		assert 100 <= result["angle_degrees"] <= 120, f"Expected 100-120°, got {result['angle_degrees']}°"
@@ -120,14 +129,25 @@ class TestReleaseAngle:
 		assert 60 <= result["angle_degrees"] <= 85, f"Expected 60-85°, got {result['angle_degrees']}°"
 
 	def test_low_arc_release(self):
-		"""Test low-arc release (~55°)."""
+		"""Test low-arc release (~26°)."""
 		trajectory = np.array([
 			[0.0, 1.0, 0.0],
 			[1.0, 1.5, 0.0],  # More horizontal
 		])
 
 		result = compute_release_angle(trajectory, shot_distance=6.0)
-		assert 45 <= result["angle_degrees"] <= 70, f"Expected 45-70°, got {result['angle_degrees']}°"
+		assert 20 <= result["angle_degrees"] <= 35, f"Expected 20-35°, got {result['angle_degrees']}°"
+
+	def test_proper_arc_release(self):
+		"""Test proper arc release (~63°)."""
+		trajectory = np.array([
+			[0.0, 1.0, 0.0],
+			[0.5, 2.0, 0.0],
+		])
+
+		result = compute_release_angle(trajectory, shot_distance=3.0)
+		assert 60 <= result["angle_degrees"] <= 75, f"Expected 60-75°, got {result['angle_degrees']}°"
+		assert result["expected_range"] is not None
 
 
 class TestEntryAngle:

@@ -37,6 +37,7 @@ export interface AnalysisResult {
   id: string;
   userId: string;
   timestamp: string;
+  runId?: string; // Backend run_id for MVP analysis artifacts
   scores: {
     elbow: number;
     balance: number;
@@ -50,6 +51,57 @@ export interface AnalysisResult {
     knee: number;
     release: number;
     bodyAlignment: number;
+  };
+  mvp?: {
+    scoreComponents?: Array<{
+      name: string;
+      value: number;
+      weight: number;
+    }>;
+    keyFrameImages?: {
+      start?: string;
+      crouch?: string;
+      release?: string;
+      end?: string;
+    };
+    shotWindow?: {
+      start_frame?: number;
+      crouch_frame?: number;
+      release_frame?: number;
+      end_frame?: number;
+      confidence?: string;
+    };
+    events?: {
+      start?: {
+        frame?: number | null;
+        timestamp?: number | null;
+        status?: string;
+        confidence?: number;
+        reason_codes?: string[];
+      };
+      crouch?: {
+        frame?: number | null;
+        timestamp?: number | null;
+        status?: string;
+        confidence?: number;
+        reason_codes?: string[];
+      };
+      release?: {
+        frame?: number | null;
+        timestamp?: number | null;
+        status?: string;
+        confidence?: number;
+        reason_codes?: string[];
+      };
+      end?: {
+        frame?: number | null;
+        timestamp?: number | null;
+        status?: string;
+        confidence?: number;
+        reason_codes?: string[];
+      };
+    };
+    diagnostics?: Record<string, unknown>;
   };
 }
 
@@ -95,20 +147,49 @@ class StorageService {
     }
   }
 
-  // Analysis History
-  async saveAnalysisResult(result: AnalysisResult): Promise<void> {
+  /** Local cache key: legacy global or per-user to avoid cross-account bleed. */
+  private analysisHistoryStorageKey(userId?: string | null): string {
+    if (userId) {
+      return `${this.KEYS.ANALYSIS_HISTORY}:${userId}`;
+    }
+    return this.KEYS.ANALYSIS_HISTORY;
+  }
+
+  /**
+   * Clear cached analyses for one user (e.g. account switch). Does not clear goals/prefs.
+   */
+  async clearAnalysisHistoryForUser(userId: string): Promise<void> {
     try {
-      const history = await this.getAnalysisHistory();
+      await AsyncStorage.removeItem(this.analysisHistoryStorageKey(userId));
+    } catch (error) {
+      console.error('Error clearing analysis history for user:', error);
+    }
+  }
+
+  // Analysis History
+  async saveAnalysisResult(
+    result: AnalysisResult,
+    userId?: string | null,
+  ): Promise<void> {
+    try {
+      const key = this.analysisHistoryStorageKey(userId);
+      const history = await this.getAnalysisHistory(userId);
       const updatedHistory = [result, ...history].slice(0, 100); // Keep last 100 analyses
-      await AsyncStorage.setItem(this.KEYS.ANALYSIS_HISTORY, JSON.stringify(updatedHistory));
+      await AsyncStorage.setItem(key, JSON.stringify(updatedHistory));
     } catch (error) {
       console.error('Error saving analysis result:', error);
       throw error;
     }
   }
 
-  async getAnalysisHistory(): Promise<AnalysisResult[]> {
+  async getAnalysisHistory(userId?: string | null): Promise<AnalysisResult[]> {
     try {
+      if (userId) {
+        const scoped = await AsyncStorage.getItem(this.analysisHistoryStorageKey(userId));
+        if (scoped) {
+          return JSON.parse(scoped);
+        }
+      }
       const data = await AsyncStorage.getItem(this.KEYS.ANALYSIS_HISTORY);
       return data ? JSON.parse(data) : [];
     } catch (error) {
@@ -199,7 +280,9 @@ class StorageService {
     try {
       const history = await this.getWorkoutHistory();
       history.push(session);
-      await AsyncStorage.setItem(this.KEYS.WORKOUT_HISTORY, JSON.stringify(history));
+      // BUG FIX: Cap workout history to prevent unbounded AsyncStorage growth
+      const capped = history.slice(-200);
+      await AsyncStorage.setItem(this.KEYS.WORKOUT_HISTORY, JSON.stringify(capped));
     } catch (error) {
       console.error('Error saving workout session:', error);
       throw error;
@@ -224,7 +307,9 @@ class StorageService {
         drillId,
         completedAt: new Date().toISOString(),
       });
-      await AsyncStorage.setItem('@shootrz_drill_completions', JSON.stringify(completions));
+      // BUG FIX: Cap drill completions to prevent unbounded AsyncStorage growth
+      const capped = completions.slice(-500);
+      await AsyncStorage.setItem('@shootrz_drill_completions', JSON.stringify(capped));
     } catch (error) {
       console.error('Error marking drill completed:', error);
       throw error;
@@ -281,29 +366,82 @@ class StorageService {
 
   async clearAllData(): Promise<void> {
     try {
-      // Clear all app data
+      const keys = await AsyncStorage.getAllKeys();
+      const analysisScoped = (keys || []).filter(
+        (k) =>
+          k === this.KEYS.ANALYSIS_HISTORY ||
+          k.startsWith(`${this.KEYS.ANALYSIS_HISTORY}:`),
+      );
       await AsyncStorage.multiRemove([
+        ...analysisScoped,
         this.KEYS.USER_DATA,
-        this.KEYS.ANALYSIS_HISTORY,
         this.KEYS.GOALS,
         this.KEYS.PREFERENCES,
         this.KEYS.WORKOUT_HISTORY,
         '@shootrz_drill_completions',
         '@shootrz_onboarding_completed',
       ]);
-
-      console.log('All app data cleared successfully');
     } catch (error) {
       console.error('Error clearing all data:', error);
       throw error;
     }
   }
 
+  /**
+   * One-time migration: push locally-cached data to Supabase via API, then
+   * clear the local copies.  Gated by a flag so it runs at most once.
+   */
+  async migrateToSupabase(apiService: any): Promise<void> {
+    try {
+      const flag = await AsyncStorage.getItem('@shootrz_supabase_migration_v1_complete')
+      if (flag === 'true') return
+
+      const [drills, workouts] = await Promise.all([
+        this.getDrillCompletions(),
+        this.getWorkoutHistory(),
+      ])
+
+      for (const drill of drills) {
+        try {
+          await apiService.completeDrill({
+            drillId: drill.drillId,
+            drillName: drill.drillId,
+          })
+        } catch { /* best-effort */ }
+      }
+
+      for (const workout of workouts) {
+        try {
+          await apiService.updateWorkoutProgress(
+            workout.workoutId || workout.id || 'unknown',
+            { workoutName: workout.workoutName || workout.name || 'Migrated Workout' },
+          )
+        } catch { /* best-effort */ }
+      }
+
+      const keys = await AsyncStorage.getAllKeys()
+      const analysisKeys = (keys || []).filter(
+        (k) =>
+          k === this.KEYS.ANALYSIS_HISTORY ||
+          k.startsWith(`${this.KEYS.ANALYSIS_HISTORY}:`),
+      )
+      await AsyncStorage.multiRemove([
+        '@shootrz_drill_completions',
+        this.KEYS.WORKOUT_HISTORY,
+        ...analysisKeys,
+      ])
+
+      await AsyncStorage.setItem('@shootrz_supabase_migration_v1_complete', 'true')
+    } catch (error) {
+      console.error('Supabase migration failed (will retry next launch):', error)
+    }
+  }
+
   async exportData(): Promise<string> {
     try {
-      const [userData, analysisHistory, goals, preferences, workoutHistory] = await Promise.all([
-        this.getUserData(),
-        this.getAnalysisHistory(),
+      const userData = await this.getUserData();
+      const [analysisHistory, goals, preferences, workoutHistory] = await Promise.all([
+        this.getAnalysisHistory(userData?.id),
         this.getGoals(),
         this.getPreferences(),
         this.getWorkoutHistory(),

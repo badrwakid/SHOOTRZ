@@ -2,6 +2,9 @@ import * as ExpoCrypto from 'expo-crypto';
 
 type ArrayBufferInput = ArrayBuffer | ArrayBufferView | string;
 
+// Type definitions for Web Crypto API polyfill
+type AlgorithmIdentifier = string | { name: string };
+
 const toUint8Array = (input: ArrayBufferInput): Uint8Array => {
   if (ArrayBuffer.isView(input)) {
     const view = input as ArrayBufferView;
@@ -29,26 +32,30 @@ const unsupported = (name: string) => () =>
   Promise.reject(new Error(`crypto.subtle.${name} is not supported in this environment`));
 
 const ensureCrypto = () => {
-  const globalCrypto: Crypto =
-    (globalThis.crypto as Crypto | undefined) ?? ((globalThis.crypto = {} as Crypto), globalThis.crypto);
+  const globalCrypto = (globalThis.crypto as any) ?? ((globalThis.crypto = {} as any), globalThis.crypto);
 
   if (typeof globalCrypto.getRandomValues !== 'function') {
-    globalCrypto.getRandomValues = (array: Uint8Array) => {
-      const randomBytes = ExpoCrypto.getRandomBytes(array.length);
-      array.set(randomBytes);
+    globalCrypto.getRandomValues = <T extends ArrayBufferView>(array: T): T => {
+      const randomBytes = ExpoCrypto.getRandomBytes(array.byteLength);
+      const randomView = new Uint8Array(array.buffer, array.byteOffset, array.byteLength);
+      randomView.set(randomBytes);
       return array;
     };
   }
 
   if (!globalCrypto.subtle) {
-    const subtle: SubtleCrypto = {
+    const subtle = {
       async digest(algorithm: AlgorithmIdentifier, data: ArrayBufferInput) {
         const algo = typeof algorithm === 'string' ? algorithm : algorithm?.name;
         if (!algo || algo.toUpperCase() !== 'SHA-256') {
           throw new Error(`Algorithm not supported: ${algo}`);
         }
         const bytes = toUint8Array(data);
-        return ExpoCrypto.digest(ExpoCrypto.CryptoDigestAlgorithm.SHA256, bytes);
+        // Create a new Uint8Array with a proper ArrayBuffer (not SharedArrayBuffer)
+        const buffer = new Uint8Array(bytes.length);
+        buffer.set(bytes);
+        const result = await ExpoCrypto.digest(ExpoCrypto.CryptoDigestAlgorithm.SHA256, buffer);
+        return result;
       },
       encrypt: unsupported('encrypt'),
       decrypt: unsupported('decrypt'),

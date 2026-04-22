@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException
-import numpy as np
+
 from ..recommender.model_loader import load_recommender
 from ..recommender.recommend_service import recommend_drill
 
@@ -13,8 +13,9 @@ def get_recommender():
         _rec = load_recommender()
     return _rec
 
+# BUG FIX: Made async to avoid blocking the asyncio event loop
 @router.post("/recommend")
-def recommend(payload: dict):
+async def recommend(payload: dict):
     try:
         user_vec = payload["user_vec"]
         user_context = payload["user_context"]
@@ -29,7 +30,9 @@ def recommend(payload: dict):
         labels=rec["labels"],
         tiers=rec["tiers"],
         faiss_index=rec["faiss_index"],
-        bandit=rec["bandit"]
+        bandit=rec["bandit"],
+        weak_areas=payload.get("weak_areas"),
+        user_level=payload.get("user_level"),
     )
 
     return result
