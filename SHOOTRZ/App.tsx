@@ -3,6 +3,7 @@ import { StatusBar } from 'expo-status-bar';
 import { AppNavigator } from './src/navigation/AppNavigator';
 import { SHOOTRZ_THEME } from './src/constants/theme';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
+import { HistoryProvider } from './src/context/HistoryContext';
 import { LoginScreen } from './src/screens/LoginScreen';
 import { OnboardingScreen } from './src/screens/OnboardingScreen';
 import { UsernameScreen } from './src/screens/UsernameScreen';
@@ -127,8 +128,10 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <AuthProvider>
-        <StatusBar style="light" backgroundColor={SHOOTRZ_THEME.colors.background} />
-        <AppContent />
+        <HistoryProvider>
+          <StatusBar style="light" backgroundColor={SHOOTRZ_THEME.colors.background} />
+          <AppContent />
+        </HistoryProvider>
       </AuthProvider>
     </SafeAreaProvider>
   );

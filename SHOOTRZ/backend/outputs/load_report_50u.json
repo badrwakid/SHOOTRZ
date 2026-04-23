@@ -1,0 +1,20 @@
+{
+  "num_requests": 610,
+  "num_failures": 139,
+  "error_rate_pct": 22.79,
+  "queue_p50_ms": 0,
+  "queue_p95_ms": 0,
+  "queue_submit_poll_p50_ms": 7200.0,
+  "queue_submit_poll_p95_ms": 32000.0,
+  "end_to_end_p50_ms": null,
+  "end_to_end_p95_ms": null,
+  "end_to_end_completed": 0,
+  "end_to_end_timeouts": 8,
+  "completion_rate_pct": 0.0,
+  "rps": 9.65,
+  "error_breakdown": {
+    "exception": 139,
+    "429": 139,
+    "timeout": 8
+  }
+}

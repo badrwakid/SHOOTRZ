@@ -9,9 +9,14 @@ import numpy as np
 import pandas as pd
 import json
 from pathlib import Path
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, Iterable, List, Optional, Tuple
 
 from backend.inference.pose_2d import MediaPipePoseDetector, BASKETBALL_KEYPOINTS
+
+
+# Minimum mean landmark visibility for a frame to be kept. Low-visibility frames
+# are dropped rather than filled with zeros so downstream averaging stays honest.
+MIN_MEAN_VISIBILITY = 0.40
 
 
 class MVPPoseEstimator:
@@ -51,50 +56,66 @@ class MVPPoseEstimator:
         frame_mapping: pd.DataFrame
     ) -> List[Dict[str, Any]]:
         """
-        Process all frames to extract pose landmarks.
-        
+        Process pre-buffered frames to extract pose landmarks.
+
+        Prefer :meth:`process_frame_stream` in the new streaming pipeline to
+        avoid holding the whole clip in memory. This path is kept for
+        backward-compatible callers.
+
         Args:
             frames: List of RGB frames
             frame_mapping: DataFrame with frame indices and timestamps
-        
+
         Returns:
-            List of pose results per frame
+            List of pose results per frame (low-visibility frames dropped).
+        """
+        iterator = (
+            (
+                int(row["processed_idx"]),
+                int(row["original_idx"]),
+                float(row["timestamp"]),
+                frames[int(row["processed_idx"])],
+            )
+            for _, row in frame_mapping.iterrows()
+            if int(row["processed_idx"]) < len(frames)
+        )
+        return self.process_frame_stream(iterator)
+
+    def process_frame_stream(
+        self,
+        frame_iter: Iterable[Tuple[int, int, float, np.ndarray]],
+    ) -> List[Dict[str, Any]]:
+        """
+        Consume a ``(processed_idx, original_idx, timestamp_s, frame_rgb)`` iterator.
+
+        Builds ``self.pose_results`` incrementally. Frames whose mean landmark
+        visibility is below :data:`MIN_MEAN_VISIBILITY` are dropped entirely
+        rather than padded with zeros — this keeps aggregate stats honest and
+        cuts memory usage dramatically on low-quality clips.
         """
         self.pose_results = []
-        
-        for processed_idx, frame in enumerate(frames):
-            # VideoLoader passes RGB frames; avoid double BGR->RGB in pose_2d
+
+        for processed_idx, original_idx, timestamp, frame in frame_iter:
             result = self.detector.process_frame(frame, input_is_rgb=True)
-
-            # Get timestamp from mapping
-            timestamp = frame_mapping.loc[
-                frame_mapping["processed_idx"] == processed_idx,
-                "timestamp"
-            ].values[0]
-
-            original_idx = frame_mapping.loc[
-                frame_mapping["processed_idx"] == processed_idx,
-                "original_idx"
-            ].values[0]
-
             if result is None:
-                # Keep timeline dense to avoid downstream frame-index drift.
-                self.pose_results.append({
+                continue
+            confidence = result["confidence"]
+            try:
+                mean_conf = float(np.mean(confidence))
+            except Exception:
+                mean_conf = 0.0
+            if mean_conf < MIN_MEAN_VISIBILITY:
+                continue
+            self.pose_results.append(
+                {
                     "frame_idx": int(original_idx),
-                    "processed_idx": processed_idx,
-                    "timestamp": float(timestamp),
-                    "landmarks": np.zeros((33, 3), dtype=np.float32),
-                    "confidence": np.zeros((33,), dtype=np.float32),
-                })
-            else:
-                self.pose_results.append({
-                    "frame_idx": int(original_idx),
-                    "processed_idx": processed_idx,
+                    "processed_idx": int(processed_idx),
                     "timestamp": float(timestamp),
                     "landmarks": result["landmarks"],
-                    "confidence": result["confidence"],
-                })
-        
+                    "confidence": confidence,
+                }
+            )
+
         return self.pose_results
     
     def determine_shooting_side(

@@ -1,0 +1,30 @@
+{
+  "run_id": "34c58088-7e6a-40a0-a094-856071514597",
+  "timestamp": "2026-04-23T04:31:34.132680",
+  "created_at": "2026-04-23 04:31:34",
+  "video_path": "C:\\Users\\Badr\\AppData\\Local\\Temp\\pytest-of-Badr\\pytest-43\\test_process_video_with_overla0\\no_overlay.mp4",
+  "video_metadata": {
+    "video_path": "C:\\Users\\Badr\\AppData\\Local\\Temp\\pytest-of-Badr\\pytest-43\\test_process_video_with_overla0\\no_overlay.mp4",
+    "fps": 30.0,
+    "frame_count": 60,
+    "width": 640,
+    "height": 480,
+    "duration_seconds": 2.0,
+    "resolution": "640x480",
+    "frame_sampling": {
+      "stride": 1,
+      "max_frames": 120,
+      "kept_frames": 60
+    }
+  },
+  "quality_warnings": [],
+  "shooting_side": "right",
+  "pose_frames_detected": 0,
+  "low_light": false,
+  "status": "completed_low_quality",
+  "phase_timings_seconds": {
+    "ingestion": 0.0257,
+    "pose_estimation": 2.6447
+  },
+  "processing_time_seconds": 2.721
+}

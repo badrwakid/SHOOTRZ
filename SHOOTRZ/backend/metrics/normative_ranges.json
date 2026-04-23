@@ -28,9 +28,18 @@
 	"elbow_flexion_release": {
 		"target_range": [165, 180],
 		"optimal_range": [170, 180],
+		"good_range": [150, 175],
 		"unit": "degrees",
-		"source": "Cabarkapa et al. 2021",
-		"description": "Elbow extension angle at ball release"
+		"source": "Cabarkapa et al. 2021 (optimal) + MVP scoring UX calibration (good)",
+		"description": "Elbow extension angle at ball release. good_range is the coach-grade 'close enough' band used by _dim_score."
+	},
+	"wrist_follow_through": {
+		"target_range": [15, 30],
+		"optimal_range": [18, 28],
+		"good_range": [10, 35],
+		"unit": "degrees",
+		"source": "Struzik et al. 2014; phone-camera MVP calibration",
+		"description": "Absolute change in wrist angle between release and end of follow-through. Matches the primitive metric value produced by MetricsDerivation._compute_wrist_followthrough."
 	},
 	"elbow_height": {
 		"proficient": {
@@ -49,9 +58,10 @@
 		},
 		"target_range": [100, 120],
 		"optimal_range": [105, 115],
+		"good_range": [85, 125],
 		"unit": "degrees",
-		"source": "Cabarkapa et al. 2021",
-		"description": "Knee flexion angle during crouch phase"
+		"source": "Cabarkapa et al. 2021 (optimal) + MVP scoring UX calibration (good)",
+		"description": "Knee flexion angle during crouch phase. good_range covers typical amateur crouch depth."
 	},
 	"hip_flexion": {
 		"target_range": [140, 160],

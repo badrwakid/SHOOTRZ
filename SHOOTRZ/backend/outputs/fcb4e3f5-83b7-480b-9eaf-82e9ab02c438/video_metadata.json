@@ -1,0 +1,15 @@
+{
+  "video_path": "C:\\Users\\Badr\\AppData\\Local\\Temp\\pytest-of-Badr\\pytest-41\\test_pipeline_creates_all_outp0\\test_shot.mp4",
+  "fps": 30.0,
+  "frame_count": 60,
+  "width": 640,
+  "height": 480,
+  "duration_seconds": 2.0,
+  "resolution": "640x480",
+  "frame_sampling": {
+    "frame_skip": 1,
+    "max_frames": 120,
+    "total_processed_frames": 60
+  },
+  "quality_warnings": []
+}

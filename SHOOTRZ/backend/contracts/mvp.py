@@ -31,11 +31,18 @@ class MVPMetric(BaseModel):
     explanation: str
     confidence: float
     frame_range: Optional[List[int]] = None
+    # Exact frame the metric was measured at (peak extension for elbow,
+    # deepest knee flex for knee_bend, etc). ``None`` when the metric is
+    # Low Confidence.
+    selected_frame: Optional[int] = None
 
 
 class MVPScoreComponent(BaseModel):
     name: str
-    value: float
+    # ``None`` when the underlying primitive is Low Confidence. Previously the
+    # backend substituted a plausible default which shipped misleading
+    # "Strength: leg load looks solid (71/100)" copy next to an Elbow N/A card.
+    value: Optional[float] = None
     unit: str
     weight: float
     explanation: str
@@ -109,6 +116,17 @@ class MVPResultResponse(BaseModel):
     key_frame_images: Optional[Dict[str, str]] = None
     quality_warnings: Optional[List[str]] = None
     diagnostics: Optional[Dict[str, Any]] = None
+    # Mean landmark visibility across kept frames (0..1). Drives the UI
+    # tracking-quality chip. Added 2026-04-23 with the angle/overlay fix.
+    pose_overall_confidence: Optional[float] = None
+    # Deterministic rule-based score from the geomean path. Preserved even
+    # after the Gemini override so UI / debugging tooling can compare.
+    rule_based_score: Optional[int] = None
+    # Whether ``overall_score`` was produced by the AI coach (Gemini).
+    # ``False`` means rule-based only (fallback or Gemini disabled).
+    ai_scored: Optional[bool] = None
+    # One-line justification emitted by Gemini alongside its score.
+    ai_score_rationale: Optional[str] = None
     error: Optional[str] = None
     error_detail: Optional[str] = None
     error_type: Optional[str] = None

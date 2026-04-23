@@ -1,0 +1,33 @@
+{
+  "run_id": "3bace81c-1a56-437c-91f2-9b6361568f14",
+  "timestamp": "2026-04-23T03:51:03.208052",
+  "created_at": "2026-04-23 03:51:03",
+  "input_video": "D:\\Users\\Badr\\Grad\\SHOOTRZ\\backend\\outputs\\3bace81c-1a56-437c-91f2-9b6361568f14\\input_video.mp4",
+  "video_path": "C:\\Users\\Badr\\AppData\\Local\\Temp\\pytest-of-Badr\\pytest-34\\test_pipeline_creates_all_outp0\\test_shot.mp4",
+  "video_metadata": {
+    "video_path": "C:\\Users\\Badr\\AppData\\Local\\Temp\\pytest-of-Badr\\pytest-34\\test_pipeline_creates_all_outp0\\test_shot.mp4",
+    "fps": 30.0,
+    "frame_count": 60,
+    "width": 640,
+    "height": 480,
+    "duration_seconds": 2.0,
+    "resolution": "640x480",
+    "frame_sampling": {
+      "stride": 1,
+      "max_frames": 120,
+      "kept_frames": 60
+    }
+  },
+  "quality_warnings": [
+    "low_light"
+  ],
+  "shooting_side": "right",
+  "pose_frames_detected": 0,
+  "low_light": true,
+  "status": "completed_low_quality",
+  "phase_timings_seconds": {
+    "ingestion": 0.0196,
+    "pose_estimation": 1.988
+  },
+  "processing_time_seconds": 3.3729
+}

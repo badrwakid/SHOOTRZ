@@ -1,0 +1,90 @@
+{
+  "overall_score": 0,
+  "feedback_summary": "Overall 0/100 \u2014 biggest gap: balance stability (45/100).",
+  "metrics": [
+    {
+      "name": "elbow_extension",
+      "value": 0.0,
+      "unit": "N/A",
+      "verdict": "Low Confidence",
+      "explanation": "Insufficient joint visibility or unstable tracking. Re-record with better lighting and full-body view.",
+      "confidence": 0.0,
+      "frame_range": [
+        0,
+        0
+      ],
+      "selected_frame": null
+    },
+    {
+      "name": "knee_bend",
+      "value": 0.0,
+      "unit": "N/A",
+      "verdict": "Low Confidence",
+      "explanation": "Insufficient joint visibility or unstable tracking. Re-record with better lighting and full-body view.",
+      "confidence": 0.0,
+      "frame_range": [
+        0,
+        0
+      ],
+      "selected_frame": null
+    },
+    {
+      "name": "wrist_follow_through",
+      "value": 0.0,
+      "unit": "N/A",
+      "verdict": "Low Confidence",
+      "explanation": "Insufficient joint visibility or unstable tracking. Re-record with better lighting and full-body view.",
+      "confidence": 0.0,
+      "frame_range": [
+        0,
+        0
+      ],
+      "selected_frame": null
+    }
+  ],
+  "scoring_method": "component_weighted",
+  "component_weights": {
+    "loading_quality": 0.3,
+    "release_mechanics": 0.35,
+    "follow_through_control": 0.2,
+    "balance_stability": 0.15
+  },
+  "legacy_weights": {
+    "elbow": 0.4,
+    "knee": 0.3,
+    "wrist": 0.3
+  },
+  "score_components": [
+    {
+      "name": "loading_quality",
+      "value": null,
+      "unit": "score",
+      "weight": 0.3,
+      "explanation": "Leg load depth and smoothness into the motion."
+    },
+    {
+      "name": "release_mechanics",
+      "value": null,
+      "unit": "score",
+      "weight": 0.35,
+      "explanation": "Elbow extension and timing near release."
+    },
+    {
+      "name": "follow_through_control",
+      "value": null,
+      "unit": "score",
+      "weight": 0.2,
+      "explanation": "Controlled wrist movement after release."
+    },
+    {
+      "name": "balance_stability",
+      "value": 45.0,
+      "unit": "score",
+      "weight": 0.15,
+      "explanation": "Stability proxy from knee consistency around release."
+    }
+  ],
+  "feedback_bullets": [
+    "Keep recording side-on with full body in frame for best tracking."
+  ]
+}

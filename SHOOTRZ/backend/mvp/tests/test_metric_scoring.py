@@ -111,18 +111,28 @@ class TestMetricScoring:
         assert 0 <= score <= 100, f"Score {score} outside [0, 100] range"
     
     def test_good_form_high_score(self):
-        """Test that good form produces high score."""
+        """Good form — values at normative midpoints — produces a high score.
+
+        The post-refactor aggregator centres sub-scores on the RESEARCH-BACKED
+        midpoint (``elbow_flexion_release`` target [165,180] midpoint 172.5,
+        ``knee_flexion`` [100,120] midpoint 110). The old test sat at 165/105
+        which is 1+ sigma off — legitimately not "optimal" under the new
+        scoring. We bump to the normative midpoints and add a real wrist
+        follow-through delta (previously masked as 0 by a framing bug).
+        """
+        n = 60
+        wrist = [80.0] * 42 + [100.0] * (n - 42)
         angles_df = pd.DataFrame({
-            "frame_id": list(range(60)),
-            "timestamp": [i * 0.033 for i in range(60)],
-            "knee_angle": [105.0] * 60,  # Optimal
-            "elbow_angle": [165.0] * 60,  # Optimal
-            "wrist_angle": [80.0] * 30 + [100.0] * 30,  # 20 degree change
-            "confidence_knee": [0.95] * 60,
-            "confidence_elbow": [0.95] * 60,
-            "confidence_wrist": [0.95] * 60,
+            "frame_id": list(range(n)),
+            "timestamp": [i * 0.033 for i in range(n)],
+            "knee_angle": [110.0] * n,
+            "elbow_angle": [172.5] * n,
+            "wrist_angle": wrist,
+            "confidence_knee": [0.95] * n,
+            "confidence_elbow": [0.95] * n,
+            "confidence_wrist": [0.95] * n,
         })
-        
+
         shot_window = {
             "start_frame": 10,
             "crouch_frame": 30,
@@ -136,11 +146,17 @@ class TestMetricScoring:
             angles_df,
             shot_window,
         )
-        
-        # All optimal should give high score
+
+        # Optimal primitives should produce a high geomean score.
         assert score >= 80, f"Expected score >= 80 for optimal form, got {score}"
         assert isinstance(bullets, list)
-        assert len(components) == 4
+        # Aggregator now appends a synthetic `shot_score_breakdown` entry when
+        # breakdown metrics are present, so the list grows by ONE.
+        assert len(components) in (4, 5)
+        component_names = {c["name"] for c in components}
+        assert {"loading_quality", "release_mechanics", "follow_through_control", "balance_stability"}.issubset(
+            component_names
+        )
 
     def test_feedback_changes_when_metrics_change(self):
         """Feedback should differ when quality degrades."""

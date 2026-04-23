@@ -1,0 +1,15 @@
+{
+  "video_path": "C:\\Users\\Badr\\AppData\\Local\\Temp\\tmp_tcaxe3x.mp4",
+  "fps": 56.184276414621934,
+  "frame_count": 187,
+  "width": 1080,
+  "height": 1920,
+  "duration_seconds": 3.328333333333333,
+  "resolution": "1080x1920",
+  "frame_sampling": {
+    "frame_skip": 1,
+    "max_frames": 120,
+    "total_processed_frames": 120
+  },
+  "quality_warnings": []
+}

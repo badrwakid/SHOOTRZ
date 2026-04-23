@@ -9,7 +9,7 @@ router = APIRouter(prefix="/db", tags=["database"])
 
 
 @router.get("/test")
-async def test_database():
+async def database_test_endpoint():
     """Test database connectivity and configuration"""
     results = {
         "timestamp": datetime.now().isoformat(),

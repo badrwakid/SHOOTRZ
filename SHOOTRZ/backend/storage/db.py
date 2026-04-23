@@ -517,12 +517,19 @@ class SupabaseDB:
         """Return sessions with analysis_summaries and per-video metrics (MVP scores).
 
         Ordered by analysis summary ``created_at`` descending (most recent first).
+
+        Prior implementation was O(N) round-trips: one ``get_session`` +
+        ``get_session_videos`` + ``get_metrics`` per summary. On a user with 100
+        sessions that produced ~300 Supabase calls and explained the 5-10s
+        "Home"/"Progress" spinners. This version batches everything into four
+        queries regardless of N.
         """
         if limit <= 0:
             return []
         try:
             sb = get_service_client()
-            resp = (
+            # 1. Summaries (latest first).
+            summ_resp = (
                 sb.table("analysis_summaries")
                 .select("*")
                 .eq("user_id", user_id)
@@ -530,20 +537,62 @@ class SupabaseDB:
                 .range(offset, offset + limit - 1)
                 .execute()
             )
-            rows = resp.data or []
+            rows = summ_resp.data or []
+            session_ids = [str(r["session_id"]) for r in rows if r.get("session_id")]
+            if not session_ids:
+                return []
+
+            # 2. Sessions in one round-trip.
+            sess_resp = (
+                sb.table("sessions")
+                .select("id, title, timestamp, shot_count, overall_score")
+                .in_("id", session_ids)
+                .execute()
+            )
+            sessions_by_id: Dict[str, Dict[str, Any]] = {
+                str(s["id"]): s for s in (sess_resp.data or [])
+            }
+
+            # 3. session -> video_id mapping in one round-trip.
+            sv_resp = (
+                sb.table("session_videos")
+                .select("session_id, video_id")
+                .in_("session_id", session_ids)
+                .execute()
+            )
+            session_to_video: Dict[str, str] = {}
+            for sv in sv_resp.data or []:
+                sid = str(sv.get("session_id")) if sv.get("session_id") else None
+                vid = str(sv.get("video_id")) if sv.get("video_id") else None
+                if sid and vid and sid not in session_to_video:
+                    session_to_video[sid] = vid
+            video_ids = list(session_to_video.values())
+
+            # 4. All metrics for those videos in one round-trip.
+            metrics_by_video: Dict[str, List[Dict[str, Any]]] = {}
+            if video_ids:
+                m_resp = (
+                    sb.table("metrics")
+                    .select("id, video_id, metric_name, value, unit, confidence, phase, frame_idx, created_at")
+                    .in_("video_id", video_ids)
+                    .order("created_at", desc=False)
+                    .execute()
+                )
+                for m in m_resp.data or []:
+                    vid = str(m.get("video_id")) if m.get("video_id") else None
+                    if not vid:
+                        continue
+                    metrics_by_video.setdefault(vid, []).append(m)
+
             out: List[Dict[str, Any]] = []
             for summ in rows:
                 session_id = summ.get("session_id")
                 if not session_id:
                     continue
-                session = self.get_session(str(session_id))
-                sv_list = self.get_session_videos(str(session_id))
-                video_id = None
-                if sv_list and isinstance(sv_list[0], dict):
-                    video_id = sv_list[0].get("video_id")
-                metrics: List[Dict[str, Any]] = []
-                if video_id:
-                    metrics = self.get_metrics(str(video_id))
+                sid = str(session_id)
+                session = sessions_by_id.get(sid)
+                video_id = session_to_video.get(sid)
+                metrics = metrics_by_video.get(video_id, []) if video_id else []
                 ts = (
                     (session or {}).get("timestamp")
                     or summ.get("created_at")
@@ -555,8 +604,8 @@ class SupabaseDB:
                 if overall is None and session:
                     overall = session.get("overall_score")
                 out.append({
-                    "session_id": str(session_id),
-                    "video_id": str(video_id) if video_id else None,
+                    "session_id": sid,
+                    "video_id": video_id,
                     "timestamp": ts,
                     "title": title,
                     "date": str(ts)[:10] if ts else "",

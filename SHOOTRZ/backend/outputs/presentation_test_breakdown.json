@@ -1,0 +1,36 @@
+{
+  "summary": {
+    "total": 86,
+    "passed": 86,
+    "failed": 0,
+    "skipped": 0,
+    "duration_s": 64.36,
+    "pass_rate_pct": 100.0
+  },
+  "by_module": {
+    "Video & AI Engine": {
+      "total": 70,
+      "passed": 70,
+      "failed": 0,
+      "skipped": 0
+    },
+    "Feedback & Chatbot": {
+      "total": 4,
+      "passed": 4,
+      "failed": 0,
+      "skipped": 0
+    },
+    "Performance": {
+      "total": 9,
+      "passed": 9,
+      "failed": 0,
+      "skipped": 0
+    },
+    "Data & Dashboard": {
+      "total": 3,
+      "passed": 3,
+      "failed": 0,
+      "skipped": 0
+    }
+  }
+}

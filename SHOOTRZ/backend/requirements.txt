@@ -1,4 +1,9 @@
 mediapipe==0.10.14
+# mediapipe==0.10.14 wheels import ``from google.protobuf import runtime_version``
+# which only exists in protobuf 5.x. Without this pin the ``_fallback_mode`` path
+# in ``backend/inference/pose_2d.py`` silently fires and produces placeholder
+# (0.5, 0.5) landmarks for every frame (see 2026-04-23 incident).
+protobuf>=5.27,<6
 # Use a version available for Python 3.12 on Windows
 opencv-python==4.10.0.84
 # Python 3.12 compatible NumPy

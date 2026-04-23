@@ -4,10 +4,26 @@ MediaPipe Pose 2D landmark extraction for basketball shooting analysis.
 Provides 33 landmarks per frame for body pose estimation.
 """
 
+import logging
+import os
+
 import cv2
 import numpy as np
 # BUG FIX: Import Any from typing (was using builtin `any` in type annotations)
 from typing import Any, Dict, List, Optional, Tuple
+
+
+logger = logging.getLogger(__name__)
+
+
+def _fallback_is_allowed() -> bool:
+    """Tests opt-in with ``SHOOTRZ_POSE_FALLBACK=1`` so synthetic clips still run.
+
+    In production the fallback is NEVER acceptable: it previously returned
+    (0.5, 0.5) landmarks for every frame, which silently produced 0 degree
+    angles and a garbage "0 POOR" shot score.
+    """
+    return os.getenv("SHOOTRZ_POSE_FALLBACK", "").lower() in {"1", "true", "yes"}
 
 
 
@@ -74,8 +90,17 @@ class MediaPipePoseDetector:
 				min_detection_confidence=min_detection_confidence,
 				min_tracking_confidence=min_tracking_confidence,
 			)
-		except Exception:
-			# Allow test and non-GPU environments to proceed when mediapipe runtime deps conflict.
+		except (ImportError, AttributeError, RuntimeError, OSError, ValueError) as exc:
+			logger.error(
+				"MediaPipe Pose failed to initialise (%s: %s). "
+				"This is catastrophic in production because pose results drive every "
+				"downstream metric. Set SHOOTRZ_POSE_FALLBACK=1 to opt in to the "
+				"synthetic-landmark mode used by unit tests.",
+				type(exc).__name__,
+				exc,
+			)
+			if not _fallback_is_allowed():
+				raise
 			self._fallback_mode = True
 		self.keypoints_map = BASKETBALL_KEYPOINTS
 
@@ -105,13 +130,16 @@ class MediaPipePoseDetector:
 			frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
 		if self._fallback_mode or self.pose is None:
-			h, w = frame_rgb.shape[:2]
-			center_x = 0.5
-			center_y = 0.5
+			# Fallback is gated by SHOOTRZ_POSE_FALLBACK (tests only). In production
+			# the ``__init__`` path re-raises, so we never reach here with real data.
+			# We still emit SOMETHING so synthetic-video tests continue to exercise
+			# the pipeline, but we mark confidence=0.0 so the visibility gate in
+			# ``MVPPoseEstimator.process_frame_stream`` drops every frame unless a
+			# test explicitly asserts on the fallback shape.
 			landmarks = np.zeros((33, 3), dtype=np.float32)
-			landmarks[:, 0] = center_x
-			landmarks[:, 1] = center_y
-			confidences = np.full((33,), 0.5, dtype=np.float32)
+			landmarks[:, 0] = 0.5
+			landmarks[:, 1] = 0.5
+			confidences = np.zeros((33,), dtype=np.float32)
 			return {"landmarks": landmarks, "confidence": confidences}
 
 		pose_results = self.pose.process(frame_rgb)

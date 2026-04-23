@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import {
 	View,
 	Text,
@@ -11,8 +11,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { LineChart } from 'react-native-chart-kit'
 import { format, parseISO, subDays, isAfter } from 'date-fns'
-import { apiService } from '../services/api.service'
 import { useAuth } from '../context/AuthContext'
+import { useHistory } from '../context/HistoryContext'
 import { colors, typography, spacing, radius, glass } from '../constants/theme'
 import { ScoreRing } from '../components/ScoreRing'
 import { MetricCard } from '../components/MetricCard'
@@ -41,67 +41,73 @@ interface MetricTrend {
 
 type TimeRange = 'week' | 'month' | 'all'
 
+function mapSession(h: HistorySession): Session {
+	const overall =
+		h.overall_score != null
+			? h.overall_score
+			: h.average_score != null
+				? h.average_score
+				: undefined
+	return {
+		id: h.session_id ?? String(Date.now()),
+		date: h.timestamp || h.date || new Date().toISOString(),
+		title: h.title ?? undefined,
+		shot_count: h.shot_count ?? 1,
+		average_score: overall,
+		metrics: h.metrics?.reduce((acc: Record<string, number>, m: any) => {
+			const key = m.metric_name || m.name
+			if (key && Number.isFinite(m.value)) acc[key] = m.value
+			return acc
+		}, {}),
+	}
+}
+
 export const ProgressScreen: React.FC = () => {
 	const { user } = useAuth()
-	const [loading, setLoading] = useState(true)
+	const history = useHistory()
 	const [refreshing, setRefreshing] = useState(false)
-	const [sessions, setSessions] = useState<Session[]>([])
-	const [metricTrends, setMetricTrends] = useState<MetricTrend[]>([])
 	const [timeRange, setTimeRange] = useState<TimeRange>('month')
 
-	const loadSessions = useCallback(async () => {
-		if (!user?.id) { setLoading(false); return }
+	// Derive sessions/trends directly from the shared cache so Progress and Home
+	// never fetch twice back-to-back.
+	const sessions = useMemo<Session[]>(
+		() => history.sessions.map(mapSession),
+		// history.version bumps when data changes; keep it in deps so the memo
+		// refreshes without a loose ``history.sessions`` identity check.
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+		[history.sessions, history.version],
+	)
+
+	const loading = history.loading && sessions.length === 0
+
+	useEffect(() => {
+		if (!user?.id) return
+		history.ensureFresh().catch(() => {})
+	}, [user?.id, history])
+
+	const onRefresh = async () => {
+		setRefreshing(true)
 		try {
-			const resp = await apiService.getAnalysisHistory(100, 0)
-			const sessionList = resp?.sessions ?? []
-			const mapped: Session[] = sessionList.map((h: HistorySession) => {
-				const overall =
-					h.overall_score != null
-						? h.overall_score
-						: h.average_score != null
-							? h.average_score
-							: undefined
-				return {
-					id: h.session_id ?? String(Date.now()),
-					date: h.timestamp || h.date || new Date().toISOString(),
-					title: h.title ?? undefined,
-					shot_count: h.shot_count ?? 1,
-					average_score: overall,
-					metrics: h.metrics?.reduce((acc: Record<string, number>, m: any) => {
-						const key = m.metric_name || m.name
-						if (key && Number.isFinite(m.value)) acc[key] = m.value
-						return acc
-					}, {}),
-				}
-			})
-			setSessions(mapped)
-			calcTrends(mapped)
-		} catch (e) {
-			console.error('Error loading progress:', e)
+			await history.refresh()
 		} finally {
-			setLoading(false)
 			setRefreshing(false)
 		}
-	}, [user])
+	}
 
-	useEffect(() => { loadSessions() }, [loadSessions])
-
-	const calcTrends = (data: Session[]) => {
+	const metricTrends = useMemo<MetricTrend[]>(() => {
 		const metricsMap: Record<string, { date: string; value: number }[]> = {}
-		data.forEach(s => {
+		sessions.forEach(s => {
 			if (!s.metrics) return
 			Object.entries(s.metrics).forEach(([k, v]) => {
 				if (!metricsMap[k]) metricsMap[k] = []
 				metricsMap[k].push({ date: s.date, value: v })
 			})
 		})
-		setMetricTrends(
-			Object.entries(metricsMap).map(([name, d]) => ({
-				name,
-				data: d.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()),
-			})),
-		)
-	}
+		return Object.entries(metricsMap).map(([name, d]) => ({
+			name,
+			data: d.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()),
+		}))
+	}, [sessions])
 
 	const filteredSessions = useMemo(() => {
 		if (timeRange === 'all') return sessions
@@ -152,7 +158,7 @@ export const ProgressScreen: React.FC = () => {
 		<SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
 			<ScrollView
 				showsVerticalScrollIndicator={false}
-				refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadSessions() }} tintColor={colors.brand.orange} />}
+				refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.brand.orange} />}
 			>
 				{/* Period Selector */}
 				<View style={styles.periodRow}>

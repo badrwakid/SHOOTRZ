@@ -18,12 +18,22 @@ class AngleComputer:
     """Computes biomechanical angles from pose keypoints."""
     
     def __init__(self, shooting_side: str = "right", confidence_threshold: float = 0.3):
-        """
-        Initialize angle computer.
-        
+        """Initialize angle computer.
+
+        Two-tier confidence gating keeps the Angle Consistency chart populated
+        while the score stays honest:
+
+        * ``AngleComputer.confidence_threshold`` (default 0.3) decides whether
+          the per-frame angle is emitted at all into ``angles.csv``. Lower it
+          to keep more rows when MediaPipe flickers on a single landmark.
+        * ``MIN_JOINT_CONF_FOR_METRIC`` (0.50) in ``metrics.py`` decides
+          whether a row is eligible to be SELECTED as the metric's
+          ``selected_frame``. This is the value driving the score.
+
         Args:
             shooting_side: "left" or "right"
-            confidence_threshold: Minimum confidence for valid angle
+            confidence_threshold: Minimum joint confidence for the angle to be
+                computed for a frame. Does NOT drive the score gate (see above).
         """
         self.shooting_side = shooting_side
         self.confidence_threshold = confidence_threshold

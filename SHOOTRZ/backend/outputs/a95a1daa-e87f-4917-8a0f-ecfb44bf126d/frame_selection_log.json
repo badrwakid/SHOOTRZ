@@ -1,0 +1,23 @@
+{
+  "chosen_release": 1,
+  "elbow_peak_frame": 1,
+  "wrist_apex_frame": 1,
+  "vel_zero_frame": null,
+  "consensus_frame": 1,
+  "heuristic_deviation": 0,
+  "heuristic_max_spread": 0,
+  "heuristics_n": 2,
+  "high_confidence_agreement": true,
+  "confidence_score": 0.2,
+  "crouch_frame": 0,
+  "warnings": [
+    "crouch_lt_lead_frames"
+  ],
+  "candidates": [
+    {
+      "frame_id": 1,
+      "score": 0.4,
+      "kind": "argmax_fallback"
+    }
+  ]
+}
