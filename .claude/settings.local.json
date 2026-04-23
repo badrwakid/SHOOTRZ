@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -m pytest backend/tests/test_pipeline.py -v)",
+      "Bash(python -m pytest backend/tests/test_pipeline.py -v --collect-only)",
+      "Bash(git stash *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)"
+    ]
+  }
+}
