@@ -9,8 +9,11 @@
     "android": "node scripts/set-expo-ip.js && expo start --android",
     "ios": "node scripts/set-expo-ip.js && expo start --ios",
     "web": "node scripts/set-expo-ip.js && expo start --web",
-    "lint": "eslint . --ext .ts,.tsx",
-    "lint:fix": "eslint . --ext .ts,.tsx --fix",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:contract": "jest -- src/theme/__tests__/tokens.contract.test.ts",
+    "lint": "eslint App.tsx src",
+    "lint:fix": "eslint App.tsx src --fix",
     "format": "prettier --write \"src/**/*.{ts,tsx}\" \"*.{ts,tsx}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx}\" \"*.{ts,tsx}\"",
     "typecheck": "tsc --noEmit"
@@ -45,10 +48,16 @@
     "react-native-svg": "15.12.1"
   },
   "devDependencies": {
+    "@testing-library/react-native": "^13.3.3",
+    "@types/jest": "^29.5.14",
     "@types/react": "~19.1.0",
+    "eslint-config-expo": "~10.0.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.4",
+    "jest": "^29.7.0",
+    "jest-expo": "^54.0.13",
     "prettier": "^3.6.2",
+    "react-test-renderer": "19.1.0",
     "typescript": "~5.9.2"
   },
   "private": true

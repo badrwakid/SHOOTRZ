@@ -1,7 +1,8 @@
 import React, { useEffect, useRef } from 'react'
 import { View, Text, StyleSheet, Animated } from 'react-native'
 import Svg, { Circle } from 'react-native-svg'
-import { colors, typography, getScoreTier, getScoreColor } from '../constants/theme'
+import { colors, typography, getScoreTier } from '../constants/theme'
+import { SCORE_TIER_LABELS, SCORE_TIER_RING_STROKE } from '../theme/scoreTier'
 import { hapticFeedback } from '../utils/hapticFeedback'
 
 type RingSize = 'sm' | 'md' | 'lg' | 'hero'
@@ -21,14 +22,6 @@ const DIMENSIONS: Record<RingSize, { diameter: number; stroke: number; fontSize:
 	hero: { diameter: 200, stroke: 18, fontSize: typography.size['4xl'] },
 }
 
-const TIER_LABELS: Record<string, string> = {
-	elite: 'ELITE',
-	great: 'GREAT',
-	good: 'GOOD',
-	fair: 'FAIR',
-	poor: 'POOR',
-}
-
 const AnimatedCircle = Animated.createAnimatedComponent(Circle)
 
 export function ScoreRing({
@@ -42,7 +35,7 @@ export function ScoreRing({
 	const r = (diameter - stroke) / 2
 	const circumference = 2 * Math.PI * r
 	const tier = getScoreTier(score)
-	const tierColor = getScoreColor(score)
+	const ringColor = SCORE_TIER_RING_STROKE[tier]
 
 	const animValue = useRef(new Animated.Value(0)).current
 	const countValue = useRef(new Animated.Value(0)).current
@@ -101,7 +94,7 @@ export function ScoreRing({
 					cx={diameter / 2}
 					cy={diameter / 2}
 					r={r}
-					stroke={tierColor.bg}
+					stroke={ringColor}
 					strokeWidth={stroke}
 					fill="none"
 					strokeLinecap="round"
@@ -115,14 +108,14 @@ export function ScoreRing({
 				<Text
 					style={[
 						styles.score,
-						{ fontSize, color: colors.brand.chrome },
+						{ fontSize, color: colors.text.primary },
 					]}
 				>
 					{displayScore}
 				</Text>
 				{showTier && size !== 'sm' ? (
-					<Text style={[styles.tier, { color: tierColor.bg }]}>
-						{TIER_LABELS[tier]}
+					<Text style={[styles.tier, { color: ringColor }]}>
+						{SCORE_TIER_LABELS[tier]}
 					</Text>
 				) : null}
 				{label ? <Text style={styles.label}>{label}</Text> : null}
@@ -142,16 +135,17 @@ const styles = StyleSheet.create({
 		justifyContent: 'center',
 	},
 	score: {
-		fontWeight: typography.weight.black,
+		...typography.roles.display,
 	},
 	tier: {
-		fontSize: typography.size.xs,
+		...typography.roles.caption,
 		fontWeight: typography.weight.bold,
-		letterSpacing: typography.tracking.widest,
+		letterSpacing: typography.tracking.wider,
+		textTransform: 'uppercase',
 		marginTop: 2,
 	},
 	label: {
-		fontSize: typography.size.xs,
+		...typography.roles.caption,
 		color: colors.text.secondary,
 		marginTop: 2,
 	},

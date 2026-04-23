@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
-import { colors, typography, spacing, radius, shadows } from '../constants/theme'
+import { colors, typography, spacing, radius } from '../constants/theme'
 import { PrimaryButton } from '../components/PrimaryButton'
 import { useAuth } from '../context/AuthContext'
 import { hapticFeedback } from '../utils/hapticFeedback'
@@ -165,12 +165,13 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }
 					<TouchableOpacity
 						onPress={() => { hapticFeedback.light(); setCurrentStep(currentStep - 1) }}
 						style={styles.backBtn}
+						activeOpacity={0.75}
 					>
 						<Ionicons name="chevron-back" size={20} color={colors.text.secondary} />
 						<Text style={styles.backText}>Back</Text>
 					</TouchableOpacity>
 				) : (
-					<TouchableOpacity onPress={onComplete} style={styles.backBtn}>
+					<TouchableOpacity onPress={onComplete} style={styles.backBtn} activeOpacity={0.75}>
 						<Text style={styles.skipText}>Skip</Text>
 					</TouchableOpacity>
 				)}
@@ -216,20 +217,20 @@ const styles = StyleSheet.create({
 		paddingTop: spacing[8],
 	},
 	title: {
-		fontSize: typography.size['2xl'],
-		fontWeight: typography.weight.bold,
+		...typography.roles.headingLg,
 		color: colors.text.primary,
 		textAlign: 'center',
 		marginTop: spacing[5],
 	},
 	subtitle: {
-		fontSize: typography.size.base,
+		...typography.roles.body,
 		color: colors.text.secondary,
 		textAlign: 'center',
 		marginTop: spacing[2],
 		marginBottom: spacing[6],
 	},
 	desc: {
+		...typography.roles.caption,
 		fontSize: typography.size.sm,
 		color: colors.text.tertiary,
 		textAlign: 'center',
@@ -338,10 +339,12 @@ const styles = StyleSheet.create({
 		paddingHorizontal: spacing[3],
 	},
 	backText: {
+		...typography.roles.caption,
 		fontSize: typography.size.sm,
 		color: colors.text.secondary,
 	},
 	skipText: {
+		...typography.roles.caption,
 		fontSize: typography.size.sm,
 		color: colors.text.tertiary,
 	},

@@ -144,13 +144,12 @@ const styles = StyleSheet.create({
 		marginBottom: spacing[6],
 	},
 	title: {
-		fontSize: typography.size['2xl'],
-		fontWeight: typography.weight.bold,
+		...typography.roles.headingLg,
 		color: colors.text.primary,
 		textAlign: 'center',
 	},
 	subtitle: {
-		fontSize: typography.size.base,
+		...typography.roles.body,
 		color: colors.text.secondary,
 		textAlign: 'center',
 		marginTop: spacing[2],
@@ -160,9 +159,10 @@ const styles = StyleSheet.create({
 		marginBottom: spacing[6],
 	},
 	inputLabel: {
-		fontSize: typography.size.sm,
-		fontWeight: typography.weight.semibold,
+		...typography.roles.caption,
 		color: colors.text.secondary,
+		fontWeight: typography.weight.semibold,
+		fontFamily: 'DMSansSemiBold',
 		marginBottom: spacing[1],
 	},
 	input: {
@@ -172,7 +172,7 @@ const styles = StyleSheet.create({
 		borderRadius: radius.md,
 		paddingHorizontal: spacing[4],
 		paddingVertical: spacing[3],
-		fontSize: typography.size.base,
+		...typography.roles.body,
 		color: colors.text.primary,
 		minHeight: 52,
 	},
@@ -186,7 +186,7 @@ const styles = StyleSheet.create({
 		marginTop: spacing[1],
 	},
 	errorText: {
-		fontSize: typography.size.xs,
+		...typography.roles.caption,
 		color: colors.error,
 	},
 })

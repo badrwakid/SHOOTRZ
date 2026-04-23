@@ -8,14 +8,15 @@ import {
 	Alert,
 	KeyboardAvoidingView,
 	Platform,
-	ActivityIndicator,
 	ScrollView,
 	Animated,
 	Modal,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
-import { colors, typography, spacing, radius, glass, shadows, animation } from '../constants/theme'
+import { colors, typography, spacing, radius, glass, animation } from '../constants/theme'
+import { semanticTokens } from '../theme/tokens'
+import { PrimaryButton } from '../components/PrimaryButton'
 import { ShootrzLogo } from '../components/ShootrzLogo'
 import { GoogleLogo } from '../components/GoogleLogo'
 import { AppleLogo } from '../components/AppleLogo'
@@ -55,6 +56,16 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
 	const [resetEmail, setResetEmail] = useState('')
 	const [resetEmailError, setResetEmailError] = useState('')
 	const [resetEmailSent, setResetEmailSent] = useState(false)
+	const [inputFocus, setInputFocus] = useState<string | null>(null)
+
+	const canSubmitSignIn =
+		!!emailOrUsername.trim() && password.length > 0
+	const canSubmitSignUp =
+		!!name.trim() &&
+		!!username.trim() &&
+		!!email.trim() &&
+		password.length > 0
+	const canSubmit = isSignUp ? canSubmitSignUp : canSubmitSignIn
 
 	useEffect(() => {
 		const handleNavigation = () => {
@@ -280,11 +291,16 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
 		onChange: (t: string) => void,
 		error: string,
 		opts: { placeholder: string; secure?: boolean; autoCapitalize?: 'none' | 'words'; keyboardType?: 'email-address' | 'default' },
+		fieldId: string,
 	) => (
 		<View style={styles.inputWrap}>
 			<Text style={styles.inputLabel}>{label}</Text>
 			<TextInput
-				style={[styles.input, error ? styles.inputError : null]}
+				style={[
+					styles.input,
+					error ? styles.inputError : null,
+					!error && inputFocus === fieldId ? styles.inputFocus : null,
+				]}
 				placeholder={opts.placeholder}
 				placeholderTextColor={colors.text.tertiary}
 				value={value}
@@ -293,6 +309,11 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
 				autoCapitalize={opts.autoCapitalize ?? 'none'}
 				autoCorrect={false}
 				keyboardType={opts.keyboardType ?? 'default'}
+				editable={!loading}
+				onFocus={() => setInputFocus(fieldId)}
+				onBlur={() => {
+					setInputFocus(f => (f === fieldId ? null : f))
+				}}
 			/>
 			{error ? (
 				<View style={styles.errorRow}>
@@ -349,15 +370,15 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
 
 						{isSignUp ? (
 							<>
-								{renderInput('Full Name', name, t => { setName(t); setNameError('') }, nameError, { placeholder: 'Your name', autoCapitalize: 'words' })}
-								{renderInput('Username', username, t => { setUsername(t.toLowerCase()); setUsernameError('') }, usernameError, { placeholder: 'Choose a username' })}
-								{renderInput('Email', email, t => { setEmail(t); setEmailError('') }, emailError, { placeholder: 'you@example.com', keyboardType: 'email-address' })}
+								{renderInput('Full Name', name, t => { setName(t); setNameError('') }, nameError, { placeholder: 'Your name', autoCapitalize: 'words' }, 'name')}
+								{renderInput('Username', username, t => { setUsername(t.toLowerCase()); setUsernameError('') }, usernameError, { placeholder: 'Choose a username' }, 'username')}
+								{renderInput('Email', email, t => { setEmail(t); setEmailError('') }, emailError, { placeholder: 'you@example.com', keyboardType: 'email-address' }, 'signupEmail')}
 							</>
 						) : (
-							renderInput('Email', emailOrUsername, t => { setEmailOrUsername(t); setEmailOrUsernameError('') }, emailOrUsernameError, { placeholder: 'you@example.com', keyboardType: 'email-address' })
+							renderInput('Email', emailOrUsername, t => { setEmailOrUsername(t); setEmailOrUsernameError('') }, emailOrUsernameError, { placeholder: 'you@example.com', keyboardType: 'email-address' }, 'emailOrUsername')
 						)}
 
-						{renderInput('Password', password, t => { setPassword(t); setPasswordError('') }, passwordError, { placeholder: 'Min 6 characters', secure: true })}
+						{renderInput('Password', password, t => { setPassword(t); setPasswordError('') }, passwordError, { placeholder: 'Min 6 characters', secure: true }, 'password')}
 
 						{!isSignUp ? (
 							<TouchableOpacity onPress={handleForgotPassword} style={styles.forgotBtn}>
@@ -365,20 +386,16 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
 							</TouchableOpacity>
 						) : null}
 
-						<TouchableOpacity
-							style={[styles.submitBtn, loading && styles.submitDisabled]}
+						<PrimaryButton
+							label={isSignUp ? 'Create Account' : 'Sign In'}
 							onPress={isSignUp ? handleSignUp : handleLogin}
-							disabled={loading}
-							activeOpacity={0.85}
-						>
-							{loading ? (
-								<ActivityIndicator color={colors.text.primary} />
-							) : (
-								<Text style={styles.submitText}>
-									{isSignUp ? 'CREATE ACCOUNT' : 'SIGN IN'}
-								</Text>
-							)}
-						</TouchableOpacity>
+							loading={loading}
+							disabled={!canSubmit}
+							fullWidth
+							size="lg"
+							variant="orange"
+							style={{ marginBottom: spacing[3] }}
+						/>
 
 						<TouchableOpacity onPress={toggleMode} style={styles.switchBtn}>
 							<Text style={styles.switchText}>
@@ -412,7 +429,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
 								disabled={loading}
 								activeOpacity={0.85}
 							>
-								<AppleLogo size={20} color="#FFFFFF" />
+								<AppleLogo size={20} />
 								<Text style={styles.appleText}>Sign in with Apple</Text>
 							</TouchableOpacity>
 						</Animated.View>
@@ -432,12 +449,16 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
 							<>
 								<Text style={styles.modalTitle}>Reset Password</Text>
 								<Text style={styles.modalDesc}>
-									Enter your email and we'll send reset instructions.
+									{"Enter your email and we'll send reset instructions."}
 								</Text>
 								<View style={styles.inputWrap}>
 									<Text style={styles.inputLabel}>Email Address</Text>
 									<TextInput
-										style={[styles.input, resetEmailError && styles.inputError]}
+										style={[
+											styles.input,
+											resetEmailError && styles.inputError,
+											!resetEmailError && inputFocus === 'resetEmail' && styles.inputFocus,
+										]}
 										placeholder="you@example.com"
 										placeholderTextColor={colors.text.tertiary}
 										value={resetEmail}
@@ -445,6 +466,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
 										keyboardType="email-address"
 										autoCapitalize="none"
 										autoFocus
+										editable={!loading}
+										onFocus={() => setInputFocus('resetEmail')}
+										onBlur={() => setInputFocus(f => (f === 'resetEmail' ? null : f))}
 									/>
 									{resetEmailError ? (
 										<View style={styles.errorRow}>
@@ -453,17 +477,16 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
 										</View>
 									) : null}
 								</View>
-								<TouchableOpacity
-									style={[styles.submitBtn, loading && styles.submitDisabled]}
+								<PrimaryButton
+									label="Send Reset Link"
 									onPress={handleSendResetEmail}
-									disabled={loading}
-								>
-									{loading ? (
-										<ActivityIndicator color={colors.text.primary} />
-									) : (
-										<Text style={styles.submitText}>SEND RESET LINK</Text>
-									)}
-								</TouchableOpacity>
+									loading={loading}
+									disabled={!resetEmail.trim()}
+									fullWidth
+									size="lg"
+									variant="orange"
+									style={{ marginBottom: spacing[3] }}
+								/>
 								<TouchableOpacity onPress={closeForgotPasswordModal} style={styles.switchBtn}>
 									<Text style={styles.forgotText}>Cancel</Text>
 								</TouchableOpacity>
@@ -479,11 +502,18 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
 								</Text>
 								<Text style={styles.resetEmailHighlight}>{resetEmail}</Text>
 								<Text style={styles.modalDescDim}>
-									The link expires in 1 hour. Check your spam folder if you don't see it.
+									{
+										"The link expires in 1 hour. Check your spam folder if you don't see it."
+									}
 								</Text>
-								<TouchableOpacity style={styles.submitBtn} onPress={closeForgotPasswordModal}>
-									<Text style={styles.submitText}>DONE</Text>
-								</TouchableOpacity>
+								<PrimaryButton
+									label="Done"
+									onPress={closeForgotPasswordModal}
+									fullWidth
+									size="lg"
+									variant="cyan"
+									style={{ marginBottom: spacing[3] }}
+								/>
 								<TouchableOpacity
 									onPress={() => { setResetEmailSent(false); setResetEmailError('') }}
 									style={styles.switchBtn}
@@ -567,6 +597,10 @@ const styles = StyleSheet.create({
 	inputError: {
 		borderColor: colors.error,
 	},
+	inputFocus: {
+		borderColor: semanticTokens.focus.ring,
+		borderWidth: 1,
+	},
 	errorRow: {
 		flexDirection: 'row',
 		alignItems: 'center',
@@ -584,24 +618,6 @@ const styles = StyleSheet.create({
 	forgotText: {
 		fontSize: typography.size.sm,
 		color: colors.brand.cyan,
-	},
-	submitBtn: {
-		backgroundColor: colors.brand.orange,
-		borderRadius: radius.button,
-		height: 52,
-		alignItems: 'center',
-		justifyContent: 'center',
-		marginBottom: spacing[3],
-		...shadows.orange,
-	},
-	submitDisabled: {
-		opacity: 0.5,
-	},
-	submitText: {
-		fontSize: typography.size.sm,
-		fontWeight: typography.weight.bold,
-		color: colors.text.primary,
-		letterSpacing: typography.tracking.widest,
 	},
 	switchBtn: {
 		alignItems: 'center',
@@ -640,13 +656,13 @@ const styles = StyleSheet.create({
 		gap: spacing[2],
 		height: 52,
 		borderRadius: radius.button,
-		backgroundColor: '#FFFFFF',
+		backgroundColor: semanticTokens.oauth.google.surface,
 		marginBottom: spacing[3],
 	},
 	googleText: {
 		fontSize: typography.size.base,
 		fontWeight: typography.weight.semibold,
-		color: '#1F1F1F',
+		color: semanticTokens.oauth.google.label,
 	},
 	appleBtn: {
 		flexDirection: 'row',
@@ -655,14 +671,14 @@ const styles = StyleSheet.create({
 		gap: spacing[2],
 		height: 52,
 		borderRadius: radius.button,
-		backgroundColor: '#000000',
+		backgroundColor: semanticTokens.oauth.apple.surface,
 		borderWidth: 1,
 		borderColor: colors.border.default,
 	},
 	appleText: {
 		fontSize: typography.size.base,
 		fontWeight: typography.weight.semibold,
-		color: '#FFFFFF',
+		color: semanticTokens.oauth.apple.label,
 	},
 	modalOverlay: {
 		flex: 1,

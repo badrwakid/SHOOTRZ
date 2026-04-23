@@ -9,6 +9,9 @@ interface IconButtonProps {
 	onPress: () => void
 	size?: number
 	color?: string
+	/** Shown to assistive technologies when the icon is not self-explanatory. */
+	accessibilityLabel?: string
+	accessibilityHint?: string
 	badge?: number
 	style?: any
 }
@@ -18,6 +21,8 @@ export function IconButton({
 	onPress,
 	size = 40,
 	color = colors.text.primary,
+	accessibilityLabel,
+	accessibilityHint,
 	badge,
 	style,
 }: IconButtonProps) {
@@ -31,6 +36,8 @@ export function IconButton({
 			onPress={handlePress}
 			activeOpacity={0.85}
 			accessibilityRole="button"
+			accessibilityLabel={accessibilityLabel}
+			accessibilityHint={accessibilityHint}
 			style={[
 				styles.base,
 				{ width: size, height: size, borderRadius: size / 2 },

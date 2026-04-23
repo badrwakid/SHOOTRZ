@@ -1,6 +1,8 @@
-import React from 'react'
-import { View, Text, StyleSheet } from 'react-native'
+import React, { useEffect, useRef } from 'react'
+import { View, Text, StyleSheet, Animated } from 'react-native'
 import { colors, typography, spacing, radius, glass } from '../constants/theme'
+import { useReduceMotion } from '../hooks/useReduceMotion'
+import { motion } from '../theme/motion'
 
 interface ChatBubbleProps {
 	message: string
@@ -11,6 +13,38 @@ interface ChatBubbleProps {
 
 export function ChatBubble({ message, role, timestamp, streaming }: ChatBubbleProps) {
 	const isUser = role === 'user'
+	const reduceMotion = useReduceMotion()
+	const cursorOpacity = useRef(new Animated.Value(1)).current
+
+	useEffect(() => {
+		if (!streaming) {
+			cursorOpacity.setValue(1)
+			return
+		}
+		if (reduceMotion) {
+			cursorOpacity.setValue(1)
+			return
+		}
+		const loop = Animated.loop(
+			Animated.sequence([
+				Animated.timing(cursorOpacity, {
+					toValue: 0.15,
+					duration: motion.timing.fast,
+					useNativeDriver: true,
+				}),
+				Animated.timing(cursorOpacity, {
+					toValue: 1,
+					duration: motion.timing.fast,
+					useNativeDriver: true,
+				}),
+			]),
+		)
+		loop.start()
+		return () => {
+			loop.stop()
+			cursorOpacity.setValue(1)
+		}
+	}, [streaming, reduceMotion, cursorOpacity])
 
 	return (
 		<View style={[styles.row, isUser ? styles.rowUser : styles.rowCoach]}>
@@ -22,7 +56,16 @@ export function ChatBubble({ message, role, timestamp, streaming }: ChatBubblePr
 			<View style={isUser ? styles.bubbleUser : styles.bubbleCoach}>
 				<Text style={styles.text}>
 					{message}
-					{streaming ? <Text style={styles.cursor}>|</Text> : null}
+					{streaming ? (
+						<Animated.Text
+							style={[styles.cursor, { opacity: cursorOpacity }]}
+							accessible={false}
+							importantForAccessibility="no"
+							accessibilityElementsHidden
+						>
+							|
+						</Animated.Text>
+					) : null}
 				</Text>
 				{timestamp ? <Text style={styles.time}>{timestamp}</Text> : null}
 			</View>
@@ -58,9 +101,9 @@ const styles = StyleSheet.create({
 	},
 	bubbleUser: {
 		maxWidth: '80%',
-		backgroundColor: 'rgba(232, 82, 26, 0.15)',
+		backgroundColor: colors.chat.userBubble,
 		borderWidth: 1,
-		borderColor: 'rgba(232, 82, 26, 0.30)',
+		borderColor: colors.chat.userBorder,
 		borderTopLeftRadius: radius.xl,
 		borderTopRightRadius: radius.xl,
 		borderBottomLeftRadius: radius.xl,

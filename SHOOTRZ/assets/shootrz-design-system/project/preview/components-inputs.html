@@ -1,0 +1,315 @@
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<title>Inputs · SHOOTRZ</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Barlow+Condensed:wght@700;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0A0E14;font-family:'DM Sans',sans-serif;padding:24px;color:#F1F5F9;max-width:980px;margin:0 auto}
+
+/* Header */
+.kicker{font-size:10px;font-weight:700;color:#94A3B8;letter-spacing:2px;margin-bottom:4px}
+.title{font-family:'Barlow Condensed',sans-serif;font-size:28px;font-weight:900;color:#F1F5F9;letter-spacing:-.5px;line-height:1}
+.sub{font-size:12px;color:#94A3B8;margin:6px 0 22px;max-width:680px;line-height:1.55}
+
+/* Sections */
+.section{margin-bottom:26px}
+.h{font-size:11px;font-weight:700;color:#64748B;letter-spacing:2px;text-transform:uppercase;margin-bottom:12px}
+.card{background:#151C26;border:1px solid rgba(148,163,184,.14);border-radius:14px;padding:18px}
+
+/* State grid */
+.state-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.state{background:#0F141B;border:1px solid rgba(148,163,184,.1);border-radius:12px;padding:14px}
+.state-tag{display:inline-block;font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;letter-spacing:1.5px;padding:3px 8px;border-radius:4px;margin-bottom:10px;text-transform:uppercase}
+.tag-default{background:rgba(148,163,184,.14);color:#CBD5E1}
+.tag-focus{background:rgba(20,199,224,.14);color:#14C7E0}
+.tag-error{background:rgba(239,68,68,.14);color:#EF4444}
+.tag-success{background:rgba(34,197,94,.14);color:#22C55E}
+.tag-disabled{background:rgba(71,85,105,.22);color:#64748B}
+.tag-readonly{background:rgba(139,92,246,.14);color:#A78BFA}
+.tag-loading{background:rgba(245,158,11,.14);color:#F59E0B}
+
+.field-label{font-size:13px;font-weight:600;color:#CBD5E1;margin-bottom:6px;display:flex;align-items:center;gap:6px}
+
+/* Base input (RN-equivalent heights/paddings) */
+.input{background:#1C2432;border:1.5px solid rgba(148,163,184,.14);border-radius:10px;padding:0 14px;height:48px;font-size:15px;color:#F1F5F9;font-family:'DM Sans',sans-serif;width:100%;outline:none;transition:border-color .15s,box-shadow .15s}
+.input::placeholder{color:#64748B}
+
+/* State variants */
+.input--focus{border-color:#14C7E0;box-shadow:0 0 0 2px rgba(20,199,224,.40)}
+.input--error{border-color:#EF4444;box-shadow:0 0 0 2px rgba(239,68,68,.18)}
+.input--success{border-color:#22C55E}
+.input--disabled{background:#141923;border-color:rgba(148,163,184,.08);color:#475569;cursor:not-allowed;opacity:.9}
+.input--readonly{background:#141923;border-color:rgba(139,92,246,.22);color:#CBD5E1;cursor:default}
+.input--loading{border-color:rgba(245,158,11,.45)}
+
+/* Helper / message rows */
+.helper{display:flex;align-items:center;gap:6px;margin-top:6px;font-size:12px;line-height:1.4}
+.helper svg{flex-shrink:0}
+.helper-default{color:#94A3B8}         /* 4.8:1 on #0F141B — AA */
+.helper-error{color:#F87171}           /* 5.3:1 — AA large + AA normal */
+.helper-success{color:#4ADE80}
+.helper-loading{color:#FBBF24}
+
+/* Loading spinner */
+.spin{width:14px;height:14px;border:2px solid rgba(245,158,11,.25);border-top-color:#F59E0B;border-radius:50%;animation:rot .8s linear infinite}
+@keyframes rot{to{transform:rotate(360deg)}}
+
+/* Read-only lock */
+.ro-badge{font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;letter-spacing:1px;color:#A78BFA;background:rgba(139,92,246,.12);padding:2px 6px;border-radius:3px;margin-left:auto}
+
+/* Chat composer */
+.chat-wrap{background:#0F141B;border-radius:16px;padding:14px}
+.chat-row{display:flex;gap:10px;align-items:flex-end}
+.chat-input{flex:1;background:#1C2432;border:1.5px solid rgba(148,163,184,.14);border-radius:22px;padding:0 18px;height:44px;font-size:15px;color:#F1F5F9;font-family:'DM Sans',sans-serif;outline:none}
+.chat-input::placeholder{color:#64748B}
+.chat-input:focus{border-color:#14C7E0;box-shadow:0 0 0 2px rgba(20,199,224,.40)}
+.send{width:44px;height:44px;border-radius:22px;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:transform .12s,box-shadow .15s,background .15s}
+.send--idle{background:#EC5A28;box-shadow:0 6px 18px rgba(236,90,40,.35)}
+.send--pressed{background:#BB3F15;transform:scale(.94);box-shadow:0 2px 8px rgba(236,90,40,.22)}
+.send--disabled{background:#334155;box-shadow:0 2px 6px rgba(0,0,0,.3);cursor:not-allowed;opacity:.75}
+.send--loading{background:#EC5A28;box-shadow:0 4px 12px rgba(236,90,40,.22);cursor:progress}
+.send--loading .chat-spin{width:16px;height:16px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:rot .8s linear infinite}
+.chat-meta{display:flex;justify-content:space-between;align-items:center;margin-top:10px;font-size:11px;color:#64748B}
+.chat-meta .tag{font-family:'JetBrains Mono',monospace;font-weight:600;letter-spacing:1px}
+
+/* Spec list */
+.spec-list{display:flex;flex-direction:column;gap:0;background:#0F141B;border-radius:10px;overflow:hidden}
+.spec-row{display:grid;grid-template-columns:140px 1fr;gap:14px;padding:10px 14px;border-bottom:1px solid rgba(148,163,184,.08);font-size:12px}
+.spec-row:last-child{border-bottom:none}
+.spec-row .k{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;color:#14C7E0;letter-spacing:.5px}
+.spec-row .v{color:#CBD5E1;line-height:1.5}
+.spec-row code{font-family:'JetBrains Mono',monospace;font-size:11px;color:#FF7B3D;background:rgba(236,90,40,.08);padding:1px 5px;border-radius:3px}
+
+/* A11y grid */
+.a11y-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.a11y{background:#0F141B;border:1px solid rgba(20,199,224,.18);border-radius:10px;padding:12px 14px}
+.a11y-t{font-size:10px;font-weight:700;color:#14C7E0;letter-spacing:1.5px;margin-bottom:6px}
+.a11y-b{font-size:12px;color:#CBD5E1;line-height:1.55}
+.a11y-b b{color:#F1F5F9}
+.a11y-b code{font-family:'JetBrains Mono',monospace;font-size:10px;color:#FF7B3D;background:rgba(236,90,40,.08);padding:1px 5px;border-radius:3px}
+
+/* JSON */
+.json{background:#0A0E14;border:1px solid rgba(148,163,184,.14);border-radius:12px;padding:14px 16px;font-family:'JetBrains Mono',monospace;font-size:11px;line-height:1.65;color:#E2E8F0;overflow-x:auto;white-space:pre}
+.json .k{color:#14C7E0}.json .s{color:#EC5A28}.json .n{color:#F59E0B}.json .c{color:#64748B;font-style:italic}
+</style></head><body>
+
+<div class="kicker">COMPONENTS · INPUTS v3</div>
+<div class="title">Text Fields &amp; Chat Composer</div>
+<div class="sub">Full interaction state coverage for mobile-first RN forms. Standardized cyan focus ring (<code style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#14C7E0">interaction.focus</code>), explicit error/success/read-only/loading branches, and the Coach J chat composer with idle / pressed / disabled / loading send.</div>
+
+<!-- ─── 1. TEXT INPUT STATES ─── -->
+<div class="section">
+  <div class="h">1 · Text Input · All States</div>
+  <div class="card">
+    <div class="state-grid">
+
+      <div class="state">
+        <span class="state-tag tag-default">default</span>
+        <div class="field-label">Email</div>
+        <input class="input" placeholder="you@shootrz.app" type="email">
+        <div class="helper helper-default">We'll send a verification link.</div>
+      </div>
+
+      <div class="state">
+        <span class="state-tag tag-focus">focused</span>
+        <div class="field-label">Email</div>
+        <input class="input input--focus" value="m.jordan@shootrz.app" type="email">
+        <div class="helper helper-default">Ring = <code style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#14C7E0">focus.ringWidth 2 · focus.ringColor cyan-40%</code></div>
+      </div>
+
+      <div class="state">
+        <span class="state-tag tag-error">error</span>
+        <div class="field-label">Password</div>
+        <input class="input input--error" value="abc" type="password" aria-invalid="true" aria-describedby="pw-err">
+        <div class="helper helper-error" id="pw-err">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 22C6.48 22 2 17.52 2 12S6.48 2 12 2s10 4.48 10 10-4.48 10-10 10zm-1-7v2h2v-2h-2zm0-8v6h2V7h-2z"/></svg>
+          Password must be at least 6 characters.
+        </div>
+      </div>
+
+      <div class="state">
+        <span class="state-tag tag-success">success</span>
+        <div class="field-label">Username</div>
+        <input class="input input--success" value="coachj_23" type="text">
+        <div class="helper helper-success">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg>
+          Username available.
+        </div>
+      </div>
+
+      <div class="state">
+        <span class="state-tag tag-disabled">disabled</span>
+        <div class="field-label" style="color:#64748B">Team code <span style="font-weight:400;color:#475569">(locked)</span></div>
+        <input class="input input--disabled" value="SH-2026-CHI" disabled aria-disabled="true">
+        <div class="helper helper-default" style="color:#64748B">Contact your coach to change this.</div>
+      </div>
+
+      <div class="state">
+        <span class="state-tag tag-readonly">read-only</span>
+        <div class="field-label">Season ID <span class="ro-badge">READ ONLY</span></div>
+        <input class="input input--readonly" value="2026-W12-REG" readonly aria-readonly="true">
+        <div class="helper helper-default">System-assigned · tap to copy.</div>
+      </div>
+
+      <div class="state" style="grid-column:1/-1">
+        <span class="state-tag tag-loading">loading · async validation</span>
+        <div class="field-label">Jersey number</div>
+        <div style="position:relative">
+          <input class="input input--loading" value="23" type="number" style="padding-right:44px">
+          <div class="spin" style="position:absolute;right:14px;top:50%;transform:translateY(-50%)"></div>
+        </div>
+        <div class="helper helper-loading">Checking availability on your team…</div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ─── 2. CHAT COMPOSER STATES ─── -->
+<div class="section">
+  <div class="h">2 · Coach J Chat Composer · Send Button States</div>
+  <div class="card">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+
+      <div>
+        <span class="state-tag tag-disabled">empty · send disabled</span>
+        <div class="chat-wrap">
+          <div class="chat-row">
+            <input class="chat-input" placeholder="Ask Coach J…">
+            <button class="send send--disabled" disabled aria-label="Send message" aria-disabled="true">
+              <svg width="16" height="16" fill="none" stroke="#94A3B8" stroke-width="2.5" viewBox="0 0 24 24"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+            </button>
+          </div>
+          <div class="chat-meta"><span>Empty message — cannot send</span><span class="tag">send.disabled</span></div>
+        </div>
+      </div>
+
+      <div>
+        <span class="state-tag tag-default">typed · idle</span>
+        <div class="chat-wrap">
+          <div class="chat-row">
+            <input class="chat-input" value="What drill fixes my follow-through?">
+            <button class="send send--idle" aria-label="Send message">
+              <svg width="16" height="16" fill="none" stroke="white" stroke-width="2.5" viewBox="0 0 24 24"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+            </button>
+          </div>
+          <div class="chat-meta"><span>Ready to send</span><span class="tag">send.idle</span></div>
+        </div>
+      </div>
+
+      <div>
+        <span class="state-tag tag-focus">focused input · pressed send</span>
+        <div class="chat-wrap">
+          <div class="chat-row">
+            <input class="chat-input" value="What drill fixes my follow-through?" style="border-color:#14C7E0;box-shadow:0 0 0 2px rgba(20,199,224,.40)">
+            <button class="send send--pressed" aria-label="Send message">
+              <svg width="16" height="16" fill="none" stroke="white" stroke-width="2.5" viewBox="0 0 24 24"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+            </button>
+          </div>
+          <div class="chat-meta"><span>Scale 0.94 · haptic selection</span><span class="tag">send.pressed</span></div>
+        </div>
+      </div>
+
+      <div>
+        <span class="state-tag tag-loading">awaiting response</span>
+        <div class="chat-wrap">
+          <div class="chat-row">
+            <input class="chat-input" value="What drill fixes my follow-through?" disabled style="opacity:.7">
+            <button class="send send--loading" disabled aria-label="Sending" aria-busy="true">
+              <span class="chat-spin"></span>
+            </button>
+          </div>
+          <div class="chat-meta"><span>Coach J is thinking…</span><span class="tag">send.loading</span></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ─── 3. SPECS ─── -->
+<div class="section">
+  <div class="h">3 · Implementation Specs</div>
+  <div class="card">
+    <div class="spec-list">
+      <div class="spec-row"><span class="k">height</span><span class="v"><code>48pt</code> standard · <code>44pt</code> chat composer · both ≥ 44pt touch target minimum</span></div>
+      <div class="spec-row"><span class="k">radius</span><span class="v">Standard <code>10</code> · chat pill <code>22</code> · send button <code>22</code></span></div>
+      <div class="spec-row"><span class="k">typography</span><span class="v">Input <code>15px/DM Sans 500</code> · label <code>13px/600</code> · helper <code>12px/400</code> (≥ 12px AA floor)</span></div>
+      <div class="spec-row"><span class="k">border.default</span><span class="v"><code>1.5px rgba(148,163,184,0.14)</code> on <code>bg.input #1C2432</code></span></div>
+      <div class="spec-row"><span class="k">focused</span><span class="v">border → <code>brand.cyan.base</code> · ring = <code>interaction.focus</code> {ringColor, ringWidth:2, ringOffset:0} · RN: wrapper View with <code>borderWidth/borderColor</code></span></div>
+      <div class="spec-row"><span class="k">error</span><span class="v">border → <code>state.error</code> · ring alpha <code>.18</code> · <code>aria-invalid=true</code> + <code>aria-describedby</code> → helper id</span></div>
+      <div class="spec-row"><span class="k">success</span><span class="v">border → <code>state.success</code> · no ring (reserved for focus) · inline check icon in helper</span></div>
+      <div class="spec-row"><span class="k">disabled</span><span class="v">opacity <code>0.9</code> · text <code>#475569</code> · bg <code>#141923</code> · <code>editable=false</code> + <code>aria-disabled</code></span></div>
+      <div class="spec-row"><span class="k">read-only</span><span class="v">violet accent border · <code>editable=false</code> + <code>aria-readonly=true</code> · cursor default · long-press → copy</span></div>
+      <div class="spec-row"><span class="k">loading</span><span class="v">amber border tint · right-aligned 14px spinner · input stays editable unless validation blocks submit · <code>aria-busy=true</code></span></div>
+      <div class="spec-row"><span class="k">send.disabled</span><span class="v">bg <code>chrome.slate #334155</code> · icon <code>#94A3B8</code> · shadow reduced to <code>0 2px 6px rgba(0,0,0,.3)</code> (no orange glow)</span></div>
+      <div class="spec-row"><span class="k">send.pressed</span><span class="v">bg <code>orange.pressed #BB3F15</code> · <code>scale 0.94</code> · 120ms · <code>Haptics.selection()</code></span></div>
+      <div class="spec-row"><span class="k">send.loading</span><span class="v">keep orange · shadow softened · 16px white spinner · <code>aria-busy=true</code> · input disabled until response</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ─── 4. A11Y ─── -->
+<div class="section">
+  <div class="h">4 · Accessibility</div>
+  <div class="a11y-grid">
+    <div class="a11y">
+      <div class="a11y-t">Touch targets</div>
+      <div class="a11y-b">All inputs ≥ <b>44pt height</b> (standard 48pt, chat 44pt). Send button <b>44×44pt</b> — iOS HIG + Android Material floor. Tap area extends full input width.</div>
+    </div>
+    <div class="a11y">
+      <div class="a11y-t">Text contrast (AA)</div>
+      <div class="a11y-b"><b>Input text</b> <code>#F1F5F9</code> on <code>#1C2432</code> = <b>14.8:1</b> AAA. <b>Helper default</b> <code>#94A3B8</code> = <b>4.8:1</b> AA. <b>Helper error</b> <code>#F87171</code> = <b>5.3:1</b> AA (brightened from base <code>#EF4444</code> for small-text legibility). <b>Placeholder</b> <code>#64748B</code> = 3.1:1 — non-load-bearing, value always editable.</div>
+    </div>
+    <div class="a11y">
+      <div class="a11y-t">Focus distinctness</div>
+      <div class="a11y-b">Focus = <b>cyan border + 2px cyan ring</b>. Success = <b>green border, no ring</b>. Default = neutral slate border, no ring. Three visibly distinct treatments — color + ring presence together, never color alone.</div>
+    </div>
+    <div class="a11y">
+      <div class="a11y-t">Non-color signaling</div>
+      <div class="a11y-b">Error ALWAYS paired with <b>alert icon</b> (◉) + helper text. Success ALWAYS paired with <b>check icon</b>. Loading ALWAYS paired with <b>spinner</b> + status copy. Read-only ALWAYS paired with <b>READ ONLY</b> badge in label.</div>
+    </div>
+    <div class="a11y">
+      <div class="a11y-t">Screen reader contract</div>
+      <div class="a11y-b"><code>accessibilityLabel</code> = field label. <code>accessibilityState={{ disabled, busy }}</code>. Error helpers linked via <code>aria-describedby</code> / RN <code>accessibilityDescribedBy</code>. Send button labelled "Send message" / "Sending" per state.</div>
+    </div>
+    <div class="a11y">
+      <div class="a11y-t">Reduced motion</div>
+      <div class="a11y-b">Press-scale on send <b>skipped</b> when <code>isReduceMotionEnabled</code>. Loading spinners kept (continuous rotation is informational, not decorative). Focus ring is non-animated.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ─── 5. TOKENS ─── -->
+<div class="section">
+  <div class="h">5 · Tokens (RN-safe)</div>
+  <div class="json">{
+  <span class="k">"input"</span>: {
+    <span class="k">"height"</span>:        <span class="n">48</span>,
+    <span class="k">"heightCompact"</span>: <span class="n">44</span>,
+    <span class="k">"radius"</span>:        <span class="n">10</span>,
+    <span class="k">"bg"</span>:            <span class="s">"#1C2432"</span>,
+    <span class="k">"bgMuted"</span>:       <span class="s">"#141923"</span>,
+    <span class="k">"border"</span>:        { <span class="k">"default"</span>:<span class="s">"rgba(148,163,184,0.14)"</span>, <span class="k">"error"</span>:<span class="s">"#EF4444"</span>, <span class="k">"success"</span>:<span class="s">"#22C55E"</span>, <span class="k">"readOnly"</span>:<span class="s">"rgba(139,92,246,0.22)"</span>, <span class="k">"loading"</span>:<span class="s">"rgba(245,158,11,0.45)"</span> },
+    <span class="k">"text"</span>:          { <span class="k">"value"</span>:<span class="s">"#F1F5F9"</span>, <span class="k">"placeholder"</span>:<span class="s">"#64748B"</span>, <span class="k">"disabled"</span>:<span class="s">"#475569"</span> },
+    <span class="k">"helper"</span>:        { <span class="k">"default"</span>:<span class="s">"#94A3B8"</span>, <span class="k">"error"</span>:<span class="s">"#F87171"</span>, <span class="k">"success"</span>:<span class="s">"#4ADE80"</span>, <span class="k">"loading"</span>:<span class="s">"#FBBF24"</span> }
+  },
+  <span class="k">"focus"</span>: {                                 <span class="c">// shared with brand v3</span>
+    <span class="k">"ringColor"</span>:  <span class="s">"rgba(20,199,224,0.40)"</span>,
+    <span class="k">"ringWidth"</span>:  <span class="n">2</span>,
+    <span class="k">"ringOffset"</span>: <span class="n">0</span>
+  },
+  <span class="k">"send"</span>: {
+    <span class="k">"size"</span>: <span class="n">44</span>,
+    <span class="k">"idle"</span>:     { <span class="k">"bg"</span>:<span class="s">"#EC5A28"</span>, <span class="k">"icon"</span>:<span class="s">"#FFFFFF"</span>, <span class="k">"shadow"</span>:{ <span class="k">"ios"</span>:{<span class="k">"shadowColor"</span>:<span class="s">"#EC5A28"</span>,<span class="k">"shadowOpacity"</span>:<span class="n">0.35</span>,<span class="k">"shadowRadius"</span>:<span class="n">9</span>,<span class="k">"shadowOffset"</span>:{<span class="k">"width"</span>:<span class="n">0</span>,<span class="k">"height"</span>:<span class="n">6</span>}}, <span class="k">"android"</span>:{<span class="k">"elevation"</span>:<span class="n">6</span>} } },
+    <span class="k">"pressed"</span>:  { <span class="k">"bg"</span>:<span class="s">"#BB3F15"</span>, <span class="k">"scale"</span>:<span class="n">0.94</span>, <span class="k">"duration"</span>:<span class="n">120</span> },
+    <span class="k">"disabled"</span>: { <span class="k">"bg"</span>:<span class="s">"#334155"</span>, <span class="k">"icon"</span>:<span class="s">"#94A3B8"</span>, <span class="k">"shadow"</span>:{ <span class="k">"ios"</span>:{<span class="k">"shadowColor"</span>:<span class="s">"#000"</span>,<span class="k">"shadowOpacity"</span>:<span class="n">0.30</span>,<span class="k">"shadowRadius"</span>:<span class="n">3</span>,<span class="k">"shadowOffset"</span>:{<span class="k">"width"</span>:<span class="n">0</span>,<span class="k">"height"</span>:<span class="n">2</span>}}, <span class="k">"android"</span>:{<span class="k">"elevation"</span>:<span class="n">2</span>} } },
+    <span class="k">"loading"</span>:  { <span class="k">"bg"</span>:<span class="s">"#EC5A28"</span>, <span class="k">"spinnerColor"</span>:<span class="s">"#FFFFFF"</span> }
+  }
+}</div>
+</div>
+
+<div style="font-size:11px;color:#64748B;text-align:center;padding:6px 0 4px">
+  All seven states shipped · cyan focus ring standardized · chat send has idle/pressed/disabled/loading · AA contrast verified.
+</div>
+
+</body></html>

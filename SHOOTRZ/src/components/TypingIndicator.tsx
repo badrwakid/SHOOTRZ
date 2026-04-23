@@ -1,27 +1,35 @@
 import React, { useEffect, useRef } from 'react'
-import { View, StyleSheet, Animated } from 'react-native'
-import { colors, spacing, radius, glass } from '../constants/theme'
+import { View, Text, StyleSheet, Animated } from 'react-native'
+import { colors, spacing, radius, glass, typography } from '../constants/theme'
+import { useReduceMotion } from '../hooks/useReduceMotion'
+import { motion } from '../theme/motion'
 
 export function TypingIndicator() {
+	const reduceMotion = useReduceMotion()
 	const dots = useRef([
 		new Animated.Value(0.3),
 		new Animated.Value(0.3),
 		new Animated.Value(0.3),
 	]).current
+	const { stagger, typingPulse } = motion.timing
 
 	useEffect(() => {
+		if (reduceMotion) {
+			dots.forEach(d => d.setValue(1))
+			return
+		}
 		const anims = dots.map((dot, i) =>
 			Animated.loop(
 				Animated.sequence([
-					Animated.delay(i * 150),
+					Animated.delay(i * stagger),
 					Animated.timing(dot, {
 						toValue: 1,
-						duration: 350,
+						duration: typingPulse,
 						useNativeDriver: true,
 					}),
 					Animated.timing(dot, {
 						toValue: 0.3,
-						duration: 350,
+						duration: typingPulse,
 						useNativeDriver: true,
 					}),
 				]),
@@ -29,12 +37,18 @@ export function TypingIndicator() {
 		)
 		anims.forEach(a => a.start())
 		return () => anims.forEach(a => a.stop())
-	}, [dots])
+	}, [dots, reduceMotion, stagger, typingPulse])
 
 	return (
-		<View style={styles.row}>
+		<View
+			style={styles.row}
+			accessible
+			accessibilityRole="text"
+			accessibilityLabel="Coach is typing"
+			accessibilityState={{ busy: true }}
+		>
 			<View style={styles.avatar}>
-				<Animated.Text style={styles.avatarText}>J</Animated.Text>
+				<Text style={styles.avatarText}>J</Text>
 			</View>
 			<View style={styles.bubble}>
 				{dots.map((opacity, i) => (
@@ -61,8 +75,8 @@ const styles = StyleSheet.create({
 		marginRight: spacing[2],
 	},
 	avatarText: {
-		fontSize: 13,
-		fontWeight: '700',
+		fontSize: typography.size.sm,
+		fontWeight: typography.weight.bold,
 		color: colors.bg.primary,
 	},
 	bubble: {

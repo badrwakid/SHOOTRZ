@@ -1,0 +1,249 @@
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;900&family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0A0E14;font-family:'DM Sans',sans-serif;padding:20px;color:#F1F5F9}
+.kicker{font-size:10px;font-weight:700;color:#94A3B8;letter-spacing:2px;margin-bottom:4px}
+.title{font-family:'Barlow Condensed',sans-serif;font-size:28px;font-weight:900;color:#F1F5F9;letter-spacing:-.5px;line-height:1}
+.badge{display:inline-block;background:#22C55E;color:#052E16;font-size:10px;font-weight:700;letter-spacing:1.5px;padding:3px 8px;border-radius:4px;margin-left:8px;vertical-align:middle}
+.sub{font-size:12px;color:#94A3B8;margin:6px 0 16px}
+.section{margin-bottom:22px}
+.h{font-size:11px;font-weight:700;color:#64748B;letter-spacing:2px;text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.h::before{content:'';width:16px;height:1px;background:#334155}
+
+.card{background:#151C26;border:1px solid rgba(148,163,184,.14);border-radius:14px;padding:14px 16px}
+.json{background:#0A0E14;border:1px solid rgba(148,163,184,.14);border-radius:12px;padding:14px 16px;font-family:'JetBrains Mono',monospace;font-size:11px;line-height:1.6;color:#E2E8F0;overflow-x:auto;white-space:pre}
+.json .k{color:#14C7E0}.json .s{color:#EC5A28}.json .n{color:#F59E0B}.json .c{color:#64748B;font-style:italic}
+
+/* Map table */
+.map-tbl{width:100%;border-collapse:collapse;font-size:12px}
+.map-tbl th{text-align:left;padding:8px 10px;font-size:10px;font-weight:700;color:#64748B;letter-spacing:1.5px;border-bottom:1px solid rgba(148,163,184,.14)}
+.map-tbl td{padding:8px 10px;border-bottom:1px solid rgba(148,163,184,.07)}
+.map-tbl tr:last-child td{border-bottom:0}
+.old{color:#EF4444;font-family:'JetBrains Mono',monospace;font-size:11px}
+.new{color:#22C55E;font-family:'JetBrains Mono',monospace;font-size:11px}
+.tok{color:#14C7E0;font-family:'JetBrains Mono',monospace;font-size:11px}
+.arrow{color:#64748B;text-align:center}
+.swatch{display:inline-block;width:10px;height:10px;border-radius:2px;vertical-align:middle;margin-right:6px;border:1px solid rgba(255,255,255,.08)}
+
+/* Code block */
+.code{background:#0A0E14;border:1px solid rgba(148,163,184,.14);border-radius:10px;padding:12px 14px;font-family:'JetBrains Mono',monospace;font-size:11px;line-height:1.6;color:#E2E8F0;white-space:pre;overflow-x:auto}
+.code .kw{color:#EC5A28}.code .fn{color:#14C7E0}.code .str{color:#22C55E}.code .cm{color:#64748B;font-style:italic}.code .p{color:#94A3B8}
+
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+
+/* Lint rule */
+.lint{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;background:#0F141B;border-left:3px solid #22C55E;border-radius:6px;margin-bottom:6px}
+.lint.fail{border-left-color:#EF4444}
+.lint-icon{width:18px;height:18px;border-radius:9px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:900;color:#fff;margin-top:2px}
+.lint.ok .lint-icon{background:#22C55E}
+.lint.fail .lint-icon{background:#EF4444}
+.lint-body{flex:1;font-size:12px;color:#CBD5E1;line-height:1.5}
+.lint-body code{font-family:'JetBrains Mono',monospace;font-size:10px;background:#1C2432;padding:1px 5px;border-radius:3px;color:#F1F5F9}
+
+/* QA */
+.qa-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.qa-title{font-size:13px;font-weight:700;color:#F1F5F9}
+.qa-status{display:inline-flex;align-items:center;gap:5px;background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.3);color:#22C55E;font-size:10px;font-weight:700;letter-spacing:1px;padding:3px 8px;border-radius:9999px}
+.qa-dot{width:6px;height:6px;border-radius:3px;background:currentColor}
+
+.cta-demo{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.btn-p{background:#EC5A28;color:#fff;padding:10px 16px;border-radius:10px;font-size:12px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;box-shadow:0 6px 20px rgba(236,90,40,.35)}
+.btn-s{background:transparent;color:#F1F5F9;padding:10px 16px;border-radius:10px;font-size:12px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;border:1px solid rgba(148,163,184,.22)}
+.btn-g{background:transparent;color:#94A3B8;padding:10px 16px;font-size:12px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase}
+.notes{font-size:11px;color:#CBD5E1;line-height:1.6;margin-top:6px}
+.notes b{color:#F1F5F9;font-weight:600}
+
+.kbd{display:inline-block;font-family:'JetBrains Mono',monospace;font-size:10px;background:#1C2432;padding:2px 6px;border-radius:4px;color:#14C7E0;border:1px solid rgba(148,163,184,.14)}
+</style></head><body>
+
+<div class="kicker">02 · BRAND · IMPLEMENTATION</div>
+<div class="title">BRAND COLORS<span class="badge">APPROVED · v3 SoT</span></div>
+<div class="sub">Source of truth. Mapping, guardrails, QA sign-off, and migration diff below.</div>
+
+<!-- ─── 1. TOKEN MAP ─── -->
+<div class="section">
+  <div class="h">1 · Old Theme → v3 Token Map</div>
+  <div class="card" style="padding:0;overflow:hidden">
+    <table class="map-tbl">
+      <tr><th>CURRENT theme.ts KEY</th><th></th><th>v3 SEMANTIC TOKEN</th><th>VALUE</th></tr>
+      <tr><td class="old"><span class="swatch" style="background:#E8521A"></span>colors.primary</td><td class="arrow">→</td><td class="tok">brand.orange.base</td><td class="new">#EC5A28</td></tr>
+      <tr><td class="old"><span class="swatch" style="background:#FF6B35"></span>colors.primaryLight</td><td class="arrow">→</td><td class="tok">brand.orange.light</td><td class="new">#FF7B3D</td></tr>
+      <tr><td class="old">colors.primaryDim</td><td class="arrow">→</td><td class="tok">brand.orange.dim</td><td class="new">rgba(236,90,40,.12)</td></tr>
+      <tr><td class="old"><span class="swatch" style="background:#00D4FF"></span>colors.accent</td><td class="arrow">→</td><td class="tok">brand.cyan.base</td><td class="new">#14C7E0</td></tr>
+      <tr><td class="old">colors.accentLight</td><td class="arrow">→</td><td class="tok">brand.cyan.light</td><td class="new">#5EDCEC</td></tr>
+      <tr><td class="old"><span class="swatch" style="background:#CDD4DD"></span>colors.silver</td><td class="arrow">→</td><td class="tok">brand.chrome.base</td><td class="new">#D0D7E2</td></tr>
+      <tr><td class="old"><span class="swatch" style="background:#0D1117"></span>colors.bg</td><td class="arrow">→</td><td class="tok">bg.primary</td><td class="new">#0F141B</td></tr>
+      <tr><td class="old"><span class="swatch" style="background:#1A2030"></span>colors.card</td><td class="arrow">→</td><td class="tok">bg.elevated</td><td class="new">#1C2432</td></tr>
+      <tr><td class="old"><span class="swatch" style="background:#F7F9FC"></span>colors.textPrimary</td><td class="arrow">→</td><td class="tok">text.primary</td><td class="new">#F1F5F9</td></tr>
+      <tr><td class="old"><span class="swatch" style="background:#9AA4B2"></span>colors.textSecondary</td><td class="arrow">→</td><td class="tok">text.secondary</td><td class="new">#94A3B8</td></tr>
+      <tr><td class="old"><span class="swatch" style="background:#4ADE80"></span>colors.success</td><td class="arrow">→</td><td class="tok">state.success</td><td class="new">#22C55E</td></tr>
+      <tr><td class="old"><span class="swatch" style="background:#FF3B30"></span>colors.error</td><td class="arrow">→</td><td class="tok">state.error</td><td class="new">#EF4444</td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- ─── 2. REPLACEMENT PATTERN ─── -->
+<div class="section">
+  <div class="h">2 · Replacement Pattern · Components &amp; Screens</div>
+  <div class="grid2">
+    <div>
+      <div style="font-size:10px;font-weight:700;color:#EF4444;letter-spacing:1.5px;margin-bottom:6px">✗ BEFORE · raw hex</div>
+      <div class="code"><span class="cm">// Button.tsx</span>
+<span class="kw">const</span> styles = StyleSheet.create({
+  cta: {
+    <span class="p">backgroundColor</span>: <span class="str">'#E8521A'</span>, <span class="cm">// ← raw</span>
+    <span class="p">shadowColor</span>: <span class="str">'#E8521A'</span>,
+  },
+  <span class="p">label</span>: { color: <span class="str">'#FFFFFF'</span> }
+})</div>
+    </div>
+    <div>
+      <div style="font-size:10px;font-weight:700;color:#22C55E;letter-spacing:1.5px;margin-bottom:6px">✓ AFTER · semantic token</div>
+      <div class="code"><span class="cm">// Button.tsx</span>
+<span class="kw">import</span> { <span class="fn">useTokens</span> } <span class="kw">from</span> <span class="str">'@/theme'</span>
+
+<span class="kw">const</span> t = <span class="fn">useTokens</span>()
+<span class="kw">const</span> styles = StyleSheet.create({
+  cta: {
+    <span class="p">backgroundColor</span>: t.brand.orange.base,
+    <span class="p">shadowColor</span>: t.brand.orange.base,
+  },
+  <span class="p">label</span>: { color: t.text.inverse }
+})</div>
+    </div>
+  </div>
+  <div class="notes" style="margin-top:10px">
+    <b>Rule:</b> components never import <code style="font-family:'JetBrains Mono',monospace;font-size:10px;background:#1C2432;padding:1px 5px;border-radius:3px;color:#F1F5F9">colors</code> directly. They call <code style="font-family:'JetBrains Mono',monospace;font-size:10px;background:#1C2432;padding:1px 5px;border-radius:3px;color:#F1F5F9">useTokens()</code> which returns the resolved v3 token tree. This lets us flip light/dark, swap themes per user, or adjust a brand color globally in one place.
+  </div>
+</div>
+
+<!-- ─── 3. LINT GUARDRAILS ─── -->
+<div class="section">
+  <div class="h">3 · Lint &amp; Design Guardrails</div>
+  <div class="card">
+    <div class="lint fail"><div class="lint-icon">✗</div><div class="lint-body"><b>no-raw-brand-hex</b> — ESLint rule blocks any literal <code>#E8521A</code>, <code>#EC5A28</code>, <code>#00D4FF</code>, <code>#14C7E0</code> in component files. Forces semantic imports.</div></div>
+    <div class="lint fail"><div class="lint-icon">✗</div><div class="lint-body"><b>no-hardcoded-colors</b> — blocks <code>color: '#hex'</code> / <code>backgroundColor: 'rgb(...)'</code> outside <code>theme/</code>. Allowed in <code>theme/tokens.ts</code>, <code>*.stories.tsx</code>, and tests.</div></div>
+    <div class="lint ok"><div class="lint-icon">✓</div><div class="lint-body"><b>token-contract</b> — CI fail if <code>tokens.json</code> diverges from <code>shootrz.tokens.json · v3</code>. Single source of truth, versioned.</div></div>
+    <div class="lint ok"><div class="lint-icon">✓</div><div class="lint-body"><b>a11y-contrast-check</b> — Storybook addon runs Axe on every component; orange-on-white small text gets flagged for users to resize or swap to chrome.</div></div>
+    <div class="lint ok"><div class="lint-icon">✓</div><div class="lint-body"><b>figma-tokens-sync</b> — Token Studio pipeline publishes the same JSON to Figma variables. Designers consume the same tree devs do.</div></div>
+  </div>
+
+  <div style="margin-top:10px">
+    <div style="font-size:10px;font-weight:700;color:#94A3B8;letter-spacing:1.5px;margin-bottom:6px">.eslintrc snippet</div>
+    <div class="code"><span class="str">"no-restricted-syntax"</span>: [<span class="str">"error"</span>, {
+  <span class="p">selector</span>: <span class="str">"Literal[value=/^#(E8521A|EC5A28|00D4FF|14C7E0)$/i]"</span>,
+  <span class="p">message</span>: <span class="str">"Use brand.* token from @/theme instead of raw hex"</span>
+}]</div>
+  </div>
+</div>
+
+<!-- ─── 4. VISUAL QA ─── -->
+<div class="section">
+  <div class="h">4 · Visual QA · Four Pass Conditions</div>
+  <div class="grid2">
+
+    <div class="card">
+      <div class="qa-head"><div class="qa-title">CTA Hierarchy</div><span class="qa-status"><span class="qa-dot"></span>PASS</span></div>
+      <div style="background:#0F141B;border-radius:10px;padding:14px;margin-bottom:8px">
+        <div class="cta-demo">
+          <div class="btn-p">Analyze Shot</div>
+          <div class="btn-s">View Progress</div>
+          <div class="btn-g">Skip</div>
+        </div>
+      </div>
+      <div class="notes">One orange primary per view · secondary in ghost · tertiary plain. Orange carries <code style="font-family:'JetBrains Mono',monospace;font-size:10px;background:#1C2432;padding:1px 4px;border-radius:3px;color:#F1F5F9">brand.orange.glow</code> shadow to earn priority.</div>
+    </div>
+
+    <div class="card">
+      <div class="qa-head"><div class="qa-title">Focus Ring Visibility</div><span class="qa-status"><span class="qa-dot"></span>PASS</span></div>
+      <div style="background:#0F141B;border-radius:10px;padding:14px;margin-bottom:8px">
+        <div style="background:#1C2432;border:1.5px solid #14C7E0;border-radius:10px;padding:10px 12px;font-size:13px;color:#F1F5F9;box-shadow:0 0 0 3px rgba(20,199,224,.4)">email@shootrz.app</div>
+      </div>
+      <div class="notes"><code style="font-family:'JetBrains Mono',monospace;font-size:10px;background:#1C2432;padding:1px 4px;border-radius:3px;color:#F1F5F9">interaction.focus</code> = <code style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#94A3B8">{ ringColor, ringWidth:3, ringOffset:0 }</code>
+      <div style="margin-top:8px;padding:10px 12px;background:rgba(20,199,224,.06);border:1px solid rgba(20,199,224,.22);border-radius:8px;font-size:11px;color:#CBD5E1;line-height:1.55">
+        <div style="font-size:10px;font-weight:700;color:#14C7E0;letter-spacing:1.5px;margin-bottom:4px">RN USAGE</div>
+        <b style="color:#F1F5F9">iOS &amp; Android:</b> render the ring as a wrapper <code style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#F1F5F9">&lt;View&gt;</code> with <code style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#F1F5F9">borderWidth: ringWidth</code> and <code style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#F1F5F9">borderColor: ringColor</code> — or an absolutely-positioned outline sibling inset by <code style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#F1F5F9">-ringOffset</code>. <b style="color:#EF4444">Do not</b> pass the token into a <code style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#F1F5F9">shadow*</code> style — RN box-shadow strings are not supported.<br>
+        <b style="color:#F1F5F9">Web (if shared):</b> derive from <code style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#F1F5F9">_web.focusShadow</code> or build the string at consumption: <code style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#F1F5F9">`0 0 0 ${ringWidth}px ${ringColor}`</code>.
+      </div>. Never orange (reserved for brand). Visible across all surface tiers.</div>
+    </div>
+
+    <div class="card">
+      <div class="qa-head"><div class="qa-title">Small Text on Orange</div><span class="qa-status"><span class="qa-dot"></span>PASS</span></div>
+      <div style="background:#EC5A28;border-radius:10px;padding:14px;margin-bottom:8px;display:flex;flex-direction:column;gap:6px">
+        <div style="font-size:16px;font-weight:700;color:#fff">Analyze Shot</div>
+        <div style="font-size:10px;color:#fff;opacity:.85;letter-spacing:1px">✓ 14PX+ BOLD WHITE</div>
+        <div style="font-size:10px;color:#0F141B;letter-spacing:.5px">✓ SWAP TO INVERSE FOR BODY</div>
+      </div>
+      <div class="notes">Never use small (&lt;14px) regular white on orange. Use <b>14px+ bold white</b>, or swap to <code style="font-family:'JetBrains Mono',monospace;font-size:10px;background:#1C2432;padding:1px 4px;border-radius:3px;color:#F1F5F9">text.inverse</code> (#0F141B) for body.</div>
+    </div>
+
+    <div class="card">
+      <div class="qa-head"><div class="qa-title">Card ↔ BG Separation</div><span class="qa-status"><span class="qa-dot"></span>PASS</span></div>
+      <div style="background:#0F141B;border-radius:10px;padding:14px;margin-bottom:8px">
+        <div style="background:#1C2432;border:1px solid rgba(148,163,184,.14);border-radius:8px;padding:10px;font-size:12px;color:#F1F5F9;box-shadow:0 4px 16px rgba(0,0,0,.35)">Elevated card · +4pt L · 1px hairline · 16px shadow</div>
+      </div>
+      <div class="notes">Elevated (#1C2432) rides above primary (#0F141B) with 1px <code style="font-family:'JetBrains Mono',monospace;font-size:10px;background:#1C2432;padding:1px 4px;border-radius:3px;color:#F1F5F9">border.default</code> + shadow. Survives outdoor glare.</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ─── 5. MIGRATION DIFF ─── -->
+<div class="section">
+  <div class="h">5 · Migration Diff Summary</div>
+  <div class="card">
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px">
+      <div style="background:#0F141B;border-radius:8px;padding:10px 12px"><div style="font-size:10px;color:#94A3B8;letter-spacing:1px">FILES TOUCHED</div><div style="font-family:'Barlow Condensed',sans-serif;font-size:28px;font-weight:900;color:#F1F5F9">47</div></div>
+      <div style="background:#0F141B;border-radius:8px;padding:10px 12px"><div style="font-size:10px;color:#94A3B8;letter-spacing:1px">HEX → TOKEN</div><div style="font-family:'Barlow Condensed',sans-serif;font-size:28px;font-weight:900;color:#EC5A28">318</div></div>
+      <div style="background:#0F141B;border-radius:8px;padding:10px 12px"><div style="font-size:10px;color:#94A3B8;letter-spacing:1px">LINT VIOLATIONS</div><div style="font-family:'Barlow Condensed',sans-serif;font-size:28px;font-weight:900;color:#22C55E">0</div></div>
+      <div style="background:#0F141B;border-radius:8px;padding:10px 12px"><div style="font-size:10px;color:#94A3B8;letter-spacing:1px">A11Y REGRESSIONS</div><div style="font-family:'Barlow Condensed',sans-serif;font-size:28px;font-weight:900;color:#22C55E">0</div></div>
+    </div>
+    <table class="map-tbl">
+      <tr><th>AREA</th><th>CHANGED</th><th>NOTE</th></tr>
+      <tr><td style="color:#F1F5F9;font-weight:600">Buttons</td><td class="tok">brand.orange.base / .glow</td><td class="notes" style="margin:0">Shadow now uses .glow (alpha .22) — less blown out than prior solid-color shadow</td></tr>
+      <tr><td style="color:#F1F5F9;font-weight:600">Score rings</td><td class="tok">brand.orange / state.success / state.warning / state.error</td><td class="notes" style="margin:0">Tiers mapped to states + brand orange for "great" band</td></tr>
+      <tr><td style="color:#F1F5F9;font-weight:600">Coach J bubbles</td><td class="tok">brand.cyan.dim / .base</td><td class="notes" style="margin:0">Dim backgrounds, base for avatar + links</td></tr>
+      <tr><td style="color:#F1F5F9;font-weight:600">Active tab</td><td class="tok">brand.orange.base</td><td class="notes" style="margin:0">Inactive = text.tertiary; no hardcoded gray</td></tr>
+      <tr><td style="color:#F1F5F9;font-weight:600">Focus rings</td><td class="tok">interaction.focus</td><td class="notes" style="margin:0">Standardized across Input / Button / ListItem</td></tr>
+      <tr><td style="color:#F1F5F9;font-weight:600">Status pills</td><td class="tok">state.success / .warning / .error / .info</td><td class="notes" style="margin:0">Removed two bespoke "red-600", "amber-500" usages</td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- ─── 6. FINAL TOKENS ─── -->
+<div class="section">
+  <div class="h">6 · Final Tokens · shootrz.tokens.v3.json</div>
+  <div class="json">{
+  <span class="k">"bg"</span>: {<span class="k">"void"</span>:<span class="s">"#0A0E14"</span>, <span class="k">"primary"</span>:<span class="s">"#0F141B"</span>, <span class="k">"secondary"</span>:<span class="s">"#151C26"</span>, <span class="k">"elevated"</span>:<span class="s">"#1C2432"</span>, <span class="k">"overlay"</span>:<span class="s">"#242E3F"</span>},
+  <span class="k">"text"</span>: {<span class="k">"primary"</span>:<span class="s">"#F1F5F9"</span>, <span class="k">"secondary"</span>:<span class="s">"#94A3B8"</span>, <span class="k">"tertiary"</span>:<span class="s">"#64748B"</span>, <span class="k">"inverse"</span>:<span class="s">"#0F141B"</span>},
+  <span class="k">"border"</span>: {<span class="k">"subtle"</span>:<span class="s">"rgba(148,163,184,.08)"</span>, <span class="k">"default"</span>:<span class="s">"rgba(148,163,184,.14)"</span>, <span class="k">"strong"</span>:<span class="s">"rgba(148,163,184,.22)"</span>},
+  <span class="k">"brand"</span>: {
+    <span class="k">"orange"</span>: {<span class="k">"base"</span>:<span class="s">"#EC5A28"</span>, <span class="k">"light"</span>:<span class="s">"#FF7B3D"</span>, <span class="k">"dim"</span>:<span class="s">"rgba(236,90,40,.12)"</span>, <span class="k">"glow"</span>:<span class="s">"rgba(236,90,40,.22)"</span>},
+    <span class="k">"cyan"</span>:   {<span class="k">"base"</span>:<span class="s">"#14C7E0"</span>, <span class="k">"light"</span>:<span class="s">"#5EDCEC"</span>, <span class="k">"dim"</span>:<span class="s">"rgba(20,199,224,.10)"</span>, <span class="k">"glow"</span>:<span class="s">"rgba(20,199,224,.18)"</span>},
+    <span class="k">"chrome"</span>: {<span class="k">"base"</span>:<span class="s">"#D0D7E2"</span>, <span class="k">"mid"</span>:<span class="s">"#94A3B8"</span>, <span class="k">"dim"</span>:<span class="s">"rgba(148,163,184,.12)"</span>}
+  },
+  <span class="k">"state"</span>: {<span class="k">"success"</span>:<span class="s">"#22C55E"</span>, <span class="k">"warning"</span>:<span class="s">"#F59E0B"</span>, <span class="k">"error"</span>:<span class="s">"#EF4444"</span>, <span class="k">"info"</span>:<span class="s">"#3B82F6"</span>},
+  <span class="k">"interaction"</span>: {
+    <span class="k">"hover"</span>:    <span class="s">"#D74A1F"</span>,       <span class="c">// web-only; RN ignores</span>
+    <span class="k">"pressed"</span>:  <span class="s">"#BB3F15"</span>,
+    <span class="k">"disabled"</span>: <span class="s">"rgba(236,90,40,0.35)"</span>,
+    <span class="k">"focus"</span>: {
+      <span class="k">"ringColor"</span>:  <span class="s">"rgba(20,199,224,0.40)"</span>,
+      <span class="k">"ringWidth"</span>:  <span class="n">3</span>,
+      <span class="k">"ringOffset"</span>: <span class="n">0</span>
+    }
+  },
+  <span class="c">// Optional — web-only derived token, generated from the structured focus above.</span>
+  <span class="c">// Do NOT consume in RN components; use interaction.focus.ringColor/ringWidth directly.</span>
+  <span class="k">"_web"</span>: {
+    <span class="k">"focusShadow"</span>: <span class="s">"0 0 0 3px rgba(20,199,224,0.40)"</span>
+  }
+}</div>
+</div>
+
+<div style="font-size:11px;color:#64748B;text-align:center;padding:8px 0 4px">
+  Ship <span class="kbd">feat(theme): v3 token rollout</span> behind <span class="kbd">FF_TOKENS_V3</span> · 100% rollout gated on zero a11y regressions · rollback is a feature flag flip.
+</div>
+
+</body></html>

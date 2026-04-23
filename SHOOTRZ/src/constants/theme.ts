@@ -2,50 +2,83 @@
 // SHOOTRZ Design System v2 — Premium Sports-Tech
 // ═══════════════════════════════════════════════
 
-export const colors = {
+import { semanticTokens } from '../theme/tokens'
+import { typographyRoleMap } from '../theme/typography'
+
+const legacyColorAliases = {
 	bg: {
-		void: '#080A0E',
-		primary: '#0D1117',
-		secondary: '#13181F',
-		elevated: '#1A2030',
-		overlay: '#1F2737',
+		// Legacy alias kept for backward compatibility with v2 callers.
+		void: semanticTokens.bg.canvas,
 	},
 	brand: {
-		orange: '#E8521A',
-		orangeLight: '#FF6B2B',
-		orangeDim: '#E8521A22',
-		orangeGlow: '#E8521A40',
-		cyan: '#00D4FF',
-		cyanLight: '#33DFFF',
-		cyanDim: '#00D4FF18',
-		chrome: '#C8D0DC',
-		chromeMid: '#8B95A3',
-		chromeDim: '#FFFFFF0A',
-	},
-	score: {
-		elite: { bg: '#FFD700', text: '#1A1400', glow: '#FFD70040' },
-		great: { bg: '#22C55E', text: '#0A1F14', glow: '#22C55E40' },
-		good: { bg: '#3B82F6', text: '#0A1529', glow: '#3B82F640' },
-		fair: { bg: '#F59E0B', text: '#1F1500', glow: '#F59E0B40' },
-		poor: { bg: '#EF4444', text: '#1F0A0A', glow: '#EF444440' },
-	},
-	text: {
-		primary: '#F0F4F8',
-		secondary: '#8B95A3',
-		tertiary: '#4A5568',
-		inverse: '#0D1117',
+		// Legacy aliases mapped to semantic brand tokens.
+		orange: semanticTokens.brand.primary,
+		orangeLight: semanticTokens.brand.primaryLight,
+		orangeDim: semanticTokens.brand.primaryDim,
+		orangeGlow: semanticTokens.brand.primaryGlow,
+		cyan: semanticTokens.brand.accent,
+		cyanLight: semanticTokens.brand.accentLight,
+		cyanDim: semanticTokens.brand.accentDim,
 	},
 	border: {
-		subtle: '#FFFFFF08',
-		default: '#FFFFFF12',
-		strong: '#FFFFFF20',
-		brand: '#E8521A40',
-		cyan: '#00D4FF30',
+		// Legacy alias mapped to semantic accent border.
+		cyan: semanticTokens.border.accent,
 	},
-	success: '#22C55E',
-	warning: '#F59E0B',
-	error: '#EF4444',
-	info: '#3B82F6',
+} as const
+
+export const colors = {
+	bg: {
+		...semanticTokens.bg,
+		...legacyColorAliases.bg,
+	},
+	brand: {
+		...semanticTokens.brand,
+		...legacyColorAliases.brand,
+	},
+	// v3 score tiers (align with `src/theme/scoreTier.ts` ring/badge semantics):
+	// poor red, fair amber, good yellow, great green, elite cyan.
+	score: {
+		poor: {
+			bg: semanticTokens.state.error,
+			text: semanticTokens.state.error,
+			glow: '#EF444440',
+		},
+		fair: {
+			bg: semanticTokens.state.warning,
+			text: semanticTokens.state.warning,
+			glow: '#F59E0B40',
+		},
+		good: {
+			bg: '#FBBF24',
+			text: '#FBBF24',
+			glow: '#FBBF2440',
+		},
+		great: {
+			bg: semanticTokens.state.success,
+			text: semanticTokens.state.success,
+			glow: '#22C55E40',
+		},
+		elite: {
+			bg: '#14C7E0',
+			text: '#14C7E0',
+			glow: '#14C7E040',
+		},
+	},
+	text: {
+		...semanticTokens.text,
+	},
+	chat: {
+		userBubble: semanticTokens.chat.userBubble,
+		userBorder: semanticTokens.chat.userBorder,
+	},
+	border: {
+		...semanticTokens.border,
+		...legacyColorAliases.border,
+	},
+	success: semanticTokens.state.success,
+	warning: semanticTokens.state.warning,
+	error: semanticTokens.state.error,
+	info: semanticTokens.state.info,
 } as const
 
 export type ScoreTier = 'elite' | 'great' | 'good' | 'fair' | 'poor'
@@ -63,6 +96,7 @@ export function getScoreColor(score: number) {
 }
 
 export const typography = {
+	roles: typographyRoleMap,
 	size: {
 		xs: 11,
 		sm: 13,
@@ -96,6 +130,9 @@ export const typography = {
 		widest: 2.0,
 	},
 } as const
+
+export const typographyRoles = typography.roles
+export type TypographyRole = keyof typeof typographyRoles
 
 export const spacing = {
 	0: 0,
@@ -159,13 +196,7 @@ export const glass = {
 } as const
 
 export const animation = {
-	duration: {
-		instant: 100,
-		fast: 200,
-		normal: 300,
-		slow: 500,
-		deliberate: 800,
-	},
+	duration: semanticTokens.motion.duration,
 	easing: {
 		spring: { damping: 15, stiffness: 150, mass: 1 },
 		springSnappy: { damping: 20, stiffness: 300 },
@@ -232,27 +263,27 @@ export const SHOOTRZ_THEME = {
 	},
 	typography: {
 		heading1: {
-			fontSize: 32,
-			fontWeight: 'bold' as const,
+			fontSize: typographyRoleMap.display.fontSize,
+			fontWeight: typographyRoleMap.display.fontWeight,
 			color: colors.text.primary,
-			letterSpacing: 1,
+			letterSpacing: typographyRoleMap.display.letterSpacing,
 		},
 		heading2: {
-			fontSize: 24,
-			fontWeight: 'bold' as const,
+			fontSize: typographyRoleMap.headingMd.fontSize,
+			fontWeight: typographyRoleMap.headingMd.fontWeight,
 			color: colors.text.primary,
-			letterSpacing: 0.5,
+			letterSpacing: typographyRoleMap.headingMd.letterSpacing,
 		},
 		heading3: {
-			fontSize: 20,
-			fontWeight: '600' as const,
+			fontSize: typographyRoleMap.headingSm.fontSize,
+			fontWeight: typographyRoleMap.headingSm.fontWeight,
 			color: colors.text.primary,
 		},
 		body: {
-			fontSize: 16,
-			fontWeight: 'normal' as const,
+			fontSize: typographyRoleMap.body.fontSize,
+			fontWeight: typographyRoleMap.body.fontWeight,
 			color: colors.text.secondary,
-			lineHeight: 24,
+			lineHeight: typographyRoleMap.body.lineHeight,
 		},
 		bodySmall: {
 			fontSize: 14,
@@ -261,13 +292,13 @@ export const SHOOTRZ_THEME = {
 			lineHeight: 20,
 		},
 		button: {
-			fontSize: 16,
-			fontWeight: 'bold' as const,
+			fontSize: typographyRoleMap.button.fontSize,
+			fontWeight: typographyRoleMap.button.fontWeight,
 			color: colors.text.primary,
 		},
 		caption: {
-			fontSize: 12,
-			fontWeight: 'normal' as const,
+			fontSize: typographyRoleMap.caption.fontSize,
+			fontWeight: typographyRoleMap.caption.fontWeight,
 			color: colors.text.tertiary,
 		},
 	},

@@ -10,6 +10,7 @@ import { UsernameScreen } from './src/screens/UsernameScreen';
 import { SplashScreen } from './src/screens/SplashScreen';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { useFonts } from 'expo-font';
 import { useDeepLinks } from './src/hooks/useDeepLinks';
 import { supabase } from './src/services/supabase.client';
 
@@ -125,6 +126,19 @@ function AppContent() {
 }
 
 export default function App() {
+  const [fontsLoaded] = useFonts({
+    BarlowCondensedBlack: require('./assets/shootrz-design-system/project/fonts/BarlowCondensed-Black.ttf'),
+    BarlowCondensedBold: require('./assets/shootrz-design-system/project/fonts/BarlowCondensed-Bold.ttf'),
+    DMSansRegular: require('./assets/shootrz-design-system/project/fonts/DMSans-Regular.ttf'),
+    DMSansMedium: require('./assets/shootrz-design-system/project/fonts/DMSans-Medium.ttf'),
+    DMSansSemiBold: require('./assets/shootrz-design-system/project/fonts/DMSans-SemiBold.ttf'),
+    DMSansBold: require('./assets/shootrz-design-system/project/fonts/DMSans-Bold.ttf'),
+  });
+
+  if (!fontsLoaded) {
+    return null;
+  }
+
   return (
     <SafeAreaProvider>
       <AuthProvider>

@@ -100,6 +100,7 @@ export const WorkoutsScreen: React.FC = () => {
 						key={tab}
 						style={[styles.tab, filterTab === tab && styles.tabActive]}
 						onPress={() => { hapticFeedback.selection(); setFilterTab(tab) }}
+						activeOpacity={0.8}
 					>
 						<Text style={[styles.tabText, filterTab === tab && styles.tabTextActive]}>
 							{tab.charAt(0).toUpperCase() + tab.slice(1)}
@@ -149,13 +150,15 @@ const styles = StyleSheet.create({
 		borderColor: colors.brand.orange,
 	},
 	tabText: {
+		...typography.roles.caption,
 		fontSize: typography.size.sm,
 		color: colors.text.secondary,
 		fontWeight: typography.weight.medium,
+		fontFamily: 'DMSansMedium',
 	},
 	tabTextActive: {
+		...typography.roles.bodyStrong,
 		color: colors.text.primary,
-		fontWeight: typography.weight.bold,
 	},
 	list: {
 		paddingHorizontal: spacing.screenPadding,

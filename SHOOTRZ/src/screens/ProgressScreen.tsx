@@ -11,15 +11,18 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { LineChart } from 'react-native-chart-kit'
 import { format, parseISO, subDays, isAfter } from 'date-fns'
+import { useNavigation } from '@react-navigation/native'
 import { useAuth } from '../context/AuthContext'
 import { useHistory } from '../context/HistoryContext'
-import { colors, typography, spacing, radius, glass } from '../constants/theme'
+import { colors, typography, spacing, radius, getScoreTier } from '../constants/theme'
+import { SCORE_TIER_CARD_SURFACE } from '../theme/scoreTier'
 import { ScoreRing } from '../components/ScoreRing'
 import { MetricCard } from '../components/MetricCard'
 import { SectionHeader } from '../components/SectionHeader'
 import { SkeletonLoader } from '../components/SkeletonLoader'
 import { EmptyState } from '../components/EmptyState'
 import { AnalysisCard } from '../components/AnalysisCard'
+import { TierBadge } from '../components/TierBadge'
 import { hapticFeedback } from '../utils/hapticFeedback'
 import type { HistorySession } from '../types/contracts'
 
@@ -63,6 +66,7 @@ function mapSession(h: HistorySession): Session {
 }
 
 export const ProgressScreen: React.FC = () => {
+	const navigation = useNavigation()
 	const { user } = useAuth()
 	const history = useHistory()
 	const [refreshing, setRefreshing] = useState(false)
@@ -128,6 +132,8 @@ export const ProgressScreen: React.FC = () => {
 			datasets: [{ data: scored.length > 0 ? scored.map(s => s.average_score || 0) : [0] }],
 		}
 	}, [filteredSessions])
+	const overallTier = getScoreTier(avgScore)
+	const overallTierStyle = SCORE_TIER_CARD_SURFACE[overallTier]
 
 	if (loading) {
 		return (
@@ -148,7 +154,14 @@ export const ProgressScreen: React.FC = () => {
 					icon="stats-chart-outline"
 					title="No sessions yet"
 					message="Analyze your first shot to start tracking progress."
-					action={{ label: 'Analyze a Shot', onPress: () => {} }}
+					action={{
+						label: 'Analyze a Shot',
+						onPress: () => {
+							hapticFeedback.medium()
+							// Tab screen name in `AppNavigator`
+							navigation.navigate('Analyze' as never)
+						},
+					}}
 				/>
 			</SafeAreaView>
 		)
@@ -176,11 +189,12 @@ export const ProgressScreen: React.FC = () => {
 				</View>
 
 				{/* Overall Score */}
-				<View style={styles.overallCard}>
+				<View style={[styles.overallCard, { backgroundColor: overallTierStyle.bg, borderColor: overallTierStyle.border }]}>
 					<ScoreRing score={avgScore} size="lg" animated />
 					<View style={styles.overallInfo}>
 						<Text style={styles.overallLabel}>AVERAGE SCORE</Text>
 						<Text style={styles.overallValue}>{avgScore}</Text>
+						<TierBadge tier={overallTier} />
 						<Text style={styles.overallSub}>{filteredSessions.length} session{filteredSessions.length !== 1 ? 's' : ''}</Text>
 					</View>
 				</View>
@@ -242,7 +256,6 @@ export const ProgressScreen: React.FC = () => {
 								date={(() => { try { return format(parseISO(s.date), 'MMM d, yyyy') } catch { return s.date } })()}
 								score={s.average_score || 0}
 								shotCount={s.shot_count}
-								onPress={() => {}}
 							/>
 						</View>
 					))}
@@ -276,7 +289,7 @@ const styles = StyleSheet.create({
 		borderColor: colors.brand.orange,
 	},
 	periodText: {
-		fontSize: typography.size.sm,
+		...typography.roles.body,
 		color: colors.text.secondary,
 		fontWeight: typography.weight.medium,
 	},
@@ -289,26 +302,26 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 		gap: spacing[5],
 		marginHorizontal: spacing.screenPadding,
-		backgroundColor: glass.orange.bg,
+		backgroundColor: colors.bg.secondary,
 		borderWidth: 1,
-		borderColor: glass.orange.border,
+		borderColor: colors.border.default,
 		borderRadius: radius.card,
 		padding: spacing.cardPadding,
 	},
 	overallInfo: { flex: 1 },
 	overallLabel: {
-		fontSize: typography.size.xs,
+		...typography.roles.caption,
 		fontWeight: typography.weight.medium,
 		color: colors.text.secondary,
 		letterSpacing: typography.tracking.widest,
+		textTransform: 'uppercase',
 	},
 	overallValue: {
-		fontSize: typography.size['3xl'],
-		fontWeight: typography.weight.black,
-		color: colors.brand.chrome,
+		...typography.roles.display,
+		color: colors.text.primary,
 	},
 	overallSub: {
-		fontSize: typography.size.sm,
+		...typography.roles.caption,
 		color: colors.text.tertiary,
 		marginTop: spacing[1],
 	},
