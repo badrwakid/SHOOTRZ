@@ -38,6 +38,16 @@ limiter = Limiter(key_func=get_remote_address)
 _MAX_CONCURRENT = int(os.getenv("SHOOTRZ_MAX_CONCURRENT", "8"))
 _analysis_semaphore = asyncio.Semaphore(_MAX_CONCURRENT)
 
+
+def _max_upload_bytes() -> int:
+    """Return the upload size cap in bytes, reading the env var on every call.
+
+    Reading at request time (not module import time) lets tests override the
+    cap via ``monkeypatch.setenv("SHOOTRZ_MAX_UPLOAD_MB", ...)`` without
+    needing ``importlib.reload``. The default is 200 MB.
+    """
+    return int(os.getenv("SHOOTRZ_MAX_UPLOAD_MB", "200")) * 1024 * 1024
+
 # Small process-local cache: maps ``sha256(first 1MB of upload)`` to the job
 # id that already analysed the same bytes. Keeps the demo cheap when the same
 # clip is submitted twice in a row (e.g. rapid double-tap on the mobile app).
@@ -113,14 +123,29 @@ async def analyze_video(
     # Spill to a named temp file, prefixed with the already-read bytes. The
     # service still takes an ``UploadFile`` so we wrap the file back up.
     tmp_suffix = Path(file.filename).suffix if file.filename else ".mp4"
+    max_bytes = _max_upload_bytes()
+    total_read = len(first_mb)
     with NamedTemporaryFile(delete=False, suffix=tmp_suffix) as tmp:
         if first_mb:
             tmp.write(first_mb)
-        # Drain the rest of the upload.
+        # Drain the rest of the upload, enforcing the size cap chunk-by-chunk.
         while True:
             chunk = await file.read(1024 * 1024)
             if not chunk:
                 break
+            total_read += len(chunk)
+            if total_read > max_bytes:
+                tmp.close()
+                try:
+                    os.remove(tmp.name)
+                except OSError:
+                    pass
+                raise HTTPException(
+                    status_code=413,
+                    detail=(
+                        f"File exceeds {max_bytes // 1024 // 1024}MB limit."
+                    ),
+                )
             tmp.write(chunk)
         tmp_path = tmp.name
 
