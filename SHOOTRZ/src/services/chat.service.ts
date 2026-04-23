@@ -180,7 +180,7 @@ export const chatService = {
 					} catch {}
 					callbacks.onError(new Error(detail))
 					// BUG FIX: Always call onDone after error so callers can clean up
-					callbacks.onDone({ model: '', usage: null })
+					callbacks.onDone({ model: '', context_used: {} })
 				}
 			}
 		}

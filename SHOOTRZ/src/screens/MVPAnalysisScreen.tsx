@@ -37,7 +37,7 @@ interface AnalysisResult extends MVPResultResponse {
 	feedback_summary: string
 	feedback_bullets?: string[]
 	metrics: MVPMetric[]
-	score_components?: Array<{ name: string; value: number; weight: number; unit?: string; explanation?: string }>
+	score_components?: Array<{ name: string; value: number | null; weight: number; unit?: string; explanation?: string }>
 	shot_window: { start_frame?: number; crouch_frame?: number; release_frame?: number; end_frame?: number; confidence?: string; confidence_score?: number }
 	events?: Record<string, any>
 	angles_data: { frames: number[]; timestamps: number[]; elbow: Array<number | null>; knee: Array<number | null>; wrist: Array<number | null> }

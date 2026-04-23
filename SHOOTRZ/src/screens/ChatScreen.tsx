@@ -132,7 +132,7 @@ export const ChatScreen: React.FC = () => {
 				{ role: 'user' as const, content: trimmed },
 			]
 
-			const { abort } = chatService.sendMessageStream(
+			chatService.sendMessageStream(
 				{ messages: outbound, includeRawArtifacts },
 				{
 					onChunk: (chunk: string) => {
@@ -162,7 +162,16 @@ export const ChatScreen: React.FC = () => {
 					},
 				},
 			)
-			abortRef.current = abort
+				.then(abort => {
+					abortRef.current = abort
+				})
+				.catch((err: Error) => {
+					streamingIdRef.current = null
+					setMessages(prev => prev.filter(m => m.id !== assistantId))
+					setErrorBanner(err.message || 'Something went wrong')
+					setIsSending(false)
+					hapticFeedback.warning()
+				})
 		},
 		[isSending, messages, includeRawArtifacts],
 	)

@@ -118,10 +118,10 @@ export const DrillDetailScreen: React.FC<DrillDetailScreenProps> = ({ drill, onC
 					</View>
 				) : null}
 
-				{drill.tips && drill.tips.length > 0 ? (
+				{drill.focusAreas && drill.focusAreas.length > 0 ? (
 					<View style={styles.section}>
-						<Text style={styles.sectionTitle}>Tips</Text>
-						{drill.tips.map((tip, i) => (
+						<Text style={styles.sectionTitle}>Focus Areas</Text>
+						{drill.focusAreas.map((tip: string, i: number) => (
 							<View key={i} style={styles.tipRow}>
 								<Ionicons name="bulb" size={16} color={colors.brand.orange} />
 								<Text style={styles.tipText}>{tip}</Text>

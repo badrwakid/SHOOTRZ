@@ -75,13 +75,15 @@ export const WorkoutsScreen: React.FC = () => {
 
 	const renderItem = ({ item }: { item: typeof WORKOUTS[0] }) => {
 		const isActive = activeWorkouts.includes(item.id)
+		const difficulty =
+			item.duration >= 50 ? 'advanced' : item.duration <= 30 ? 'beginner' : 'intermediate'
 		return (
 			<View style={[styles.cardWrap, isActive && styles.cardActive]}>
 				<WorkoutCard
 					name={item.name}
 					drillCount={item.drills?.length || 0}
-					estimatedMinutes={item.estimatedMinutes || 15}
-					difficulty={item.difficulty || 'intermediate'}
+					estimatedMinutes={item.duration}
+					difficulty={difficulty}
 					progress={isActive ? 0.5 : 0}
 					onPress={() => handleStartWorkout(item.id)}
 				/>
