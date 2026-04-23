@@ -42,6 +42,29 @@ class ShotFeedbackOutput(BaseModel):
         description="Optional drill names that address weak areas",
     )
     score_tier: str = Field(description="elite / great / good / fair / poor")
+    # Holistic coach-style score. The rule-based geomean on the backend is
+    # deliberately conservative (it collapses when any single axis is off).
+    # Gemini looks at the whole motion and returns what an amateur coach
+    # would actually grade this attempt, so a "decent looking jumpshot with
+    # one weak axis" lands 60-80 instead of 3.
+    ai_overall_score: int = Field(
+        ge=0,
+        le=100,
+        description=(
+            "Holistic 0-100 score. An attempted jumpshot with one weak axis "
+            "but overall reasonable form should score 60-80. Textbook form "
+            "scores 85-100. Motion that doesn't resemble a shot scores 0-20."
+        ),
+    )
+    ai_score_rationale: str = Field(
+        description="One sentence explaining the score (cited to angle values)."
+    )
+
+    # NOTE: ``ShotFeedbackOutput`` is sent verbatim to Gemini as the
+    # ``response_schema``; Gemini rejects JSON schemas containing default
+    # values, so "did this come from the fallback?" is signalled via the
+    # ``get_shot_feedback`` return type, NOT a model field. See
+    # ``backend/services/llm/llm_router.py``.
 
 
 # ------------------------------------------------------------------

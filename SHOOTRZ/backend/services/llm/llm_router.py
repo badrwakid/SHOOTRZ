@@ -92,7 +92,13 @@ class LLMService:
         feedback_summary: str,
         feedback_bullets: List[str],
         user_profile: Optional[Dict[str, Any]] = None,
-    ) -> ShotFeedbackOutput:
+    ) -> Tuple[ShotFeedbackOutput, bool]:
+        """Return ``(feedback, is_fallback)``.
+
+        ``is_fallback=True`` means Gemini was unreachable / errored and the
+        returned ``ShotFeedbackOutput`` is the rule-based echo. Callers must
+        NOT treat ``ai_overall_score`` as an AI grade in that case.
+        """
         try:
             system, user = prompt_builders.build_shot_feedback_prompt(
                 metrics=metrics,
@@ -101,19 +107,23 @@ class LLMService:
                 score_tier=score_tier,
                 user_profile=user_profile,
             )
-            return self._gemini.generate_structured(
+            fb = self._gemini.generate_structured(
                 system_prompt=system,
                 user_prompt=user,
                 schema=ShotFeedbackOutput,
             )
+            return fb, False
         except Exception:
             logger.exception("Gemini shot feedback failed, using fallback")
-            return fallbacks.fallback_shot_feedback(
-                metrics=metrics,
-                score_components=score_components,
-                overall_score=overall_score,
-                feedback_summary=feedback_summary,
-                feedback_bullets=feedback_bullets,
+            return (
+                fallbacks.fallback_shot_feedback(
+                    metrics=metrics,
+                    score_components=score_components,
+                    overall_score=overall_score,
+                    feedback_summary=feedback_summary,
+                    feedback_bullets=feedback_bullets,
+                ),
+                True,
             )
 
     # ------------------------------------------------------------------

@@ -7,9 +7,20 @@ Loads videos using OpenCV, extracts metadata, and handles frame sampling.
 import cv2
 import numpy as np
 from pathlib import Path
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, List, Optional, Tuple, Iterator
 import json
 import pandas as pd
+
+
+# Target number of pose frames kept for the MVP pipeline. Stride is derived from
+# the source clip length so we always land in this range regardless of duration.
+DEFAULT_TARGET_FRAMES = 120
+
+# MediaPipe Pose's BlazePose backbone hits diminishing accuracy returns above
+# ~720p. Feeding 1080x1920 phone clips at full size just burns CPU on colour
+# conversion and model inference without improving keypoint quality, so we
+# downscale so the long side is this many pixels before pose runs.
+MAX_POSE_INPUT_LONG_SIDE = 720
 
 
 class VideoLoader:
@@ -126,6 +137,129 @@ class VideoLoader:
         self.frame_mapping = mapping
         return pd.DataFrame(mapping)
     
+    def compute_stride(
+        self,
+        target_frames: int = DEFAULT_TARGET_FRAMES,
+    ) -> int:
+        """
+        Compute stride so approximately ``target_frames`` are yielded regardless
+        of source clip length.
+
+        Respects ``frame_skip`` from config as a minimum stride (so the config
+        can still force denser sampling on short clips if explicitly set).
+        """
+        if not self.metadata:
+            self.load_metadata()
+        total = int(self.metadata.get("frame_count") or 0)
+        frame_skip = int(self.config.get("frame_skip", 1))
+        if total <= 0:
+            return max(1, frame_skip)
+        derived = max(1, total // max(1, target_frames))
+        return max(derived, frame_skip)
+
+    def iter_frames(
+        self,
+        stride: Optional[int] = None,
+        max_frames: Optional[int] = None,
+        target_frames: int = DEFAULT_TARGET_FRAMES,
+    ) -> Iterator[Tuple[int, int, float, np.ndarray]]:
+        """
+        Stream frames from the source video WITHOUT buffering the whole clip.
+
+        Yields tuples of ``(processed_idx, original_idx, timestamp_s, frame_rgb)``.
+
+        Args:
+            stride: Keep every Nth frame. ``None`` triggers auto-stride.
+            max_frames: Hard cap on yielded frames (None = use config or unlimited).
+            target_frames: Auto-stride target when ``stride`` is None.
+
+        Builds ``self.frame_mapping`` incrementally so callers can persist it
+        after the generator is exhausted.
+
+        Raises:
+            ValueError: Video cannot be opened or yields zero frames.
+        """
+        if not self.metadata:
+            self.load_metadata()
+
+        effective_stride = int(stride) if stride and stride > 0 else self.compute_stride(target_frames)
+        fps = float(self.metadata.get("fps") or 0.0) or 30.0
+        cap_limit = int(max_frames) if max_frames else self.config.get("max_frames")
+        if cap_limit is None:
+            cap_limit = target_frames * 2
+
+        cap = cv2.VideoCapture(str(self.video_path))
+        if not cap.isOpened():
+            raise ValueError(f"Could not open video: {self.video_path}")
+
+        mapping: List[Dict[str, Any]] = []
+        raw_idx = 0
+        processed_idx = 0
+
+        try:
+            while True:
+                ok, frame_bgr = cap.read()
+                if not ok:
+                    break
+                if raw_idx % effective_stride != 0:
+                    raw_idx += 1
+                    continue
+
+                frame_rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
+
+                # Downscale to ``MAX_POSE_INPUT_LONG_SIDE`` on the long axis.
+                # On a 1080x1920 vertical clip this cuts pose inference by ~3x
+                # without measurable accuracy loss (landmarks are normalised,
+                # so downstream math is resolution-agnostic). Controlled by
+                # ``video.max_pose_long_side`` (set to 0 to disable).
+                target_long = int(
+                    self.config.get("max_pose_long_side", MAX_POSE_INPUT_LONG_SIDE)
+                    or 0
+                )
+                if target_long > 0:
+                    h_in, w_in = frame_rgb.shape[:2]
+                    long_side = max(h_in, w_in)
+                    if long_side > target_long:
+                        scale = target_long / float(long_side)
+                        new_w = max(1, int(round(w_in * scale)))
+                        new_h = max(1, int(round(h_in * scale)))
+                        frame_rgb = cv2.resize(
+                            frame_rgb, (new_w, new_h), interpolation=cv2.INTER_AREA
+                        )
+
+                timestamp = raw_idx / fps if fps > 0 else raw_idx * 0.033
+
+                mapping.append(
+                    {
+                        "processed_idx": processed_idx,
+                        "original_idx": raw_idx,
+                        "timestamp": timestamp,
+                    }
+                )
+
+                yield processed_idx, raw_idx, timestamp, frame_rgb
+
+                processed_idx += 1
+                raw_idx += 1
+                if cap_limit is not None and processed_idx >= int(cap_limit):
+                    break
+        finally:
+            cap.release()
+
+        if processed_idx == 0:
+            raise ValueError("No frames could be extracted from video")
+
+        self.frame_mapping = mapping
+        self.metadata.setdefault("frame_sampling", {}).update(
+            {"stride": effective_stride, "max_frames": cap_limit, "kept_frames": processed_idx}
+        )
+
+    def iter_frame_mapping_df(self) -> pd.DataFrame:
+        """Return a DataFrame view of the mapping built during ``iter_frames``."""
+        if not self.frame_mapping:
+            return pd.DataFrame(columns=["processed_idx", "original_idx", "timestamp"])
+        return pd.DataFrame(self.frame_mapping)
+
     def load_frames(self) -> Tuple[List[np.ndarray], pd.DataFrame]:
         """
         Load video frames according to frame_skip configuration.

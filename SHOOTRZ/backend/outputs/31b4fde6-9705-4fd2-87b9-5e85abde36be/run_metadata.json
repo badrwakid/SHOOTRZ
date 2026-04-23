@@ -1,0 +1,115 @@
+{
+  "run_id": "31b4fde6-9705-4fd2-87b9-5e85abde36be",
+  "timestamp": "2026-04-23T02:14:04.424582",
+  "created_at": "2026-04-23 02:14:04",
+  "video_path": "C:\\Users\\Badr\\AppData\\Local\\Temp\\pytest-of-Badr\\pytest-21\\test_pipeline_creates_all_outp0\\test_shot.mp4",
+  "video_metadata": {
+    "video_path": "C:\\Users\\Badr\\AppData\\Local\\Temp\\pytest-of-Badr\\pytest-21\\test_pipeline_creates_all_outp0\\test_shot.mp4",
+    "fps": 30.0,
+    "frame_count": 60,
+    "width": 640,
+    "height": 480,
+    "duration_seconds": 2.0,
+    "resolution": "640x480",
+    "frame_sampling": {
+      "stride": 1,
+      "max_frames": 120,
+      "kept_frames": 60
+    }
+  },
+  "quality_warnings": [
+    "low_light"
+  ],
+  "shooting_side": "right",
+  "pose_frames_detected": 60,
+  "low_light": true,
+  "shot_window": {
+    "start_frame": 0,
+    "crouch_frame": 0,
+    "release_frame": 1,
+    "end_frame": 6,
+    "confidence": "low",
+    "confidence_score": 0.2,
+    "method": "fused_temporal",
+    "crouch_confidence": 0.5,
+    "release_confidence": 0.2,
+    "start_confidence": 0.4,
+    "end_confidence": 0.75,
+    "diagnostics": {
+      "method": "fused_temporal",
+      "candidates": {
+        "crouch": {
+          "base_frame": 0,
+          "base_confidence": 0.25,
+          "knee_min_frame": 0,
+          "fused_frame": 0,
+          "hip_boost": 0.15,
+          "wrist_boost": 0.1
+        },
+        "release": {
+          "candidates": [
+            {
+              "frame_id": 1,
+              "score": 0.4,
+              "kind": "argmax_fallback"
+            }
+          ],
+          "chosen": {
+            "frame_id": 1,
+            "score": 0.4,
+            "kind": "argmax_fallback"
+          }
+        },
+        "start": {
+          "confidence": 0.4,
+          "reason": "low_motion_window"
+        },
+        "end": {
+          "confidence": 0.75,
+          "reason": "wrist_settle"
+        }
+      },
+      "warnings": []
+    },
+    "frame_selection": {
+      "chosen_release": 1,
+      "elbow_peak_frame": 1,
+      "wrist_apex_frame": 1,
+      "vel_zero_frame": null,
+      "consensus_frame": 1,
+      "heuristic_deviation": 0,
+      "heuristic_max_spread": 0,
+      "heuristics_n": 2,
+      "high_confidence_agreement": true,
+      "confidence_score": 0.2,
+      "crouch_frame": 0,
+      "warnings": [
+        "crouch_lt_lead_frames"
+      ],
+      "candidates": [
+        {
+          "frame_id": 1,
+          "score": 0.4,
+          "kind": "argmax_fallback"
+        }
+      ]
+    },
+    "warnings": [
+      "crouch_lt_lead_frames"
+    ]
+  },
+  "overall_score": 0,
+  "metrics_count": 3,
+  "phase_timings_seconds": {
+    "ingestion": 0.0412,
+    "pose_estimation": 0.2681,
+    "smoothing": 0.1293,
+    "angle_computation": 0.2464,
+    "shot_detection": 0.0144,
+    "phase_detection": 0.0183,
+    "metrics_scoring": 0.0059
+  },
+  "processing_time_seconds": 3.6177,
+  "pose_overall_confidence": 0.5,
+  "peak_memory_mb": null
+}

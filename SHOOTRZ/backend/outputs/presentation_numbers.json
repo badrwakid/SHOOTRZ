@@ -1,0 +1,85 @@
+{
+  "clip": "backend/outputs/6b84daec-4390-43ba-9416-0ed2202446cd/input_video.mp4",
+  "clip_duration_s": 13.7,
+  "clip_resolution": "1080x1920",
+  "n_runs": 5,
+  "shooting_side_resolved": "right",
+  "processing_time_s": {
+    "mean": 10.709,
+    "std": 0.832,
+    "min": 9.715,
+    "max": 12.123
+  },
+  "peak_memory_mb_delta": {
+    "mean": 111.3,
+    "max": 161.3,
+    "min": 96.8
+  },
+  "pose_overall_confidence": {
+    "mean": 0.815,
+    "std": 0.0
+  },
+  "overall_score_rule_based_latest": 69,
+  "metrics": [
+    {
+      "name": "elbow_extension",
+      "value_deg": 163.43,
+      "verdict": "Good",
+      "confidence": 0.98,
+      "selected_frame": 339,
+      "sub_score": 90.1
+    },
+    {
+      "name": "knee_bend",
+      "value_deg": 54.46,
+      "verdict": "Needs Work",
+      "confidence": 0.987,
+      "selected_frame": 228,
+      "sub_score": 39.5
+    },
+    {
+      "name": "wrist_follow_through",
+      "value_deg": 25.87,
+      "verdict": "Good",
+      "confidence": 0.974,
+      "selected_frame": 351,
+      "sub_score": 100.0
+    }
+  ],
+  "score_components": [
+    {
+      "name": "loading_quality",
+      "value": 31.5,
+      "weight": 0.3
+    },
+    {
+      "name": "release_mechanics",
+      "value": 100.0,
+      "weight": 0.35
+    },
+    {
+      "name": "follow_through_control",
+      "value": 94.8,
+      "weight": 0.2
+    },
+    {
+      "name": "balance_stability",
+      "value": 70.0,
+      "weight": 0.15
+    }
+  ],
+  "score_breakdown_for_slide": [
+    {
+      "name": "elbow_extension",
+      "sub_score": 90.1
+    },
+    {
+      "name": "knee_bend",
+      "sub_score": 39.5
+    },
+    {
+      "name": "wrist_follow_through",
+      "sub_score": 100.0
+    }
+  ]
+}

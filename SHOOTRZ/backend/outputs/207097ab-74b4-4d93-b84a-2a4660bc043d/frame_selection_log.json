@@ -1,0 +1,53 @@
+{
+  "chosen_release": 69,
+  "elbow_peak_frame": 83,
+  "wrist_apex_frame": 69,
+  "vel_zero_frame": 2,
+  "consensus_frame": 69,
+  "heuristic_deviation": 0,
+  "heuristic_max_spread": 81,
+  "heuristics_n": 3,
+  "high_confidence_agreement": false,
+  "confidence_score": 0.5068228195077119,
+  "crouch_frame": 0,
+  "warnings": [
+    "crouch_lt_lead_frames"
+  ],
+  "candidates": [
+    {
+      "frame_id": 69,
+      "score": 0.53830368,
+      "kind": "peak"
+    },
+    {
+      "frame_id": 111,
+      "score": 0.31460742800000036,
+      "kind": "peak"
+    },
+    {
+      "frame_id": 2,
+      "score": 0.49730844512146966,
+      "kind": "vel_zero"
+    },
+    {
+      "frame_id": 17,
+      "score": 0.49596397329324826,
+      "kind": "vel_zero"
+    },
+    {
+      "frame_id": 27,
+      "score": 0.48722072042015635,
+      "kind": "vel_zero"
+    },
+    {
+      "frame_id": 69,
+      "score": 0.471728574655611,
+      "kind": "vel_zero"
+    },
+    {
+      "frame_id": 111,
+      "score": 0.4479881554312337,
+      "kind": "vel_zero"
+    }
+  ]
+}

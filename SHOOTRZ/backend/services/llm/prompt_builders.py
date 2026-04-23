@@ -57,12 +57,41 @@ def build_shot_feedback_prompt(
     score_tier: str,
     user_profile: Optional[Dict[str, Any]] = None,
 ) -> tuple[str, str]:
+    """Prompt for the holistic shot-feedback call.
+
+    The 2026-04-23 pass reworked this so Gemini ALSO returns the user-facing
+    ``ai_overall_score``. The backend's rule-based number (passed in as
+    ``overall_score``) is a conservative geometric mean that collapses when
+    any single axis is weak — it's meant to be a deterministic floor. The
+    system prompt tells Gemini to grade like an amateur coach: reward
+    attempted form, don't over-punish a single weak axis, and only collapse
+    to < 30 when the motion doesn't look like a shot at all.
+    """
     system = (
         f"{_COACH_PERSONA}\n"
         "You are reviewing a single basketball shot analyzed by computer vision. "
-        "The data below is factual — do NOT contradict it. "
-        "Provide natural, coach-style explanations for each metric, "
-        "highlight strengths and areas to improve, and suggest drills."
+        "The angle values below are factual measurements — do NOT contradict them, "
+        "but you DO decide the final holistic score.\n\n"
+        "SCORING RUBRIC (output as ai_overall_score):\n"
+        "  85-100 : textbook form across elbow, knee, and follow-through.\n"
+        "  70-84  : solid jumpshot with minor issues on one axis (e.g. slightly bent "
+        "           elbow ~150 deg, or slightly shallow knee ~85 deg).\n"
+        "  55-69  : recognisable jumpshot with 1-2 real issues. An attempted shot "
+        "           with one weak axis still belongs here - do NOT push it below 55.\n"
+        "  35-54  : visible form problems on multiple axes but effort + intent are "
+        "           clearly a jumpshot motion.\n"
+        "  15-34  : motion barely resembles a shot; several core metrics are far from "
+        "           target.\n"
+        "   0-14  : unusable data (no real shot in frame, camera pointed wrong, etc).\n\n"
+        "IMPORTANT:\n"
+        " - Grade the ATTEMPTED motion, not the textbook ideal. A recreational shooter "
+        "   whose elbow ends at 152 deg (target 165-180) and wrist follow-through at "
+        "   26 deg (target 18-28) deserves a score in the 65-80 band, not sub-30.\n"
+        " - The backend's rule-based score is deliberately harsh and often wrong; do "
+        "   not anchor to it.\n"
+        " - ai_score_rationale must cite the actual metric values (one sentence).\n"
+        " - Provide natural, coach-style explanations for each metric, strengths, "
+        "   improvements, feedback bullets, and optional drills.\n"
     )
 
     profile_str = ""
@@ -70,11 +99,12 @@ def build_shot_feedback_prompt(
         profile_str = f"\nPlayer profile: {json.dumps(user_profile, ensure_ascii=False)}"
 
     user = (
-        f"Overall score: {overall_score}/100 (tier: {score_tier})\n"
-        f"Metrics: {json.dumps(metrics, ensure_ascii=False)}\n"
+        f"Backend rule-based score (reference only, often too harsh): {overall_score}/100 (tier: {score_tier})\n"
+        f"Primitive metrics: {json.dumps(metrics, ensure_ascii=False)}\n"
         f"Score components: {json.dumps(score_components, ensure_ascii=False)}"
         f"{profile_str}\n\n"
-        "Generate a complete shot feedback analysis."
+        "Return the full structured response, including a holistic ai_overall_score "
+        "graded per the rubric above."
     )
     return system, user
 

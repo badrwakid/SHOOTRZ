@@ -1,0 +1,76 @@
+# SHOOTRZ MVP Configuration
+# All tunable parameters for deterministic, reproducible analysis
+
+# Pose Detection
+pose_detection:
+  model_complexity: 1  # 0 (fastest), 1 (balanced), 2 (most accurate)
+  min_detection_confidence: 0.5
+  min_tracking_confidence: 0.5
+  smooth_landmarks: true
+  confidence_threshold: 0.3  # Joints below this are treated as missing
+
+# Video Processing
+video:
+  frame_skip: 1  # Minimum stride when streaming (auto-stride usually wins)
+  max_frames: 120  # Hard cap on pose frames kept in memory per job
+  min_duration: 1.0  # Minimum video duration in seconds
+  min_resolution: 480  # Minimum height in pixels
+  low_light_threshold: 50.0  # Mean luminance (0-255) below which low_light is flagged
+  max_pose_long_side: 720  # Downscale each frame so its long axis is <= this before pose (0 disables)
+
+# Signal Smoothing
+smoothing:
+  window_length: 5  # Savitzky-Golay window size (must be odd)
+  polyorder: 2  # Polynomial order for Savitzky-Golay
+  max_gap_frames: 10  # Maximum frames to interpolate across
+
+# Shot Detection
+shot_detection:
+  knee_flexion_threshold: 100.0  # Degrees - minimum for crouch detection
+  wrist_peak_window: 15  # Frames to search around peak
+  pre_frames: 10  # Frames before crouch to include in shot window
+  post_frames: 20  # Frames after release to include in shot window
+  stable_window_frames: 5  # Frames for low-motion start detection
+  motion_energy_threshold: 3.0  # Knee angle std threshold for "stable" setup
+  use_legacy_detector: false  # Set true to rollback to knee-min + first wrist peak only
+
+# Metrics - Three Core Metrics
+metrics:
+  # 1. Elbow Extension at Release
+  elbow_extension:
+    good_range: [150, 175]  # Degrees
+    optimal_range: [160, 170]
+    release_window: 3  # Frames ± release to average
+  
+  # 2. Knee Bend Depth
+  knee_bend:
+    good_range: [85, 120]  # Degrees
+    optimal_range: [95, 110]
+  
+  # 3. Wrist Follow-Through
+  wrist_follow_through:
+    min_angle_change: 10  # Degrees change from release to end
+    good_range: [10, 30]
+    optimal_range: [15, 25]
+
+# Scoring
+scoring:
+  # Explainable components (primary overall score)
+  component_weights:
+    loading_quality: 0.30
+    release_mechanics: 0.35
+    follow_through_control: 0.20
+    balance_stability: 0.15
+  # Legacy primitive weights (used only if angles/shot_window omitted)
+  weights:
+    elbow: 0.40
+    knee: 0.30
+    wrist: 0.30
+  confidence_penalty: 0.5
+  low_confidence_threshold: 0.4
+
+# Output
+output:
+  save_overlay_video: false  # Overlay render doubles latency; opt-in via SHOOTRZ_SAVE_OVERLAY=1
+  save_diagnostic_plots: true
+  save_all_csvs: true

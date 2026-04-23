@@ -22,6 +22,7 @@ import { PrimaryButton } from '../components/PrimaryButton'
 import { SkeletonLoader } from '../components/SkeletonLoader'
 import { EmptyState } from '../components/EmptyState'
 import { useAuth } from '../context/AuthContext'
+import { useHistory } from '../context/HistoryContext'
 import { apiService } from '../services/api.service'
 import { storageService } from '../services/storage.service'
 import type { HistorySession } from '../types/contracts'
@@ -42,6 +43,7 @@ function getGreeting(): string {
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 	const { user } = useAuth()
+	const history = useHistory()
 	const [loading, setLoading] = useState(true)
 	const [refreshing, setRefreshing] = useState(false)
 	const [stats, setStats] = useState({ dayStreak: 0, totalAnalyses: 0, averageScore: 0, bestScore: 0 })
@@ -50,24 +52,53 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
 	useEffect(() => { loadData() }, [user?.id])
 	useEffect(() => {
-		const unsub = navigation.addListener('focus', () => loadData())
+		// Stale-while-revalidate on tab focus: ``ensureFresh`` is a no-op if the
+		// cache is <30s old, so flipping between Home and other tabs no longer
+		// re-fires the same history call 2-3 times.
+		const unsub = navigation.addListener('focus', () => {
+			history.ensureFresh().catch(() => {})
+			// Streak/stats endpoints are cheap on the server but still not free;
+			// only refresh them when history is also stale.
+			loadData({ sessionsOnly: true })
+		})
 		return unsub
-	}, [navigation])
+	}, [navigation, history])
 
-	const loadData = async () => {
+	// React to cache bumps from new analyses.
+	useEffect(() => {
+		applySessions(history.sessions as HistorySession[])
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [history.version])
+
+	const applySessions = (histSessions: HistorySession[]) => {
+		if (histSessions.length === 0) return
+		const latest = histSessions[0]
+		const score = Math.round(latest.overall_score ?? latest.average_score ?? 0)
+		setLastSession({ score, date: fmtDate(latest.timestamp || latest.date) })
+		setRecentSessions(
+			histSessions.slice(0, 3).map(h => ({
+				id: h.session_id,
+				score: Math.round(h.overall_score ?? h.average_score ?? 0),
+				date: fmtDate(h.timestamp || h.date),
+			})),
+		)
+	}
+
+	const loadData = async (opts: { sessionsOnly?: boolean } = {}) => {
 		try {
 			if (user?.id) {
 				let serverStats: any = null
 				let serverStreak: any = null
 				let histSessions: HistorySession[] = []
 				try {
-					;[serverStats, serverStreak] = await Promise.all([
-						apiService.getUserStats(),
-						apiService.getUserStreak(),
-					])
+					if (!opts.sessionsOnly) {
+						;[serverStats, serverStreak] = await Promise.all([
+							apiService.getUserStats(),
+							apiService.getUserStreak(),
+						])
+					}
 					try {
-						const hist = await apiService.getAnalysisHistory(5, 0)
-						histSessions = hist?.sessions ?? []
+						histSessions = await history.ensureFresh()
 					} catch {
 						/* history optional if token/network fails */
 					}
@@ -85,27 +116,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 				}
 
 				if (histSessions.length > 0) {
-					const latest = histSessions[0]
-					const score = Math.round(
-						latest.overall_score ??
-							latest.average_score ??
-							serverStats?.bestScore ??
-							serverStats?.avgScore ??
-							0,
-					)
-					setLastSession({
-						score,
-						date: fmtDate(latest.timestamp || latest.date),
-					})
-					setRecentSessions(
-						histSessions.slice(0, 3).map(h => ({
-							id: h.session_id,
-							score: Math.round(
-								h.overall_score ?? h.average_score ?? 0,
-							),
-							date: fmtDate(h.timestamp || h.date),
-						})),
-					)
+					applySessions(histSessions)
 				} else if (serverStats?.lastSessionDate) {
 					setLastSession({
 						score: Math.round(serverStats.bestScore ?? serverStats.avgScore ?? 0),
@@ -214,8 +225,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
 	const onRefresh = async () => {
 		setRefreshing(true)
-		await loadData()
-		setRefreshing(false)
+		try {
+			await history.refresh()
+			await loadData()
+		} finally {
+			setRefreshing(false)
+		}
 	}
 
 	if (loading) {

@@ -14,11 +14,21 @@ export interface MVPMetric {
 	explanation: string
 	confidence: number
 	frame_range?: [number, number]
+	/**
+	 * The exact frame the metric was measured at (peak extension for elbow,
+	 * deepest knee for knee_bend, etc). ``null`` when the metric is Low
+	 * Confidence / N/A.
+	 */
+	selected_frame?: number | null
 }
 
 export interface MVPScoreComponent {
 	name: string
-	value: number
+	/**
+	 * ``null`` when the underlying primitive metric was Low Confidence.
+	 * UI should render as "N/A" rather than 0.
+	 */
+	value: number | null
 	unit?: string
 	weight: number
 	explanation?: string
@@ -39,8 +49,15 @@ export interface MVPEvent {
 	alternatives?: MVPEventAlternative[]
 }
 
+export type MVPResultStatus =
+	| 'queued'
+	| 'processing'
+	| 'completed'
+	| 'completed_low_quality'
+	| 'failed'
+
 export interface MVPResultResponse {
-	status: 'queued' | 'processing' | 'completed' | 'failed'
+	status: MVPResultStatus
 	contract_version?: string
 	run_id?: string
 	overall_score?: number
@@ -88,6 +105,14 @@ export interface MVPResultResponse {
 	}
 	diagnostics?: Record<string, unknown>
 	quality_warnings?: string[]
+	/** Mean landmark visibility across kept frames (0..1). Drives the tracking-quality chip. */
+	pose_overall_confidence?: number | null
+	/** Deterministic rule-based score preserved alongside the AI-refined overall_score. */
+	rule_based_score?: number | null
+	/** ``true`` when ``overall_score`` was produced by Gemini rather than the rule-based geomean. */
+	ai_scored?: boolean | null
+	/** One-line justification Gemini emitted alongside its score. */
+	ai_score_rationale?: string | null
 	error?: string
 	error_detail?: string
 	error_type?: string

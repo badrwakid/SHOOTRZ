@@ -73,6 +73,15 @@ def fallback_shot_feedback(
         feedback_bullets=feedback_bullets[:5],
         drill_suggestions=[],
         score_tier=_score_tier(overall_score),
+        # Echo the rule-based score so the schema stays populated; the
+        # caller (``llm_service.get_shot_feedback``) returns a tuple whose
+        # second element tells consumers this is a fallback, not a real AI
+        # grade.
+        ai_overall_score=int(overall_score),
+        ai_score_rationale=(
+            feedback_summary
+            or f"Rule-based score {overall_score}/100 (AI coach unavailable)."
+        ),
     )
 
 

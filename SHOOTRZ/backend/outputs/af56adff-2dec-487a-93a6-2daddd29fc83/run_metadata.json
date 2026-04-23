@@ -1,0 +1,174 @@
+{
+  "run_id": "af56adff-2dec-487a-93a6-2daddd29fc83",
+  "timestamp": "2026-04-23T03:09:50.791698",
+  "created_at": "2026-04-23 03:09:50",
+  "video_path": "C:\\Users\\Badr\\AppData\\Local\\Temp\\tmp_tcaxe3x.mp4",
+  "video_metadata": {
+    "video_path": "C:\\Users\\Badr\\AppData\\Local\\Temp\\tmp_tcaxe3x.mp4",
+    "fps": 56.184276414621934,
+    "frame_count": 187,
+    "width": 1080,
+    "height": 1920,
+    "duration_seconds": 3.328333333333333,
+    "resolution": "1080x1920",
+    "frame_sampling": {
+      "stride": 1,
+      "max_frames": 120,
+      "kept_frames": 120
+    }
+  },
+  "quality_warnings": [],
+  "shooting_side": "right",
+  "pose_frames_detected": 120,
+  "low_light": false,
+  "shot_window": {
+    "start_frame": 0,
+    "crouch_frame": 0,
+    "release_frame": 69,
+    "end_frame": 74,
+    "confidence": "medium",
+    "confidence_score": 0.5068228195077119,
+    "method": "fused_temporal",
+    "crouch_confidence": 0.59139605,
+    "release_confidence": 0.5068228195077119,
+    "start_confidence": 0.4,
+    "end_confidence": 0.75,
+    "diagnostics": {
+      "method": "fused_temporal",
+      "candidates": {
+        "crouch": {
+          "base_frame": 95,
+          "base_confidence": 0.49139605,
+          "knee_min_frame": 0,
+          "fused_frame": 0,
+          "hip_boost": 0.0,
+          "wrist_boost": 0.1
+        },
+        "release": {
+          "candidates": [
+            {
+              "frame_id": 69,
+              "score": 0.53830368,
+              "kind": "peak"
+            },
+            {
+              "frame_id": 111,
+              "score": 0.31460742800000036,
+              "kind": "peak"
+            },
+            {
+              "frame_id": 2,
+              "score": 0.49730844512146966,
+              "kind": "vel_zero"
+            },
+            {
+              "frame_id": 17,
+              "score": 0.49596397329324826,
+              "kind": "vel_zero"
+            },
+            {
+              "frame_id": 27,
+              "score": 0.48722072042015635,
+              "kind": "vel_zero"
+            },
+            {
+              "frame_id": 69,
+              "score": 0.471728574655611,
+              "kind": "vel_zero"
+            },
+            {
+              "frame_id": 111,
+              "score": 0.4479881554312337,
+              "kind": "vel_zero"
+            }
+          ],
+          "chosen": {
+            "frame_id": 69,
+            "score": 0.53830368,
+            "kind": "peak"
+          }
+        },
+        "start": {
+          "confidence": 0.4,
+          "reason": "low_motion_window"
+        },
+        "end": {
+          "confidence": 0.75,
+          "reason": "wrist_settle"
+        }
+      },
+      "warnings": []
+    },
+    "frame_selection": {
+      "chosen_release": 69,
+      "elbow_peak_frame": 83,
+      "wrist_apex_frame": 69,
+      "vel_zero_frame": 2,
+      "consensus_frame": 69,
+      "heuristic_deviation": 0,
+      "heuristic_max_spread": 81,
+      "heuristics_n": 3,
+      "high_confidence_agreement": false,
+      "confidence_score": 0.5068228195077119,
+      "crouch_frame": 0,
+      "warnings": [
+        "crouch_lt_lead_frames"
+      ],
+      "candidates": [
+        {
+          "frame_id": 69,
+          "score": 0.53830368,
+          "kind": "peak"
+        },
+        {
+          "frame_id": 111,
+          "score": 0.31460742800000036,
+          "kind": "peak"
+        },
+        {
+          "frame_id": 2,
+          "score": 0.49730844512146966,
+          "kind": "vel_zero"
+        },
+        {
+          "frame_id": 17,
+          "score": 0.49596397329324826,
+          "kind": "vel_zero"
+        },
+        {
+          "frame_id": 27,
+          "score": 0.48722072042015635,
+          "kind": "vel_zero"
+        },
+        {
+          "frame_id": 69,
+          "score": 0.471728574655611,
+          "kind": "vel_zero"
+        },
+        {
+          "frame_id": 111,
+          "score": 0.4479881554312337,
+          "kind": "vel_zero"
+        }
+      ]
+    },
+    "warnings": [
+      "crouch_lt_lead_frames"
+    ]
+  },
+  "overall_score": 1,
+  "metrics_count": 3,
+  "phase_timings_seconds": {
+    "ingestion": 0.0116,
+    "pose_estimation": 4.5509,
+    "smoothing": 0.0821,
+    "angle_computation": 0.3155,
+    "shot_detection": 0.0103,
+    "phase_detection": 0.0068,
+    "metrics_scoring": 0.0044
+  },
+  "processing_time_seconds": 5.03,
+  "pose_overall_confidence": 0.9166691899299622,
+  "peak_memory_mb": 333.9,
+  "job_id": "11146e446c7f492c8e28bebf807adc7e"
+}

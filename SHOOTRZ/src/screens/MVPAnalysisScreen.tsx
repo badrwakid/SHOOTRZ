@@ -15,6 +15,7 @@ import * as ImagePicker from 'expo-image-picker'
 import * as FileSystem from 'expo-file-system/legacy'
 import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '../context/AuthContext'
+import { useHistory } from '../context/HistoryContext'
 import { storageService } from '../services/storage.service'
 import { CameraRecorder } from '../components/CameraRecorder'
 import { ScoreRing } from '../components/ScoreRing'
@@ -26,12 +27,12 @@ import { AngleGraph } from '../components/AngleGraph'
 import { API_BASE_URL, apiService } from '../services/api.service'
 import { colors, typography, spacing, radius, glass, shadows, animation, getScoreTier } from '../constants/theme'
 import { hapticFeedback } from '../utils/hapticFeedback'
-import type { MVPMetric, MVPResultResponse } from '../types/contracts'
+import type { MVPMetric, MVPResultResponse, MVPResultStatus } from '../types/contracts'
 
 interface AnalysisResult extends MVPResultResponse {
 	contract_version?: string
 	run_id: string
-	status: 'queued' | 'processing' | 'completed' | 'failed'
+	status: MVPResultStatus
 	overall_score: number
 	feedback_summary: string
 	feedback_bullets?: string[]
@@ -55,6 +56,7 @@ const PROCESSING_LABELS = [
 
 export const MVPAnalysisScreen: React.FC = () => {
 	const { user } = useAuth()
+	const history = useHistory()
 	const [isAnalyzing, setIsAnalyzing] = useState(false)
 	const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null)
 	const [showCameraRecorder, setShowCameraRecorder] = useState(false)
@@ -132,14 +134,27 @@ export const MVPAnalysisScreen: React.FC = () => {
 		try {
 			const uploadResponse = await apiService.analyzeMVP(videoUri, shootingSide)
 			if (uploadResponse.job_id) {
-				let pollCount = 0
-				while (pollCount < 120) {
-					await new Promise(r => setTimeout(r, 1000))
+				// Exponential-ish poll: most real analyses finish in 2-5s on warm
+				// ProcessPool workers. The previous flat 1000ms wasted ~700ms of
+				// wall time per analysis and had a 120s hard cap.
+				const POLL_SCHEDULE_MS = [300, 400, 600, 800, 1000]
+				const POLL_CEILING_MS = 1500
+				const MAX_WALL_TIME_MS = 90_000
+				const start = Date.now()
+				let pollIdx = 0
+				while (Date.now() - start < MAX_WALL_TIME_MS) {
+					const waitMs = POLL_SCHEDULE_MS[Math.min(pollIdx, POLL_SCHEDULE_MS.length - 1)] ?? POLL_CEILING_MS
+					await new Promise(r => setTimeout(r, waitMs))
+					pollIdx += 1
 					const res = await apiService.getMVPResult(uploadResponse.job_id)
-					if (res.status === 'completed') {
+					if (res.status === 'completed' || res.status === 'completed_low_quality') {
 						const v: AnalysisResult = {
-							...res, run_id: res.run_id ?? '', status: 'completed',
-							overall_score: res.overall_score ?? 0, feedback_summary: res.feedback_summary || 'Analysis completed',
+							...res, run_id: res.run_id ?? '', status: res.status,
+							overall_score: res.overall_score ?? 0,
+							feedback_summary:
+								res.status === 'completed_low_quality'
+									? (res.feedback_summary || 'We could not analyse this clip. Try again with better lighting and a full-body side angle.')
+									: (res.feedback_summary || 'Analysis completed'),
 							feedback_bullets: Array.isArray(res.feedback_bullets) ? res.feedback_bullets : [],
 							metrics: Array.isArray(res.metrics) ? res.metrics : [],
 							score_components: Array.isArray(res.score_components) ? res.score_components : [],
@@ -162,6 +177,9 @@ export const MVPAnalysisScreen: React.FC = () => {
 									console.warn('completeMVPAnalysis failed after retry', e2)
 								}
 							}
+							// Invalidate shared history cache so Home/Progress pick
+							// this session up next time they mount or focus.
+							history.bump()
 						}
 						try {
 							const fmv = (k: string) => { const m = v.metrics.find(m2 => m2.name?.toLowerCase().includes(k)); return Number.isFinite(m?.value) ? (m?.value as number) : 0 }
@@ -178,7 +196,6 @@ export const MVPAnalysisScreen: React.FC = () => {
 						return
 					}
 					if (res.status === 'failed') throw new Error(res.error || res.error_detail || 'Analysis failed')
-					pollCount++
 				}
 				throw new Error('Analysis timed out.')
 			} else { throw new Error('Failed to start analysis') }
@@ -244,30 +261,84 @@ export const MVPAnalysisScreen: React.FC = () => {
 					</View>
 				) : analysisResult ? (
 					<View>
-						{/* Score Hero */}
-						<View style={styles.scoreHero}>
-							<Text style={styles.scoreHeroLabel}>YOUR SHOT SCORE</Text>
-							<ScoreRing score={analysisResult.overall_score} size="hero" animated />
-							<TierBadge tier={getScoreTier(analysisResult.overall_score)} size="md" />
-							<Text style={styles.scoreHeroDate}>{new Date().toLocaleDateString()}</Text>
-						</View>
+						{analysisResult.status === 'completed_low_quality' ? (
+							<View style={styles.lowQualityBanner}>
+								<Ionicons name="warning" size={22} color={colors.warning} />
+								<View style={{ flex: 1 }}>
+									<Text style={styles.lowQualityTitle}>We could not analyse this clip</Text>
+									<Text style={styles.lowQualityText}>
+										{analysisResult.feedback_summary || 'Try again with a full-body side view and better lighting.'}
+									</Text>
+									{analysisResult.quality_warnings?.length ? (
+										<Text style={styles.lowQualityHint}>
+											Reason: {analysisResult.quality_warnings.join(', ')}
+										</Text>
+									) : null}
+								</View>
+							</View>
+						) : (
+							<View style={styles.scoreHero}>
+								<Text style={styles.scoreHeroLabel}>YOUR SHOT SCORE</Text>
+								<ScoreRing score={analysisResult.overall_score} size="hero" animated />
+								<TierBadge tier={getScoreTier(analysisResult.overall_score)} size="md" />
+								<Text style={styles.scoreHeroDate}>{new Date().toLocaleDateString()}</Text>
+							</View>
+						)}
+
+						{/* Tracking quality chip — drives user expectations for why a
+						     metric might be N/A. Values come from the backend's
+						     pose_overall_confidence (mean landmark visibility). */}
+						{typeof analysisResult.pose_overall_confidence === 'number' ? (
+							(() => {
+								const q = Math.round((analysisResult.pose_overall_confidence || 0) * 100)
+								const tone =
+									q >= 75 ? colors.success : q >= 55 ? colors.warning : colors.error
+								const label =
+									q >= 75 ? 'Great tracking' : q >= 55 ? 'OK tracking' : 'Weak tracking'
+								return (
+									<View style={[styles.trackingChip, { borderColor: tone }]}>
+										<Ionicons name="body" size={16} color={tone} />
+										<Text style={[styles.trackingChipText, { color: tone }]}>
+											{label} · {q}%
+										</Text>
+										{q < 55 ? (
+											<Text style={styles.trackingChipHint}>
+												Re-record side-on with full body in frame.
+											</Text>
+										) : null}
+									</View>
+								)
+							})()
+						) : null}
 
 						{/* Metric Breakdown */}
 						{analysisResult.metrics && analysisResult.metrics.length > 0 ? (
 							<View style={styles.section}>
 								<SectionHeader title="Biomechanics" />
 								<View style={styles.metricsGrid}>
-									{analysisResult.metrics.map((m, i) => (
-										<View key={i} style={styles.metricItem}>
-											<MetricCard
-												label={m.name ? m.name.replace(/_/g, ' ') : 'Metric'}
-												value={m.value != null ? m.value.toFixed(1) : '--'}
-												unit={m.unit || ''}
-												score={m.confidence != null ? Math.round(m.confidence * 100) : undefined}
-												description={m.explanation}
-											/>
-										</View>
-									))}
+									{analysisResult.metrics.map((m, i) => {
+										const isLowConf = m.verdict === 'Low Confidence'
+										const rawLabel = m.name ? m.name.replace(/_/g, ' ') : 'Metric'
+										const displayValue = isLowConf
+											? '--'
+											: (m.value != null ? m.value.toFixed(1) : '--')
+										const displayUnit = isLowConf ? 'N/A' : (m.unit || '')
+										return (
+											<View key={i} style={styles.metricItem}>
+												<MetricCard
+													label={rawLabel}
+													value={displayValue}
+													unit={displayUnit}
+													score={
+														!isLowConf && m.confidence != null
+															? Math.round(m.confidence * 100)
+															: undefined
+													}
+													description={m.explanation}
+												/>
+											</View>
+										)
+									})}
 								</View>
 							</View>
 						) : null}
@@ -383,6 +454,27 @@ const styles = StyleSheet.create({
 	scoreHero: { alignItems: 'center', paddingVertical: spacing[10], paddingHorizontal: spacing.screenPadding, backgroundColor: colors.bg.void },
 	scoreHeroLabel: { fontSize: typography.size.xs, fontWeight: typography.weight.medium, color: colors.text.secondary, letterSpacing: typography.tracking.widest, marginBottom: spacing[4] },
 	scoreHeroDate: { fontSize: typography.size.sm, color: colors.text.tertiary, marginTop: spacing[3] },
+	lowQualityBanner: {
+		flexDirection: 'row', gap: spacing[3], alignItems: 'flex-start',
+		margin: spacing.screenPadding, padding: spacing[4],
+		borderRadius: radius.xl, borderWidth: 1, borderColor: colors.warning,
+		backgroundColor: colors.bg.void,
+	},
+	lowQualityTitle: { fontSize: typography.size.md, fontWeight: typography.weight.semibold, color: colors.text.primary },
+	lowQualityText: { fontSize: typography.size.sm, color: colors.text.secondary, marginTop: spacing[1] },
+	lowQualityHint: { fontSize: typography.size.xs, color: colors.text.tertiary, marginTop: spacing[2] },
+	trackingChip: {
+		flexDirection: 'row', alignItems: 'center', gap: spacing[2], flexWrap: 'wrap',
+		marginHorizontal: spacing.screenPadding, marginTop: spacing[4],
+		paddingVertical: spacing[2], paddingHorizontal: spacing[3],
+		borderRadius: radius.pill, borderWidth: 1,
+		backgroundColor: colors.bg.void,
+	},
+	trackingChipText: { fontSize: typography.size.sm, fontWeight: typography.weight.semibold },
+	trackingChipHint: {
+		fontSize: typography.size.xs, color: colors.text.tertiary,
+		width: '100%', marginTop: spacing[1],
+	},
 	section: { paddingHorizontal: spacing.screenPadding, marginTop: spacing.sectionGap },
 	metricsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[3] },
 	metricItem: { width: '47%' },

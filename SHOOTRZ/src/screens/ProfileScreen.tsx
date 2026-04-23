@@ -36,7 +36,7 @@ export const ProfileScreen: React.FC = () => {
 	const [loading, setLoading] = useState(false)
 	const [stats, setStats] = useState({ totalSessions: 0, bestScore: 0, currentStreak: 0, goalsCompleted: 0, totalGoals: 0 })
 
-	useEffect(() => { loadUserStats(); loadPreferences() }, [])
+	useEffect(() => { loadUserStats(); loadPreferences() }, [user?.id])
 
 	const loadUserStats = async () => {
 		try {
