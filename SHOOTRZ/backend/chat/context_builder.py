@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import json
 import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -9,6 +10,8 @@ from typing import Any, Dict, List, Optional, Tuple
 from ..storage.db import db
 
 logger = logging.getLogger(__name__)
+
+MAX_CONTEXT_CHARS = 32_000
 
 
 @dataclass(frozen=True)
@@ -124,5 +127,35 @@ def sanitize_context_for_llm(context: Dict[str, Any]) -> Dict[str, Any]:
     goals = out.get("goals")
     if isinstance(goals, list):
         out["goals"] = goals[:10]
+
+    # Hard cap: trim until serialized JSON is within MAX_CONTEXT_CHARS
+    if len(json.dumps(out, default=str)) > MAX_CONTEXT_CHARS:
+        # Phase 1: pop recent_sessions one at a time from the end
+        sessions = out.get("recent_sessions")
+        while isinstance(sessions, list) and sessions and len(json.dumps(out, default=str)) > MAX_CONTEXT_CHARS:
+            sessions.pop()
+
+        # Phase 2: if still over limit, truncate large string fields
+        if len(json.dumps(out, default=str)) > MAX_CONTEXT_CHARS:
+            _LARGE_STRING_FIELDS = ["stats", "user", "primary_goal"]
+            for field in _LARGE_STRING_FIELDS:
+                val = out.get(field)
+                if isinstance(val, str) and len(val) > 500:
+                    out[field] = val[:500]
+                elif isinstance(val, dict):
+                    # Truncate any oversized string values within the dict
+                    for k, v in val.items():
+                        if isinstance(v, str) and len(v) > 200:
+                            val[k] = v[:200]
+                if len(json.dumps(out, default=str)) <= MAX_CONTEXT_CHARS:
+                    break
+
+        # Phase 3: last resort — truncate the whole serialized blob
+        if len(json.dumps(out, default=str)) > MAX_CONTEXT_CHARS:
+            logger.warning(
+                "sanitize_context_for_llm: context still over limit after trimming; "
+                "returning truncated payload",
+                extra={"size": len(json.dumps(out, default=str))},
+            )
 
     return out
