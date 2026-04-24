@@ -5,7 +5,7 @@ import logging
 import time
 from typing import Any, Dict, Generator, List
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
 
 from ..chat.context_builder import (
@@ -18,6 +18,7 @@ from ..services.llm import llm_service
 from ..services.llm.prompt_builders import build_chat_prompt
 from ..storage.db import db
 from ..utils.supabase_auth import AuthenticatedUser, get_authenticated_user
+from .mvp import limiter
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +46,9 @@ def _build_context(payload: ChatRequest, user: AuthenticatedUser):
 # ---------------------------------------------------------------------------
 
 @router.post("/chat", response_model=ChatResponse)
+@limiter.limit("20/minute")
 async def chat(
+    request: Request,
     payload: ChatRequest,
     user: AuthenticatedUser = Depends(get_authenticated_user),
 ):
@@ -131,7 +134,9 @@ def _sse_generator(
 
 
 @router.post("/chat/stream")
+@limiter.limit("20/minute")
 async def chat_stream(
+    request: Request,
     payload: ChatRequest,
     user: AuthenticatedUser = Depends(get_authenticated_user),
 ):
