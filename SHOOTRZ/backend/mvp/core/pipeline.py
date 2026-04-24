@@ -69,7 +69,7 @@ def _try_ball_tracking(video_path: str) -> Optional[Dict[str, Any]]:
             return None
         return detect_and_track_ball(frames_rgb)
     except Exception as exc:
-        print(f"Ball tracking unavailable: {exc}")
+        logger.warning("Ball tracking unavailable: %s", exc)
         return None
 
 
@@ -102,7 +102,7 @@ def _release_angle_from_trajectory(
             "frame_range": [0, 0],
         }
     except Exception as exc:
-        print(f"Release-angle metric skipped: {exc}")
+        logger.warning("Release-angle metric skipped: %s", exc)
         return None
 
 
@@ -485,7 +485,7 @@ class MVPPipeline:
                             mapped["phase"] = str(phase_obj)
                     phases_payload.append(mapped)
             except Exception as phase_err:
-                print(f"Phase detection skipped: {phase_err}")
+                logger.warning("Phase detection skipped: %s", phase_err)
 
         # Optional ball tracking (env-gated; failures swallowed).
         ball_trajectory: Optional[List[Dict[str, Any]]] = None
