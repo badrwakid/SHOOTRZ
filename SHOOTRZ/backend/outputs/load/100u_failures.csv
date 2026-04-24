@@ -1,4 +1,0 @@
-Method,Name,Error,Occurrences
-GET,poll,"ConnectionResetError(10054, 'An existing connection was forcibly closed by the remote host', None, 10054, None)",1
-POST,submit,"ConnectionResetError(10054, 'An existing connection was forcibly closed by the remote host', None, 10054, None)",18
-POST,submit_with_poll,"ConnectionResetError(10054, 'An existing connection was forcibly closed by the remote host', None, 10054, None)",19

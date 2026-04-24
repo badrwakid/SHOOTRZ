@@ -1,3 +1,0 @@
-Method,Name,Error,Occurrences
-POST,submit,"ConnectionAbortedError(10053, 'An established connection was aborted by the software in your host machine', None, 10053, None)",1
-GET,poll,"ReadTimeout(ReadTimeoutError(""HTTPConnectionPool(host='127.0.0.1', port=8000): Read timed out. (read timeout=20)""))",2

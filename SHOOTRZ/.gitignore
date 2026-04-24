@@ -68,3 +68,8 @@ htmlcov/
 tmp/
 temp/
 *.tmp
+
+# Runtime artifacts
+__graveyard__/
+backend/outputs/
+backend/database/progress.db
