@@ -17,6 +17,8 @@ _PROMPT_SAFE_RE = re.compile(r"[^\w\s.,!?'\"\\():;\-]")
 
 def _sanitize_str(s: object, max_len: int = 200) -> str:
     """Strip non-printable and injection-prone characters from user-supplied strings."""
+    if s is None:
+        return ""
     if not isinstance(s, str):
         return str(s)[:max_len]
     return _PROMPT_SAFE_RE.sub("", s)[:max_len]
@@ -71,14 +73,14 @@ def build_user_context(
     user_section: Dict[str, Any] = {}
     if user:
         user_section = {
-            "name": _sanitize_str(user.get("name")),
-            "skill_level": _sanitize_str(user.get("skill_level")),
-            "position": _sanitize_str(user.get("position")),
+            "name": _sanitize_str(user.get("name"), max_len=80),
+            "skill_level": _sanitize_str(user.get("skill_level"), max_len=50),
+            "position": _sanitize_str(user.get("position"), max_len=50),
             "dominant_hand": user.get("dominant_hand"),
         }
     if profile:
-        user_section["coaching_style"] = _sanitize_str(profile.get("coaching_style", "balanced"))
-        user_section["primary_goal"] = _sanitize_str(profile.get("primary_goal"))
+        user_section["coaching_style"] = _sanitize_str(profile.get("coaching_style", "balanced"), max_len=80)
+        user_section["primary_goal"] = _sanitize_str(profile.get("primary_goal"), max_len=300)
         user_section["training_frequency"] = profile.get("training_frequency")
         user_section["years_playing"] = profile.get("years_playing")
 
@@ -103,7 +105,7 @@ def build_user_context(
                 for g in local_goals[:10]
             ]
 
-    primary_goal = _sanitize_str(profile.get("primary_goal")) if profile else None
+    primary_goal = _sanitize_str(profile.get("primary_goal"), max_len=300) if profile else None
 
     context: Dict[str, Any] = {
         "user": user_section,
