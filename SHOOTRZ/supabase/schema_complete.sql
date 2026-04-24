@@ -67,7 +67,7 @@ END $$;
 --      Root entity. Auth trigger populates this from auth.users on sign-up.
 -- -----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS users (
-  id                       uuid        PRIMARY KEY DEFAULT auth.uid(),
+  id                       uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
   email                    text        UNIQUE NOT NULL,
   username                 text        UNIQUE,
   name                     text,
@@ -103,6 +103,7 @@ CREATE TABLE IF NOT EXISTS user_streaks (
   current_streak     int         NOT NULL DEFAULT 0,
   longest_streak     int         NOT NULL DEFAULT 0,
   last_activity_date date,
+  total_sessions     int         NOT NULL DEFAULT 0,
   updated_at         timestamptz DEFAULT now()
 );
 
@@ -308,6 +309,9 @@ CREATE INDEX IF NOT EXISTS idx_session_videos_session_id
 CREATE INDEX IF NOT EXISTS idx_session_videos_video_id
   ON session_videos(video_id);
 
+CREATE INDEX IF NOT EXISTS idx_metrics_video_id ON metrics(video_id);
+CREATE INDEX IF NOT EXISTS idx_feedback_metric_id ON feedback(metric_id);
+
 CREATE INDEX IF NOT EXISTS idx_metrics_metric_name
   ON metrics(metric_name);
 
@@ -512,6 +516,15 @@ DO $$ BEGIN
     );
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
+DO $$ BEGIN
+  CREATE POLICY "User update own videos" ON storage.objects
+    FOR UPDATE USING (
+      bucket_id = 'videos'
+      AND auth.role() = 'authenticated'
+      AND split_part(name, '/', 1) = auth.uid()::text
+    );
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
 
 -- =============================================================================
 -- 8. FUNCTIONS / RPCs
@@ -628,52 +641,47 @@ $$;
 -- 8.3  update_user_streak(p_user_id uuid)
 --      Called by db.update_streak().  Bumps streak if activity today or yesterday.
 -- -----------------------------------------------------------------------------
-CREATE OR REPLACE FUNCTION public.update_user_streak(p_user_id uuid)
+CREATE OR REPLACE FUNCTION update_user_streak(p_user_id UUID)
 RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
 AS $$
 DECLARE
-  v_today        date := CURRENT_DATE;
-  v_last_date    date;
-  v_current      int;
-  v_longest      int;
+  v_today date := CURRENT_DATE;
+  v_last_date date;
+  v_current_streak int;
+  v_longest_streak int;
 BEGIN
-  -- Upsert row so it always exists
-  INSERT INTO public.user_streaks (user_id, current_streak, longest_streak, last_activity_date, updated_at)
-  VALUES (p_user_id, 1, 1, v_today, now())
-  ON CONFLICT (user_id) DO NOTHING;
+  -- Atomic upsert: create row if absent, otherwise do nothing but lock the row
+  INSERT INTO public.user_streaks (user_id, current_streak, longest_streak, last_activity_date, total_sessions)
+  VALUES (p_user_id, 1, 1, v_today, 1)
+  ON CONFLICT (user_id) DO UPDATE
+    SET total_sessions = user_streaks.total_sessions + 1
+    -- only increment total_sessions here; streak logic below uses RETURNING
+  RETURNING last_activity_date, current_streak, longest_streak
+  INTO v_last_date, v_current_streak, v_longest_streak;
 
-  SELECT last_activity_date, current_streak, longest_streak
-  INTO v_last_date, v_current, v_longest
-  FROM public.user_streaks
-  WHERE user_id = p_user_id;
+  -- If this is the first insert (v_last_date = v_today from the INSERT), we're done
+  IF v_last_date = v_today AND v_current_streak = 1 THEN
+    RETURN; -- fresh row, already set correctly
+  END IF;
 
+  -- Streak update logic (safe: we hold the row lock from the upsert above)
   IF v_last_date = v_today THEN
-    -- Already counted today — just refresh updated_at
-    UPDATE public.user_streaks
-    SET updated_at = now()
-    WHERE user_id = p_user_id;
-
+    -- Already counted today (duplicate call), just return
+    RETURN;
   ELSIF v_last_date = v_today - INTERVAL '1 day' THEN
     -- Consecutive day — extend streak
-    v_current := v_current + 1;
-    v_longest := GREATEST(v_longest, v_current);
     UPDATE public.user_streaks
-    SET current_streak     = v_current,
-        longest_streak     = v_longest,
-        last_activity_date = v_today,
-        updated_at         = now()
+    SET current_streak = v_current_streak + 1,
+        longest_streak = GREATEST(v_longest_streak, v_current_streak + 1),
+        last_activity_date = v_today
     WHERE user_id = p_user_id;
-
   ELSE
     -- Streak broken — reset
     UPDATE public.user_streaks
-    SET current_streak     = 1,
-        longest_streak     = GREATEST(v_longest, 1),
-        last_activity_date = v_today,
-        updated_at         = now()
+    SET current_streak = 1,
+        last_activity_date = v_today
     WHERE user_id = p_user_id;
   END IF;
 END;
