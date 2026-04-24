@@ -1,23 +1,16 @@
 import React from 'react'
 import { View, Text, StyleSheet } from 'react-native'
-import { colors, typography, radius, spacing } from '../constants/theme'
+import { typography, radius, spacing } from '../constants/theme'
 import type { ScoreTier } from '../constants/theme'
+import { SCORE_TIER_BADGE, SCORE_TIER_LABELS } from '../theme/scoreTier'
 
 interface TierBadgeProps {
 	tier: ScoreTier
 	size?: 'sm' | 'md'
 }
 
-const TIER_LABELS: Record<ScoreTier, string> = {
-	elite: 'ELITE',
-	great: 'GREAT',
-	good: 'GOOD',
-	fair: 'FAIR',
-	poor: 'POOR',
-}
-
 export function TierBadge({ tier, size = 'sm' }: TierBadgeProps) {
-	const tierColor = colors.score[tier]
+	const tierColor = SCORE_TIER_BADGE[tier]
 
 	return (
 		<View
@@ -31,7 +24,7 @@ export function TierBadge({ tier, size = 'sm' }: TierBadgeProps) {
 			]}
 		>
 			<Text style={[styles.label, { color: tierColor.text }]}>
-				{TIER_LABELS[tier]}
+				{SCORE_TIER_LABELS[tier]}
 			</Text>
 		</View>
 	)
@@ -43,8 +36,9 @@ const styles = StyleSheet.create({
 		alignSelf: 'flex-start',
 	},
 	label: {
-		fontSize: typography.size.xs,
+		...typography.roles.caption,
 		fontWeight: typography.weight.bold,
 		letterSpacing: typography.tracking.wider,
+		textTransform: 'uppercase',
 	},
 })

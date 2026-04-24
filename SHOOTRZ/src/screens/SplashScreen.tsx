@@ -120,8 +120,10 @@ const styles = StyleSheet.create({
 		backgroundColor: colors.brand.orange,
 	},
 	tagline: {
+		...typography.roles.caption,
 		fontSize: typography.size.xs,
 		fontWeight: typography.weight.medium,
+		fontFamily: 'DMSansMedium',
 		color: colors.brand.cyan,
 		letterSpacing: typography.tracking.widest,
 	},

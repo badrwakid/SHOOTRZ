@@ -37,9 +37,17 @@ def linucb_expectation_scores(bandit, user_context):
     return bandit.predict_expectations(ctx)
 
 
-def recommend_drill(user_vec, user_context, drills, labels, tiers, faiss_index, bandit):
+def recommend_drill(
+    user_vec, user_context, drills, labels, tiers, faiss_index, bandit,
+    weak_areas=None, user_level=None
+):
     """
     Recommend a drill using FAISS + LinUCB.
+
+    weak_areas: list[str] | None — shot-mechanic weak areas (e.g. ["elbow"]).
+        Reserved for future tier/pool filtering; not yet used in the body.
+    user_level: str | None — skill level (e.g. "beginner").
+        Reserved for future tier/pool filtering; not yet used in the body.
     """
 
     # Normalize user embedding

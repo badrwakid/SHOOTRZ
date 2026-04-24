@@ -1,7 +1,8 @@
 import React from 'react'
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
-import { colors, typography, spacing } from '../constants/theme'
+import { spacing } from '../constants/theme'
+import { useTokens } from '../theme/useTokens'
 
 interface ScreenHeaderProps {
 	title: string
@@ -18,11 +19,13 @@ export function ScreenHeader({
 	rightAction,
 	transparent = false,
 }: ScreenHeaderProps) {
+	const t = useTokens()
+
 	return (
 		<View
 			style={[
 				styles.header,
-				!transparent && styles.opaque,
+				!transparent && [styles.opaque, { backgroundColor: t.tokens.bg.primary, borderBottomColor: t.tokens.border.subtle }],
 			]}
 		>
 			{backButton ? (
@@ -33,17 +36,23 @@ export function ScreenHeader({
 					accessibilityLabel="Go back"
 					hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
 				>
-					<Ionicons name="chevron-back" size={24} color={colors.text.primary} />
+					<Ionicons name="chevron-back" size={24} color={t.tokens.text.primary} />
 				</TouchableOpacity>
 			) : (
 				<View style={styles.backPlaceholder} />
 			)}
 			<View style={styles.center}>
-				<Text style={styles.title} numberOfLines={1}>
+				<Text style={[t.typography.headingMd, { color: t.tokens.text.primary }]} numberOfLines={1}>
 					{title}
 				</Text>
 				{subtitle ? (
-					<Text style={styles.subtitle} numberOfLines={1}>
+					<Text
+						style={[
+							t.typography.caption,
+							{ color: t.tokens.text.secondary, marginTop: spacing[1] },
+						]}
+						numberOfLines={1}
+					>
 						{subtitle}
 					</Text>
 				) : null}
@@ -65,9 +74,7 @@ const styles = StyleSheet.create({
 		paddingHorizontal: spacing.screenPadding,
 	},
 	opaque: {
-		backgroundColor: colors.bg.primary,
 		borderBottomWidth: 1,
-		borderBottomColor: colors.border.subtle,
 	},
 	back: {
 		width: 44,
@@ -81,15 +88,6 @@ const styles = StyleSheet.create({
 	center: {
 		flex: 1,
 		alignItems: 'center',
-	},
-	title: {
-		fontSize: typography.size.lg,
-		fontWeight: typography.weight.bold,
-		color: colors.text.primary,
-	},
-	subtitle: {
-		fontSize: typography.size.sm,
-		color: colors.text.secondary,
 	},
 	rightAction: {
 		width: 44,

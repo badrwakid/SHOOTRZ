@@ -205,7 +205,7 @@ export const ProfileScreen: React.FC = () => {
 					</View>
 					<Text style={styles.userName}>{user?.name || 'Player'}</Text>
 					{user?.username ? <Text style={styles.userHandle}>@{user.username}</Text> : null}
-					<TouchableOpacity onPress={handleEditProfile} style={styles.editBtn}>
+					<TouchableOpacity onPress={handleEditProfile} style={styles.editBtn} activeOpacity={0.75}>
 						<Ionicons name="create-outline" size={16} color={colors.brand.orange} />
 						<Text style={styles.editText}>Edit Profile</Text>
 					</TouchableOpacity>
@@ -226,33 +226,54 @@ export const ProfileScreen: React.FC = () => {
 							<Ionicons name="notifications-outline" size={20} color={colors.text.secondary} />
 							<Text style={styles.prefLabel}>Notifications</Text>
 						</View>
-						<Switch value={notifications} onValueChange={handleNotificationToggle} trackColor={{ false: colors.bg.elevated, true: colors.brand.orangeDim }} thumbColor={notifications ? colors.brand.orange : colors.text.tertiary} />
+						<Switch
+							value={notifications}
+							onValueChange={handleNotificationToggle}
+							trackColor={{ false: colors.bg.elevated, true: colors.brand.orangeDim }}
+							thumbColor={notifications ? colors.brand.orange : colors.text.tertiary}
+							accessibilityLabel="Notifications"
+							accessibilityHint="When on, you can receive training reminders and app updates"
+						/>
 					</View>
 					<View style={styles.prefRow}>
 						<View style={styles.prefLeft}>
 							<Ionicons name="moon-outline" size={20} color={colors.text.secondary} />
 							<Text style={styles.prefLabel}>Dark Mode</Text>
 						</View>
-						<Switch value={darkMode} onValueChange={handleDarkModeToggle} trackColor={{ false: colors.bg.elevated, true: colors.brand.orangeDim }} thumbColor={darkMode ? colors.brand.orange : colors.text.tertiary} />
+						<Switch
+							value={darkMode}
+							onValueChange={handleDarkModeToggle}
+							trackColor={{ false: colors.bg.elevated, true: colors.brand.orangeDim }}
+							thumbColor={darkMode ? colors.brand.orange : colors.text.tertiary}
+							accessibilityLabel="Dark mode"
+							accessibilityHint="SHOOTRZ currently uses a dark interface only; this toggle is for future theming"
+						/>
 					</View>
 					<View style={styles.prefRow}>
 						<View style={styles.prefLeft}>
 							<Ionicons name="analytics-outline" size={20} color={colors.text.secondary} />
 							<Text style={styles.prefLabel}>Analytics</Text>
 						</View>
-						<Switch value={analytics} onValueChange={handleAnalyticsToggle} trackColor={{ false: colors.bg.elevated, true: colors.brand.orangeDim }} thumbColor={analytics ? colors.brand.orange : colors.text.tertiary} />
+						<Switch
+							value={analytics}
+							onValueChange={handleAnalyticsToggle}
+							trackColor={{ false: colors.bg.elevated, true: colors.brand.orangeDim }}
+							thumbColor={analytics ? colors.brand.orange : colors.text.tertiary}
+							accessibilityLabel="Product analytics"
+							accessibilityHint="When on, uses anonymous data to help improve the app"
+						/>
 					</View>
 				</View>
 
 				{/* Account Actions */}
 				<View style={styles.section}>
 					<SectionHeader title="Account" />
-					<TouchableOpacity style={styles.actionRow} onPress={handleExportData}>
+					<TouchableOpacity style={styles.actionRow} onPress={handleExportData} activeOpacity={0.75}>
 						<Ionicons name="download-outline" size={20} color={colors.text.secondary} />
 						<Text style={styles.actionLabel}>Export Data</Text>
 						<Ionicons name="chevron-forward" size={16} color={colors.text.tertiary} />
 					</TouchableOpacity>
-					<TouchableOpacity style={styles.actionRow} onPress={handleDeleteAccount}>
+					<TouchableOpacity style={styles.actionRow} onPress={handleDeleteAccount} activeOpacity={0.75}>
 						<Ionicons name="trash-outline" size={20} color={colors.error} />
 						<Text style={[styles.actionLabel, { color: colors.error }]}>Delete Account</Text>
 						<Ionicons name="chevron-forward" size={16} color={colors.text.tertiary} />
@@ -304,6 +325,7 @@ export const ProfileScreen: React.FC = () => {
 										key={level}
 										style={[styles.skillPill, editSkillLevel === level && styles.skillPillActive]}
 										onPress={() => { hapticFeedback.selection(); setEditSkillLevel(level) }}
+										activeOpacity={0.8}
 									>
 										<Text style={[styles.skillPillText, editSkillLevel === level && styles.skillPillTextActive]}>
 											{level.charAt(0).toUpperCase() + level.slice(1)}
@@ -313,7 +335,7 @@ export const ProfileScreen: React.FC = () => {
 							</View>
 						</View>
 						<PrimaryButton label="Save" onPress={handleSaveProfile} loading={loading} fullWidth />
-						<TouchableOpacity onPress={() => setShowEditModal(false)} style={styles.modalCancel}>
+						<TouchableOpacity onPress={() => setShowEditModal(false)} style={styles.modalCancel} activeOpacity={0.75}>
 							<Text style={styles.modalCancelText}>Cancel</Text>
 						</TouchableOpacity>
 					</View>
@@ -327,12 +349,12 @@ const styles = StyleSheet.create({
 	container: { flex: 1, backgroundColor: colors.bg.primary },
 	loadingOverlay: {
 		...StyleSheet.absoluteFillObject,
-		backgroundColor: 'rgba(8, 10, 14, 0.9)',
+		backgroundColor: glass.sheet.bg,
 		alignItems: 'center',
 		justifyContent: 'center',
 		zIndex: 10,
 	},
-	loadingText: { fontSize: typography.size.base, color: colors.text.secondary, marginTop: spacing[3] },
+	loadingText: { ...typography.roles.body, color: colors.text.secondary, marginTop: spacing[3] },
 	heroCard: {
 		alignItems: 'center',
 		paddingVertical: spacing[8],
@@ -351,17 +373,16 @@ const styles = StyleSheet.create({
 		marginBottom: spacing[3],
 	},
 	avatarInitials: {
-		fontSize: typography.size.xl,
-		fontWeight: typography.weight.bold,
-		color: colors.text.primary,
+		...typography.roles.headingMd,
+		color: colors.text.inverse,
 	},
 	userName: {
-		fontSize: typography.size.xl,
-		fontWeight: typography.weight.bold,
+		...typography.roles.headingLg,
 		color: colors.text.primary,
+		textAlign: 'center' as const,
 	},
 	userHandle: {
-		fontSize: typography.size.sm,
+		...typography.roles.caption,
 		color: colors.text.tertiary,
 		marginTop: 2,
 	},
@@ -372,9 +393,10 @@ const styles = StyleSheet.create({
 		marginTop: spacing[3],
 	},
 	editText: {
-		fontSize: typography.size.sm,
+		...typography.roles.caption,
 		color: colors.brand.orange,
 		fontWeight: typography.weight.semibold,
+		fontFamily: 'DMSansSemiBold',
 	},
 	statsRow: {
 		flexDirection: 'row',
@@ -395,7 +417,7 @@ const styles = StyleSheet.create({
 		borderBottomColor: colors.border.subtle,
 	},
 	prefLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing[3] },
-	prefLabel: { fontSize: typography.size.base, color: colors.text.primary },
+	prefLabel: { ...typography.roles.body, color: colors.text.primary },
 	actionRow: {
 		flexDirection: 'row',
 		alignItems: 'center',
@@ -404,14 +426,14 @@ const styles = StyleSheet.create({
 		borderBottomWidth: 1,
 		borderBottomColor: colors.border.subtle,
 	},
-	actionLabel: { flex: 1, fontSize: typography.size.base, color: colors.text.primary },
+	actionLabel: { flex: 1, ...typography.roles.body, color: colors.text.primary },
 	signOutSection: {
 		paddingHorizontal: spacing.screenPadding,
 		marginTop: spacing[8],
 	},
 	modalOverlay: {
 		flex: 1,
-		backgroundColor: 'rgba(8, 10, 14, 0.85)',
+		backgroundColor: glass.sheet.bg,
 		justifyContent: 'center',
 		padding: spacing[5],
 	},
@@ -423,14 +445,13 @@ const styles = StyleSheet.create({
 		borderColor: colors.border.default,
 	},
 	modalTitle: {
-		fontSize: typography.size.xl,
-		fontWeight: typography.weight.bold,
+		...typography.roles.headingLg,
 		color: colors.text.primary,
 		textAlign: 'center',
 		marginBottom: spacing[5],
 	},
 	modalField: { marginBottom: spacing[4] },
-	modalLabel: { fontSize: typography.size.sm, fontWeight: typography.weight.semibold, color: colors.text.secondary, marginBottom: spacing[1] },
+	modalLabel: { ...typography.roles.caption, color: colors.text.secondary, fontWeight: typography.weight.semibold, fontFamily: 'DMSansSemiBold', marginBottom: spacing[1] },
 	modalInput: {
 		backgroundColor: colors.bg.secondary,
 		borderWidth: 1,
@@ -438,7 +459,7 @@ const styles = StyleSheet.create({
 		borderRadius: radius.md,
 		paddingHorizontal: spacing[4],
 		paddingVertical: spacing[3],
-		fontSize: typography.size.base,
+		...typography.roles.body,
 		color: colors.text.primary,
 	},
 	skillPills: { flexDirection: 'row', gap: spacing[2] },
@@ -451,8 +472,8 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 	},
 	skillPillActive: { backgroundColor: colors.brand.orangeDim, borderColor: colors.brand.orange },
-	skillPillText: { fontSize: typography.size.sm, color: colors.text.secondary },
-	skillPillTextActive: { color: colors.brand.orangeLight, fontWeight: typography.weight.bold },
+	skillPillText: { ...typography.roles.caption, color: colors.text.secondary },
+	skillPillTextActive: { ...typography.roles.bodyStrong, color: colors.brand.orangeLight },
 	modalCancel: { alignItems: 'center', paddingVertical: spacing[3], marginTop: spacing[2] },
-	modalCancelText: { fontSize: typography.size.sm, color: colors.text.tertiary },
+	modalCancelText: { ...typography.roles.caption, color: colors.text.tertiary },
 })

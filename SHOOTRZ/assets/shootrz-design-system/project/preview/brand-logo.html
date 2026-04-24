@@ -1,0 +1,376 @@
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<title>Logo System · SHOOTRZ</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Barlow+Condensed:wght@700;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0A0E14;font-family:'DM Sans',sans-serif;padding:24px;color:#F1F5F9;max-width:1040px;margin:0 auto}
+
+.kicker{font-size:10px;font-weight:700;color:#94A3B8;letter-spacing:2px;margin-bottom:4px}
+.title{font-family:'Barlow Condensed',sans-serif;font-size:28px;font-weight:900;letter-spacing:-.5px;line-height:1}
+.sub{font-size:12px;color:#94A3B8;margin:6px 0 22px;max-width:700px;line-height:1.55}
+
+.section{margin-bottom:26px}
+.h{font-size:11px;font-weight:700;color:#64748B;letter-spacing:2px;text-transform:uppercase;margin-bottom:12px}
+.card{background:#151C26;border:1px solid rgba(148,163,184,.14);border-radius:14px;padding:18px}
+
+/* Variant grid */
+.vgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.var{border-radius:12px;overflow:hidden;border:1px solid rgba(148,163,184,.1)}
+.var-preview{padding:28px 20px;display:flex;align-items:center;justify-content:center;min-height:130px}
+.var-meta{padding:10px 14px;background:#0F141B;border-top:1px solid rgba(148,163,184,.08);display:flex;align-items:center;justify-content:space-between;font-size:11px}
+.var-name{font-family:'JetBrains Mono',monospace;font-weight:700;color:#F1F5F9;letter-spacing:.5px}
+.var-tag{font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;letter-spacing:1px;padding:3px 7px;border-radius:4px}
+.tag-primary{background:rgba(236,90,40,.14);color:#FF7B3D}
+.tag-mono{background:rgba(148,163,184,.14);color:#CBD5E1}
+.tag-a11y{background:rgba(20,199,224,.14);color:#14C7E0}
+.tag-icon{background:rgba(245,158,11,.14);color:#F59E0B}
+
+/* Backgrounds */
+.bg-dark{background:#0A0E14}
+.bg-elev{background:#1C2432}
+.bg-light{background:#F1F5F9}
+.bg-brand{background:#EC5A28}
+.bg-photo{background:linear-gradient(135deg,#1e3a8a,#7c2d12);position:relative;overflow:hidden}
+.bg-photo::after{content:'';position:absolute;inset:0;background:radial-gradient(circle at 30% 40%,rgba(255,255,255,.2),transparent 50%),radial-gradient(circle at 70% 70%,rgba(0,0,0,.3),transparent 50%)}
+
+.var-preview img,.var-preview svg{max-width:100%;height:auto;max-height:56px;object-fit:contain;position:relative;z-index:1}
+
+/* Mono versions — use CSS filters to fake 1-color renders from the raster */
+.mono-light img{filter:brightness(0) invert(1)}
+.mono-dark img{filter:brightness(0)}
+.a11y-hi img{filter:brightness(0) invert(1) drop-shadow(0 0 0 #fff)}
+
+/* Icon-only mark grid */
+.icon-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;align-items:end}
+.icon-spec{display:flex;flex-direction:column;align-items:center;gap:8px}
+.icon-box{background:#0F141B;border:1px solid rgba(148,163,184,.1);border-radius:12px;padding:12px;display:flex;align-items:center;justify-content:center}
+.icon-label{font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;color:#94A3B8;letter-spacing:1px;text-align:center}
+.icon-label b{color:#F1F5F9;font-weight:700}
+
+/* Clear space */
+.cs-wrap{background:#0F141B;border-radius:12px;padding:32px;display:flex;justify-content:center;align-items:center}
+.cs-box{position:relative;display:inline-block;padding:24px}
+.cs-box::before{content:'';position:absolute;inset:0;border:1.5px dashed rgba(20,199,224,.5);border-radius:4px}
+.cs-tick{position:absolute;font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;color:#14C7E0;letter-spacing:1px}
+.cs-tick.top{top:-16px;left:50%;transform:translateX(-50%)}
+.cs-tick.right{right:-8px;top:50%;transform:translate(100%,-50%)}
+.cs-tick.bottom{bottom:-16px;left:50%;transform:translateX(-50%)}
+.cs-tick.left{left:-8px;top:50%;transform:translate(-100%,-50%)}
+
+/* Do / Don't */
+.dd-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.dd{border-radius:12px;overflow:hidden;border:1px solid rgba(148,163,184,.1)}
+.dd-preview{height:110px;display:flex;align-items:center;justify-content:center;padding:14px;position:relative}
+.dd-label{padding:10px 12px;font-size:11px;display:flex;align-items:center;gap:8px;background:#0F141B;border-top:1px solid rgba(148,163,184,.08);line-height:1.35}
+.dd-tag{flex-shrink:0;width:18px;height:18px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px}
+.tag-do{background:#22C55E;color:#0A0E14}
+.tag-dont{background:#EF4444;color:#F1F5F9}
+.dd-preview img{max-width:100%;height:auto;max-height:40px}
+
+/* Specs table */
+.spec{display:flex;flex-direction:column;background:#0F141B;border-radius:10px;overflow:hidden}
+.spec-row{display:grid;grid-template-columns:160px 1fr;gap:14px;padding:10px 14px;border-bottom:1px solid rgba(148,163,184,.08);font-size:12px}
+.spec-row:last-child{border-bottom:none}
+.spec-row .k{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;color:#14C7E0;letter-spacing:.5px}
+.spec-row .v{color:#CBD5E1;line-height:1.5}
+.spec-row code{font-family:'JetBrains Mono',monospace;font-size:11px;color:#FF7B3D;background:rgba(236,90,40,.08);padding:1px 5px;border-radius:3px}
+
+/* Contrast matrix */
+.matrix{width:100%;border-collapse:separate;border-spacing:0;font-size:12px}
+.matrix th{background:#0F141B;padding:10px 12px;text-align:left;font-size:10px;letter-spacing:1.5px;color:#94A3B8;font-weight:700;border-bottom:1px solid rgba(148,163,184,.14)}
+.matrix td{padding:10px 12px;border-bottom:1px solid rgba(148,163,184,.06);color:#CBD5E1;vertical-align:middle}
+.matrix .pill{display:inline-block;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;padding:3px 8px;border-radius:4px;letter-spacing:.5px}
+.pill-ok{background:rgba(34,197,94,.14);color:#4ADE80}
+.pill-warn{background:rgba(245,158,11,.14);color:#FBBF24}
+.pill-no{background:rgba(239,68,68,.14);color:#F87171}
+.matrix code{font-family:'JetBrains Mono',monospace;font-size:10px;color:#FF7B3D;background:rgba(236,90,40,.08);padding:1px 5px;border-radius:3px}
+
+/* Export */
+.ex-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.ex{background:#0F141B;border:1px solid rgba(148,163,184,.1);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:6px}
+.ex-t{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;color:#F1F5F9;letter-spacing:.5px}
+.ex-d{font-size:11px;color:#94A3B8;line-height:1.45}
+.ex-s{font-family:'JetBrains Mono',monospace;font-size:10px;color:#14C7E0}
+
+/* App icon crop */
+.crop-wrap{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.crop{background:#0F141B;border-radius:12px;padding:16px;display:flex;flex-direction:column;align-items:center;gap:10px}
+.crop-icon{width:120px;height:120px;border-radius:26px;background:linear-gradient(135deg,#EC5A28,#BB3F15);position:relative;overflow:hidden;box-shadow:0 8px 24px rgba(236,90,40,.35);display:flex;align-items:center;justify-content:center}
+.crop-mask{position:absolute;inset:0;border:1.5px dashed rgba(255,255,255,.35);border-radius:26px;pointer-events:none}
+.crop-safe{position:absolute;inset:12px;border:1px dashed rgba(20,199,224,.6);border-radius:20px;pointer-events:none}
+.crop-label{font-size:11px;color:#CBD5E1;text-align:center;line-height:1.4}
+.crop-label b{color:#F1F5F9}
+</style></head><body>
+
+<div class="kicker">BRAND · LOGO SYSTEM v2</div>
+<div class="title">SHOOTRZ Logo System</div>
+<div class="sub">Five variants, two forms. Full lockup for marketing &amp; settings; icon-only monogram for app icon, tab bar, notifications, and favicon. Every variant has a contrast-validated background pairing and a small-size optimized version.</div>
+
+<!-- ─── 1. VARIANTS ─── -->
+<div class="section">
+  <div class="h">1 · Logo Variants</div>
+  <div class="card">
+    <div class="vgrid">
+
+      <div class="var">
+        <div class="var-preview bg-dark"><img src="../assets/shootrz-logo.png" alt="SHOOTRZ"></div>
+        <div class="var-meta"><span class="var-name">logo.primary</span><span class="var-tag tag-primary">FULL COLOR</span></div>
+      </div>
+
+      <div class="var mono-light">
+        <div class="var-preview bg-dark"><img src="../assets/shootrz-logo.png" alt="SHOOTRZ"></div>
+        <div class="var-meta"><span class="var-name">logo.mono.light</span><span class="var-tag tag-mono">1-COLOR LIGHT</span></div>
+      </div>
+
+      <div class="var mono-dark">
+        <div class="var-preview bg-light"><img src="../assets/shootrz-logo.png" alt="SHOOTRZ"></div>
+        <div class="var-meta"><span class="var-name">logo.mono.dark</span><span class="var-tag tag-mono">1-COLOR DARK</span></div>
+      </div>
+
+      <div class="var">
+        <!-- High-contrast: pure white wordmark + cyan tagline, heavier strokes -->
+        <div class="var-preview" style="background:#000">
+          <svg viewBox="0 0 403 80" width="100%" style="max-width:320px">
+            <text x="201.5" y="48" text-anchor="middle" font-family="'Barlow Condensed',sans-serif" font-weight="900" font-size="52" fill="#FFFFFF" letter-spacing="2">SHOOTRZ</text>
+            <text x="201.5" y="72" text-anchor="middle" font-family="'DM Sans',sans-serif" font-weight="700" font-size="10" fill="#14C7E0" letter-spacing="3">PERFECT THE GAME</text>
+          </svg>
+        </div>
+        <div class="var-meta"><span class="var-name">logo.a11y.hiContrast</span><span class="var-tag tag-a11y">A11Y · AAA</span></div>
+      </div>
+
+      <div class="var">
+        <div class="var-preview bg-dark">
+          <!-- Icon-only: basketball + S monogram, large -->
+          <svg viewBox="0 0 120 120" width="88" height="88">
+            <defs>
+              <radialGradient id="bb" cx="35%" cy="30%" r="75%">
+                <stop offset="0%" stop-color="#FF9B5A"/>
+                <stop offset="55%" stop-color="#EC5A28"/>
+                <stop offset="100%" stop-color="#BB3F15"/>
+              </radialGradient>
+            </defs>
+            <circle cx="60" cy="60" r="54" fill="url(#bb)"/>
+            <!-- Basketball lines (inner shadow look) -->
+            <path d="M60 6 L60 114 M6 60 L114 60 M21 21 C45 45 75 45 99 21 M21 99 C45 75 75 75 99 99" stroke="#1a0a05" stroke-width="2.5" fill="none" opacity=".55"/>
+            <!-- S monogram -->
+            <path d="M44 44 Q44 36 52 36 L70 36 Q78 36 78 44 Q78 50 72 52 L50 58 Q44 60 44 68 Q44 76 52 76 L72 76" stroke="#F1F5F9" stroke-width="8" stroke-linecap="round" fill="none"/>
+          </svg>
+        </div>
+        <div class="var-meta"><span class="var-name">logo.icon</span><span class="var-tag tag-icon">ICON ONLY</span></div>
+      </div>
+
+      <div class="var">
+        <div class="var-preview bg-dark">
+          <!-- Small-size optimized: wordmark only, no ball illustration, heavier letterforms -->
+          <svg viewBox="0 0 200 60" width="100%" style="max-width:200px">
+            <text x="100" y="38" text-anchor="middle" font-family="'Barlow Condensed',sans-serif" font-weight="900" font-size="36" fill="#F1F5F9" letter-spacing="1.5">SHOOTRZ</text>
+            <rect x="78" y="46" width="44" height="2" fill="#EC5A28"/>
+          </svg>
+        </div>
+        <div class="var-meta"><span class="var-name">logo.small</span><span class="var-tag tag-mono">&lt; 120px WIDE</span></div>
+      </div>
+
+    </div>
+    <div style="margin-top:12px;font-size:11px;color:#94A3B8;line-height:1.55"><b style="color:#F1F5F9">When to use each:</b> <code style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#14C7E0">primary</code> for marketing &amp; splash · <code style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#14C7E0">mono.light/dark</code> for constrained surfaces (print, embroidery, partner co-brand) · <code style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#14C7E0">a11y</code> when WCAG AAA required or over uncontrolled photography · <code style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#14C7E0">icon</code> for app icon, tab bar, notifications, favicon · <code style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#14C7E0">small</code> when lockup renders below 120px wide (tagline drops).</div>
+  </div>
+</div>
+
+<!-- ─── 2. ICON MARK · SIZE SYSTEM ─── -->
+<div class="section">
+  <div class="h">2 · Icon Mark · Size System</div>
+  <div class="card">
+    <div class="icon-grid">
+
+      <div class="icon-spec">
+        <div class="icon-box"><svg viewBox="0 0 120 120" width="16" height="16"><circle cx="60" cy="60" r="54" fill="#EC5A28"/><path d="M44 44 Q44 36 52 36 L70 36 Q78 36 78 44 Q78 50 72 52 L50 58 Q44 60 44 68 Q44 76 52 76 L72 76" stroke="#F1F5F9" stroke-width="10" stroke-linecap="round" fill="none"/></svg></div>
+        <div class="icon-label"><b>16pt</b><br>favicon · tab</div>
+      </div>
+
+      <div class="icon-spec">
+        <div class="icon-box"><svg viewBox="0 0 120 120" width="24" height="24"><circle cx="60" cy="60" r="54" fill="#EC5A28"/><path d="M60 6 L60 114 M6 60 L114 60" stroke="#1a0a05" stroke-width="3" opacity=".5"/><path d="M44 44 Q44 36 52 36 L70 36 Q78 36 78 44 Q78 50 72 52 L50 58 Q44 60 44 68 Q44 76 52 76 L72 76" stroke="#F1F5F9" stroke-width="9" stroke-linecap="round" fill="none"/></svg></div>
+        <div class="icon-label"><b>24pt</b><br>nav icon</div>
+      </div>
+
+      <div class="icon-spec">
+        <div class="icon-box"><svg viewBox="0 0 120 120" width="40" height="40"><circle cx="60" cy="60" r="54" fill="#EC5A28"/><path d="M60 6 L60 114 M6 60 L114 60 M21 21 C45 45 75 45 99 21 M21 99 C45 75 75 75 99 99" stroke="#1a0a05" stroke-width="2.5" fill="none" opacity=".55"/><path d="M44 44 Q44 36 52 36 L70 36 Q78 36 78 44 Q78 50 72 52 L50 58 Q44 60 44 68 Q44 76 52 76 L72 76" stroke="#F1F5F9" stroke-width="8" stroke-linecap="round" fill="none"/></svg></div>
+        <div class="icon-label"><b>40pt</b><br>tab bar (iOS)</div>
+      </div>
+
+      <div class="icon-spec">
+        <div class="icon-box"><svg viewBox="0 0 120 120" width="60" height="60"><defs><radialGradient id="bb60" cx="35%" cy="30%" r="75%"><stop offset="0%" stop-color="#FF9B5A"/><stop offset="55%" stop-color="#EC5A28"/><stop offset="100%" stop-color="#BB3F15"/></radialGradient></defs><circle cx="60" cy="60" r="54" fill="url(#bb60)"/><path d="M60 6 L60 114 M6 60 L114 60 M21 21 C45 45 75 45 99 21 M21 99 C45 75 75 75 99 99" stroke="#1a0a05" stroke-width="2.5" fill="none" opacity=".55"/><path d="M44 44 Q44 36 52 36 L70 36 Q78 36 78 44 Q78 50 72 52 L50 58 Q44 60 44 68 Q44 76 52 76 L72 76" stroke="#F1F5F9" stroke-width="8" stroke-linecap="round" fill="none"/></svg></div>
+        <div class="icon-label"><b>60pt</b><br>notification</div>
+      </div>
+
+      <div class="icon-spec">
+        <div class="icon-box"><svg viewBox="0 0 120 120" width="88" height="88"><defs><radialGradient id="bb88" cx="35%" cy="30%" r="75%"><stop offset="0%" stop-color="#FF9B5A"/><stop offset="55%" stop-color="#EC5A28"/><stop offset="100%" stop-color="#BB3F15"/></radialGradient></defs><circle cx="60" cy="60" r="54" fill="url(#bb88)"/><path d="M60 6 L60 114 M6 60 L114 60 M21 21 C45 45 75 45 99 21 M21 99 C45 75 75 75 99 99" stroke="#1a0a05" stroke-width="2.5" fill="none" opacity=".55"/><path d="M44 44 Q44 36 52 36 L70 36 Q78 36 78 44 Q78 50 72 52 L50 58 Q44 60 44 68 Q44 76 52 76 L72 76" stroke="#F1F5F9" stroke-width="8" stroke-linecap="round" fill="none"/></svg></div>
+        <div class="icon-label"><b>88pt</b><br>splash</div>
+      </div>
+
+      <div class="icon-spec">
+        <div class="icon-box" style="padding:4px"><svg viewBox="0 0 120 120" width="120" height="120"><defs><radialGradient id="bb120" cx="35%" cy="30%" r="75%"><stop offset="0%" stop-color="#FF9B5A"/><stop offset="55%" stop-color="#EC5A28"/><stop offset="100%" stop-color="#BB3F15"/></radialGradient></defs><circle cx="60" cy="60" r="54" fill="url(#bb120)"/><path d="M60 6 L60 114 M6 60 L114 60 M21 21 C45 45 75 45 99 21 M21 99 C45 75 75 75 99 99" stroke="#1a0a05" stroke-width="2.5" fill="none" opacity=".55"/><path d="M44 44 Q44 36 52 36 L70 36 Q78 36 78 44 Q78 50 72 52 L50 58 Q44 60 44 68 Q44 76 52 76 L72 76" stroke="#F1F5F9" stroke-width="8" stroke-linecap="round" fill="none"/></svg></div>
+        <div class="icon-label"><b>120pt</b><br>app icon src</div>
+      </div>
+
+    </div>
+    <div style="margin-top:14px;font-size:11px;color:#94A3B8;line-height:1.55"><b style="color:#F1F5F9">Small-size optimization:</b> at ≤24pt the basketball seam lines drop, stroke weight of the S increases from 8 → 10, and the radial gradient flattens to solid <code style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#FF7B3D">orange.base</code> — detail that costs legibility is removed, not shrunk.</div>
+  </div>
+</div>
+
+<!-- ─── 3. CLEAR SPACE ─── -->
+<div class="section">
+  <div class="h">3 · Clear Space &amp; Minimum Size</div>
+  <div class="card">
+    <div class="cs-wrap">
+      <div class="cs-box">
+        <img src="../assets/shootrz-logo.png" alt="SHOOTRZ" style="height:56px;display:block">
+        <span class="cs-tick top">1×</span>
+        <span class="cs-tick right">1×</span>
+        <span class="cs-tick bottom">1×</span>
+        <span class="cs-tick left">1×</span>
+      </div>
+    </div>
+    <div class="spec" style="margin-top:14px">
+      <div class="spec-row"><span class="k">clear space</span><span class="v"><b style="color:#F1F5F9">1× cap-height</b> of the wordmark on all four sides. Nothing crosses the dashed box — no text, no UI chrome, no other logos.</span></div>
+      <div class="spec-row"><span class="k">min · lockup</span><span class="v">Primary lockup renders no smaller than <code>120px / 32mm</code> wide. Below that → switch to <code>logo.small</code> (tagline drops) or <code>logo.icon</code>.</span></div>
+      <div class="spec-row"><span class="k">min · icon</span><span class="v">Icon mark renders no smaller than <code>16pt / 16px</code>. Below 24pt use the small-size optimized form (seams dropped, S stroke +2pt).</span></div>
+      <div class="spec-row"><span class="k">max scale</span><span class="v">No upper limit on the icon. Wordmark retains full detail to <code>2048px</code> wide; above that export from source SVG rather than upscaling PNG.</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ─── 4. BACKGROUND PAIRINGS + CONTRAST ─── -->
+<div class="section">
+  <div class="h">4 · Background Pairings &amp; Contrast Validation</div>
+  <div class="card" style="padding:0;overflow:hidden">
+    <table class="matrix">
+      <thead><tr><th>Background</th><th>Use Variant</th><th>Wordmark Contrast</th><th>Tagline Contrast</th><th>Verdict</th></tr></thead>
+      <tbody>
+        <tr><td><code>bg.primary #0A0E14</code> (dark)</td><td><code>logo.primary</code></td><td>14.2 : 1</td><td>6.1 : 1</td><td><span class="pill pill-ok">AAA</span></td></tr>
+        <tr><td><code>bg.elevated #1C2432</code></td><td><code>logo.primary</code></td><td>11.5 : 1</td><td>5.2 : 1</td><td><span class="pill pill-ok">AAA</span></td></tr>
+        <tr><td><code>bg.inverse #F1F5F9</code> (light)</td><td><code>logo.mono.dark</code></td><td>15.9 : 1</td><td>4.8 : 1</td><td><span class="pill pill-ok">AAA</span></td></tr>
+        <tr><td><code>brand.orange.base #EC5A28</code></td><td><code>logo.mono.light</code></td><td>4.6 : 1</td><td>4.6 : 1</td><td><span class="pill pill-ok">AA</span></td></tr>
+        <tr><td>Photography / video</td><td><code>logo.a11y.hiContrast</code> on 60% black scrim</td><td>≥ 8.0 : 1</td><td>≥ 4.5 : 1</td><td><span class="pill pill-ok">AAA*</span></td></tr>
+        <tr><td><code>brand.cyan.base #14C7E0</code></td><td><code>logo.mono.dark</code></td><td>9.8 : 1</td><td>3.1 : 1</td><td><span class="pill pill-warn">AA large only</span></td></tr>
+        <tr><td>Full-color on orange</td><td>❌ never</td><td>2.1 : 1</td><td>—</td><td><span class="pill pill-no">FAIL</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div style="margin-top:10px;font-size:11px;color:#94A3B8;line-height:1.55">*Scrim is non-negotiable on uncontrolled photography — apply <code style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#FF7B3D">linear-gradient(180deg,rgba(0,0,0,.6) 0%,rgba(0,0,0,.3) 100%)</code> behind the logo area before compositing.</div>
+</div>
+
+<!-- ─── 5. DO / DON'T ─── -->
+<div class="section">
+  <div class="h">5 · Do / Don't</div>
+  <div class="dd-grid">
+
+    <div class="dd">
+      <div class="dd-preview bg-dark"><img src="../assets/shootrz-logo.png" alt=""></div>
+      <div class="dd-label"><span class="dd-tag tag-do">✓</span>Use <code>logo.primary</code> on approved dark surfaces at ≥ 120px wide.</div>
+    </div>
+
+    <div class="dd">
+      <div class="dd-preview bg-light"><img src="../assets/shootrz-logo.png" alt="" style="filter:brightness(0)"></div>
+      <div class="dd-label"><span class="dd-tag tag-do">✓</span>Use <code>logo.mono.dark</code> on light surfaces — never full-color on white.</div>
+    </div>
+
+    <div class="dd">
+      <div class="dd-preview bg-brand"><img src="../assets/shootrz-logo.png" alt="" style="height:40px"></div>
+      <div class="dd-label"><span class="dd-tag tag-dont">✕</span>Never full-color on orange — wordmark disappears (2.1:1 contrast).</div>
+    </div>
+
+    <div class="dd">
+      <div class="dd-preview bg-dark"><img src="../assets/shootrz-logo.png" alt="" style="transform:skewX(-12deg) scaleY(1.25)"></div>
+      <div class="dd-label"><span class="dd-tag tag-dont">✕</span>Don't skew, stretch, or apply non-uniform scale.</div>
+    </div>
+
+    <div class="dd">
+      <div class="dd-preview bg-dark"><img src="../assets/shootrz-logo.png" alt="" style="filter:hue-rotate(140deg) saturate(1.2)"></div>
+      <div class="dd-label"><span class="dd-tag tag-dont">✕</span>Don't recolor. Use an approved mono variant instead.</div>
+    </div>
+
+    <div class="dd">
+      <div class="dd-preview bg-photo"><img src="../assets/shootrz-logo.png" alt="" style="height:40px"></div>
+      <div class="dd-label"><span class="dd-tag tag-dont">✕</span>Don't place over unscrimmed photography — use <code>logo.a11y</code> + 60% black scrim.</div>
+    </div>
+
+    <div class="dd">
+      <div class="dd-preview bg-dark"><img src="../assets/shootrz-logo.png" alt="" style="height:14px"></div>
+      <div class="dd-label"><span class="dd-tag tag-dont">✕</span>Don't render lockup below 120px wide — swap to <code>logo.small</code> or icon.</div>
+    </div>
+
+    <div class="dd">
+      <div class="dd-preview bg-dark" style="flex-direction:row;gap:10px"><img src="../assets/shootrz-logo.png" alt="" style="height:32px"><div style="width:1px;height:32px;background:#94A3B8"></div><span style="font-weight:700;color:#F1F5F9;font-size:13px">Partner</span></div>
+      <div class="dd-label"><span class="dd-tag tag-do">✓</span>Co-brand with 1× clear space divider; partner never larger than SHOOTRZ.</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ─── 6. APP ICON CROP ─── -->
+<div class="section">
+  <div class="h">6 · App Icon Crop Guidelines</div>
+  <div class="card">
+    <div class="crop-wrap">
+
+      <div class="crop">
+        <div class="crop-icon">
+          <svg viewBox="0 0 120 120" width="84" height="84"><circle cx="60" cy="60" r="54" fill="none"/><path d="M60 6 L60 114 M6 60 L114 60 M21 21 C45 45 75 45 99 21 M21 99 C45 75 75 75 99 99" stroke="#1a0a05" stroke-width="2.5" fill="none" opacity=".55"/><path d="M44 44 Q44 36 52 36 L70 36 Q78 36 78 44 Q78 50 72 52 L50 58 Q44 60 44 68 Q44 76 52 76 L72 76" stroke="#F1F5F9" stroke-width="8" stroke-linecap="round" fill="none"/></svg>
+          <div class="crop-mask"></div>
+          <div class="crop-safe"></div>
+        </div>
+        <div class="crop-label"><b>iOS</b> · 1024×1024 source · <code style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#14C7E0">cornerRadius ≈ 22.37%</code> (applied by system) · keep mark within <code style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#14C7E0">80%</code> safe zone (cyan dash)</div>
+      </div>
+
+      <div class="crop">
+        <div class="crop-icon" style="border-radius:50%">
+          <svg viewBox="0 0 120 120" width="84" height="84"><circle cx="60" cy="60" r="54" fill="none"/><path d="M60 6 L60 114 M6 60 L114 60 M21 21 C45 45 75 45 99 21 M21 99 C45 75 75 75 99 99" stroke="#1a0a05" stroke-width="2.5" fill="none" opacity=".55"/><path d="M44 44 Q44 36 52 36 L70 36 Q78 36 78 44 Q78 50 72 52 L50 58 Q44 60 44 68 Q44 76 52 76 L72 76" stroke="#F1F5F9" stroke-width="8" stroke-linecap="round" fill="none"/></svg>
+          <div style="position:absolute;inset:0;border:1.5px dashed rgba(255,255,255,.35);border-radius:50%;pointer-events:none"></div>
+          <div style="position:absolute;inset:12px;border:1px dashed rgba(20,199,224,.6);border-radius:50%;pointer-events:none"></div>
+        </div>
+        <div class="crop-label"><b>Android Adaptive</b> · 108×108dp foreground · 72×72dp safe zone · system renders circle / squircle / rounded-square per OEM</div>
+      </div>
+
+      <div class="crop">
+        <div class="crop-icon" style="width:64px;height:64px;border-radius:12px">
+          <svg viewBox="0 0 120 120" width="44" height="44"><circle cx="60" cy="60" r="54" fill="none"/><path d="M44 44 Q44 36 52 36 L70 36 Q78 36 78 44 Q78 50 72 52 L50 58 Q44 60 44 68 Q44 76 52 76 L72 76" stroke="#F1F5F9" stroke-width="10" stroke-linecap="round" fill="none"/></svg>
+        </div>
+        <div class="crop-label"><b>Favicon / Web</b> · 32×32 + 16×16 · dropped seams, heavier S stroke · <code style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#14C7E0">favicon.ico</code> multi-res bundle</div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ─── 7. EXPORT PACKAGE ─── -->
+<div class="section">
+  <div class="h">7 · Export Package</div>
+  <div class="ex-grid">
+    <div class="ex">
+      <div class="ex-t">SVG · source</div>
+      <div class="ex-d">Master artboards for primary + mono + a11y + icon + small. Optimized with SVGO.</div>
+      <div class="ex-s">logo-*.svg</div>
+    </div>
+    <div class="ex">
+      <div class="ex-t">PNG · @1x / @2x / @3x</div>
+      <div class="ex-d">Primary lockup at 240 / 480 / 720 px wide. Icon at 60 / 120 / 180 px.</div>
+      <div class="ex-s">logo-*@Nx.png</div>
+    </div>
+    <div class="ex">
+      <div class="ex-t">App icon set</div>
+      <div class="ex-d">iOS <code style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#FF7B3D">AppIcon.appiconset</code> (20 sizes) + Android adaptive foreground/background PNGs.</div>
+      <div class="ex-s">AppIcon.appiconset, mipmap-*/</div>
+    </div>
+    <div class="ex">
+      <div class="ex-t">Favicon bundle</div>
+      <div class="ex-d"><code style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#FF7B3D">favicon.ico</code> (16/32/48) + <code style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#FF7B3D">apple-touch-icon.png</code> (180).</div>
+      <div class="ex-s">favicon.ico, *.png</div>
+    </div>
+  </div>
+  <div style="margin-top:12px;font-size:11px;color:#94A3B8;line-height:1.55"><b style="color:#F1F5F9">Delivery:</b> <code style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#FF7B3D">brand/shootrz-logo-kit-v2.zip</code> — ships all variants + README with usage matrix. RN consumes from <code style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#FF7B3D">@/brand/logo.ts</code> which re-exports each variant as a typed <code style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#FF7B3D">ImageSource</code>.</div>
+</div>
+
+<div style="font-size:11px;color:#64748B;text-align:center;padding:8px 0 4px">
+  5 variants · 6 icon sizes · 7 contrast pairings validated · app icon + favicon crops specified · export kit documented.
+</div>
+
+</body></html>

@@ -1,7 +1,10 @@
 # recommender/dummy_data.py
+import logging
 import numpy as np
 import pandas as pd
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 # Human-readable drill families (for realism / debugging)
 CLUSTERS = {
@@ -109,8 +112,8 @@ def generate_dummy_storage(
     index.add(embeddings)
     faiss.write_index(index, str(storage_dir / "faiss_index.bin"))
 
-    print("[OK] Realistic basketball dummy data generated")
-    print(metadata["family"].value_counts())
-    print(metadata["tier"].value_counts())
+    logger.info("[OK] Realistic basketball dummy data generated")
+    logger.info("Dummy data family distribution:\n%s", metadata["family"].value_counts())
+    logger.info("Dummy data tier distribution:\n%s", metadata["tier"].value_counts())
 
     return embeddings, metadata

@@ -13,6 +13,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { colors, typography, spacing, radius, glass } from '../constants/theme'
+import { semanticTokens } from '../theme/tokens'
+import { PrimaryButton } from '../components/PrimaryButton'
 import { ChatBubble } from '../components/ChatBubble'
 import { TypingIndicator } from '../components/TypingIndicator'
 import { CoachContextChip } from '../components/CoachContextChip'
@@ -60,6 +62,7 @@ export const ChatScreen: React.FC = () => {
 	const [messages, setMessages] = useState<UiMessage[]>([COACH_GREETING])
 	const [inputText, setInputText] = useState('')
 	const [isSending, setIsSending] = useState(false)
+	const [composerFocused, setComposerFocused] = useState(false)
 	const [errorBanner, setErrorBanner] = useState<string | null>(null)
 	const [includeRawArtifacts, setIncludeRawArtifacts] = useState(false)
 	const [lastContextUsed, setLastContextUsed] = useState<Record<string, any> | null>(null)
@@ -279,7 +282,10 @@ export const ChatScreen: React.FC = () => {
 				{/* Input */}
 				<View style={styles.inputRow}>
 					<TextInput
-						style={styles.input}
+						style={[
+							styles.input,
+							composerFocused ? styles.inputFocus : null,
+						]}
 						placeholder="Ask Coach J..."
 						placeholderTextColor={colors.text.tertiary}
 						value={inputText}
@@ -287,15 +293,20 @@ export const ChatScreen: React.FC = () => {
 						multiline
 						maxLength={1000}
 						editable={!isSending}
+						onFocus={() => setComposerFocused(true)}
+						onBlur={() => setComposerFocused(false)}
 					/>
-					<TouchableOpacity
-						onPress={() => send(inputText)}
+					<PrimaryButton
+						label="Send"
+						a11yLabel={isSending ? 'Sending' : 'Send message'}
+						icon={isSending ? undefined : 'send'}
+						iconOnly
+						size="md"
+						variant="orange"
+						loading={isSending}
 						disabled={!inputText.trim() || isSending}
-						style={[styles.sendBtn, (!inputText.trim() || isSending) && styles.sendBtnDisabled]}
-						accessibilityLabel="Send message"
-					>
-						<Ionicons name="send" size={18} color={colors.text.primary} />
-					</TouchableOpacity>
+						onPress={() => send(inputText)}
+					/>
 				</View>
 			</KeyboardAvoidingView>
 		</SafeAreaView>
@@ -404,21 +415,15 @@ const styles = StyleSheet.create({
 		flex: 1,
 		backgroundColor: colors.bg.secondary,
 		borderRadius: radius['2xl'],
+		borderWidth: 1,
+		borderColor: 'transparent',
 		paddingHorizontal: spacing[4],
 		paddingVertical: spacing[3],
 		fontSize: typography.size.base,
 		color: colors.text.primary,
 		maxHeight: 100,
 	},
-	sendBtn: {
-		width: 40,
-		height: 40,
-		borderRadius: 20,
-		backgroundColor: colors.brand.orange,
-		alignItems: 'center',
-		justifyContent: 'center',
-	},
-	sendBtnDisabled: {
-		opacity: 0.4,
+	inputFocus: {
+		borderColor: semanticTokens.focus.ring,
 	},
 })

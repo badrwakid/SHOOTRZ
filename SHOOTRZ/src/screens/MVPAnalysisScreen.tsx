@@ -25,8 +25,10 @@ import { SectionHeader } from '../components/SectionHeader'
 import { PrimaryButton } from '../components/PrimaryButton'
 import { AngleGraph } from '../components/AngleGraph'
 import { API_BASE_URL, apiService } from '../services/api.service'
-import { colors, typography, spacing, radius, glass, shadows, animation, getScoreTier } from '../constants/theme'
+import { colors, typography, spacing, radius, animation, getScoreTier } from '../constants/theme'
+import { semanticTokens } from '../theme/tokens'
 import { hapticFeedback } from '../utils/hapticFeedback'
+import { useNavigation } from '@react-navigation/native'
 import type { MVPMetric, MVPResultResponse, MVPResultStatus } from '../types/contracts'
 
 interface AnalysisResult extends MVPResultResponse {
@@ -55,6 +57,7 @@ const PROCESSING_LABELS = [
 ]
 
 export const MVPAnalysisScreen: React.FC = () => {
+	const navigation = useNavigation()
 	const { user } = useAuth()
 	const history = useHistory()
 	const [isAnalyzing, setIsAnalyzing] = useState(false)
@@ -236,6 +239,7 @@ export const MVPAnalysisScreen: React.FC = () => {
 											key={side}
 											style={[styles.sidePill, shootingSide === side && styles.sidePillActive]}
 											onPress={() => { hapticFeedback.selection(); setShootingSide(side) }}
+											activeOpacity={0.8}
 										>
 											<Text style={[styles.sidePillText, shootingSide === side && styles.sidePillTextActive]}>
 												{side === 'auto' ? 'Auto' : side.charAt(0).toUpperCase() + side.slice(1)}
@@ -416,7 +420,16 @@ export const MVPAnalysisScreen: React.FC = () => {
 
 						{/* CTAs */}
 						<View style={styles.ctaRow}>
-							<PrimaryButton label="Ask Coach J" icon="chatbubbles" variant="cyan" onPress={() => {}} size="md" />
+							<PrimaryButton
+								label="Ask Coach J"
+								icon="chatbubbles"
+								variant="cyan"
+								onPress={() => {
+									hapticFeedback.medium()
+									navigation.navigate('Coach J' as never)
+								}}
+								size="md"
+							/>
 							<PrimaryButton label="Analyze Again" icon="refresh" onPress={() => setAnalysisResult(null)} size="md" />
 						</View>
 					</View>
@@ -436,33 +449,33 @@ const styles = StyleSheet.create({
 		borderWidth: 2, borderStyle: 'dashed', borderColor: colors.brand.chromeMid, borderRadius: radius['2xl'],
 		padding: spacing[8], alignItems: 'center',
 	},
-	uploadTitle: { fontSize: typography.size.lg, fontWeight: typography.weight.semibold, color: colors.text.primary, marginTop: spacing[4] },
-	uploadHint: { fontSize: typography.size.xs, color: colors.text.tertiary, marginTop: spacing[1], marginBottom: spacing[6] },
+	uploadTitle: { ...typography.roles.headingSm, color: colors.text.primary, marginTop: spacing[4] },
+	uploadHint: { ...typography.roles.caption, color: colors.text.tertiary, marginTop: spacing[1], marginBottom: spacing[6] },
 	sideSelector: { width: '100%', marginBottom: spacing[6] },
-	sideSelectorLabel: { fontSize: typography.size.sm, color: colors.text.secondary, marginBottom: spacing[2] },
+	sideSelectorLabel: { ...typography.roles.caption, color: colors.text.secondary, marginBottom: spacing[2] },
 	sidePills: { flexDirection: 'row', gap: spacing[2] },
 	sidePill: { flex: 1, paddingVertical: spacing[2], borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border.default, alignItems: 'center' },
 	sidePillActive: { backgroundColor: colors.brand.orangeDim, borderColor: colors.brand.orange },
-	sidePillText: { fontSize: typography.size.sm, color: colors.text.secondary },
-	sidePillTextActive: { color: colors.brand.orangeLight, fontWeight: typography.weight.bold },
+	sidePillText: { ...typography.roles.caption, color: colors.text.secondary },
+	sidePillTextActive: { ...typography.roles.bodyStrong, color: colors.brand.orangeLight },
 	uploadButtons: { width: '100%', gap: spacing[3] },
 	processingSection: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: spacing[20], paddingHorizontal: spacing.screenPadding },
 	processingRing: { width: 120, height: 120, borderRadius: 60, borderWidth: 4, borderColor: colors.brand.orange, alignItems: 'center', justifyContent: 'center', marginBottom: spacing[8] },
 	processingRingInner: { width: 100, height: 100, borderRadius: 50, borderWidth: 2, borderColor: colors.brand.orangeDim },
-	processingLabel: { fontSize: typography.size.md, fontWeight: typography.weight.semibold, color: colors.text.primary, textAlign: 'center' },
-	processingHint: { fontSize: typography.size.sm, color: colors.text.tertiary, marginTop: spacing[2] },
+	processingLabel: { ...typography.roles.bodyStrong, color: colors.text.primary, textAlign: 'center' },
+	processingHint: { ...typography.roles.caption, color: colors.text.tertiary, marginTop: spacing[2] },
 	scoreHero: { alignItems: 'center', paddingVertical: spacing[10], paddingHorizontal: spacing.screenPadding, backgroundColor: colors.bg.void },
-	scoreHeroLabel: { fontSize: typography.size.xs, fontWeight: typography.weight.medium, color: colors.text.secondary, letterSpacing: typography.tracking.widest, marginBottom: spacing[4] },
-	scoreHeroDate: { fontSize: typography.size.sm, color: colors.text.tertiary, marginTop: spacing[3] },
+	scoreHeroLabel: { ...typography.roles.caption, color: colors.text.secondary, letterSpacing: typography.tracking.widest, textTransform: 'uppercase' as const, marginBottom: spacing[4] },
+	scoreHeroDate: { ...typography.roles.caption, color: colors.text.tertiary, marginTop: spacing[3] },
 	lowQualityBanner: {
 		flexDirection: 'row', gap: spacing[3], alignItems: 'flex-start',
 		margin: spacing.screenPadding, padding: spacing[4],
 		borderRadius: radius.xl, borderWidth: 1, borderColor: colors.warning,
 		backgroundColor: colors.bg.void,
 	},
-	lowQualityTitle: { fontSize: typography.size.md, fontWeight: typography.weight.semibold, color: colors.text.primary },
-	lowQualityText: { fontSize: typography.size.sm, color: colors.text.secondary, marginTop: spacing[1] },
-	lowQualityHint: { fontSize: typography.size.xs, color: colors.text.tertiary, marginTop: spacing[2] },
+	lowQualityTitle: { ...typography.roles.bodyStrong, color: colors.text.primary },
+	lowQualityText: { ...typography.roles.caption, color: colors.text.secondary, marginTop: spacing[1] },
+	lowQualityHint: { ...typography.roles.caption, color: colors.text.tertiary, marginTop: spacing[2] },
 	trackingChip: {
 		flexDirection: 'row', alignItems: 'center', gap: spacing[2], flexWrap: 'wrap',
 		marginHorizontal: spacing.screenPadding, marginTop: spacing[4],
@@ -470,9 +483,9 @@ const styles = StyleSheet.create({
 		borderRadius: radius.pill, borderWidth: 1,
 		backgroundColor: colors.bg.void,
 	},
-	trackingChipText: { fontSize: typography.size.sm, fontWeight: typography.weight.semibold },
+	trackingChipText: { ...typography.roles.caption, fontWeight: typography.weight.semibold, fontFamily: 'DMSansSemiBold' },
 	trackingChipHint: {
-		fontSize: typography.size.xs, color: colors.text.tertiary,
+		...typography.roles.caption, color: colors.text.tertiary,
 		width: '100%', marginTop: spacing[1],
 	},
 	section: { paddingHorizontal: spacing.screenPadding, marginTop: spacing.sectionGap },
@@ -480,13 +493,24 @@ const styles = StyleSheet.create({
 	metricItem: { width: '47%' },
 	phaseBar: { flexDirection: 'row', borderRadius: radius.sm, overflow: 'hidden', height: 36 },
 	phaseBlock: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-	phaseText: { fontSize: typography.size.xs, fontWeight: typography.weight.semibold, color: colors.text.primary },
-	phaseInfo: { fontSize: typography.size.xs, color: colors.text.tertiary, marginTop: spacing[2] },
+	phaseText: { ...typography.roles.caption, color: colors.text.primary, fontWeight: typography.weight.semibold, fontFamily: 'DMSansSemiBold' },
+	phaseInfo: { ...typography.roles.caption, color: colors.text.tertiary, marginTop: spacing[2] },
 	feedbackCard: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing[2], backgroundColor: colors.bg.secondary, borderRadius: radius.md, padding: spacing[3], marginBottom: spacing[2] },
-	feedbackText: { flex: 1, fontSize: typography.size.sm, color: colors.text.primary, lineHeight: typography.size.sm * typography.lineHeight.normal },
+	feedbackText: { flex: 1, fontSize: typography.size.sm, color: colors.text.primary, lineHeight: typography.size.sm * typography.lineHeight.normal, fontFamily: 'DMSansRegular' },
 	overlayWrap: { position: 'relative', width: '100%' },
-	overlayVideo: { width: '100%', height: 220, borderRadius: radius.lg, backgroundColor: '#000', overflow: 'hidden' },
-	overlaySpinner: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', backgroundColor: '#00000066' },
+	overlayVideo: {
+		width: '100%',
+		height: 220,
+		borderRadius: radius.lg,
+		backgroundColor: semanticTokens.shadow.base,
+		overflow: 'hidden',
+	},
+	overlaySpinner: {
+		...StyleSheet.absoluteFillObject,
+		alignItems: 'center',
+		justifyContent: 'center',
+		backgroundColor: `${semanticTokens.shadow.base}66`,
+	},
 	overlayErr: { fontSize: typography.size.xs, color: colors.error, marginBottom: spacing[2] },
 	ctaRow: { flexDirection: 'row', gap: spacing[3], paddingHorizontal: spacing.screenPadding, marginTop: spacing.sectionGap },
 	bottomPad: { height: spacing.tabBarHeight },

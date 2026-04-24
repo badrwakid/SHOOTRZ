@@ -10,6 +10,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { colors, typography, spacing, radius } from '../constants/theme'
+import { semanticTokens } from '../theme/tokens'
 import { DrillDetailScreen } from './DrillDetailScreen'
 import { EmptyState } from '../components/EmptyState'
 import { hapticFeedback } from '../utils/hapticFeedback'
@@ -40,7 +41,7 @@ export const DrillsScreen: React.FC = () => {
 		<TouchableOpacity
 			style={styles.drillCard}
 			onPress={() => handleDrillPress(item)}
-			activeOpacity={0.85}
+			activeOpacity={0.75}
 		>
 			<View style={[styles.drillHeader, {
 				backgroundColor:
@@ -92,6 +93,7 @@ export const DrillsScreen: React.FC = () => {
 					<TouchableOpacity
 						style={[styles.filterPill, selectedCategory === cat && styles.filterPillActive]}
 						onPress={() => { hapticFeedback.selection(); setSelectedCategory(cat) }}
+						activeOpacity={0.8}
 					>
 						<Text style={[styles.filterText, selectedCategory === cat && styles.filterTextActive]}>
 							{cat === 'all' ? 'All' : cat.charAt(0).toUpperCase() + cat.slice(1)}
@@ -111,6 +113,7 @@ export const DrillsScreen: React.FC = () => {
 					<TouchableOpacity
 						style={[styles.filterPill, selectedDifficulty === diff && styles.filterPillActive]}
 						onPress={() => { hapticFeedback.selection(); setSelectedDifficulty(diff) }}
+						activeOpacity={0.8}
 					>
 						<Text style={[styles.filterText, selectedDifficulty === diff && styles.filterTextActive]}>
 							{diff === 'all' ? 'All' : diff.charAt(0).toUpperCase() + diff.slice(1)}
@@ -174,12 +177,13 @@ const styles = StyleSheet.create({
 		borderColor: colors.brand.orange,
 	},
 	filterText: {
+		...typography.roles.caption,
 		fontSize: typography.size.sm,
 		color: colors.text.secondary,
 	},
 	filterTextActive: {
+		...typography.roles.bodyStrong,
 		color: colors.text.primary,
-		fontWeight: typography.weight.bold,
 	},
 	grid: {
 		paddingHorizontal: spacing.screenPadding,
@@ -219,21 +223,23 @@ const styles = StyleSheet.create({
 		flexDirection: 'row',
 		alignItems: 'center',
 		gap: 3,
-		backgroundColor: 'rgba(0,0,0,0.4)',
+		backgroundColor: `${semanticTokens.shadow.base}66`,
 		borderRadius: radius.pill,
 		paddingHorizontal: spacing[2],
 		paddingVertical: 2,
 	},
 	durationText: {
-		fontSize: typography.size.xs,
+		...typography.roles.caption,
 		color: colors.text.primary,
 	},
 	drillBody: {
 		padding: spacing[3],
 	},
 	drillName: {
+		...typography.roles.caption,
 		fontSize: typography.size.sm,
 		fontWeight: typography.weight.semibold,
+		fontFamily: 'DMSansSemiBold',
 		color: colors.text.primary,
 		marginBottom: spacing[2],
 	},
@@ -245,8 +251,9 @@ const styles = StyleSheet.create({
 		alignSelf: 'flex-start',
 	},
 	categoryText: {
-		fontSize: typography.size.xs,
+		...typography.roles.caption,
 		color: colors.brand.orangeLight,
 		fontWeight: typography.weight.medium,
+		fontFamily: 'DMSansMedium',
 	},
 })

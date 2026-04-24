@@ -6,8 +6,6 @@ import {
 	ScrollView,
 	TouchableOpacity,
 	RefreshControl,
-	FlatList,
-	Dimensions,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
@@ -27,8 +25,7 @@ import { apiService } from '../services/api.service'
 import { storageService } from '../services/storage.service'
 import type { HistorySession } from '../types/contracts'
 import { hapticFeedback } from '../utils/hapticFeedback'
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window')
+import { SCORE_TIER_CARD_SURFACE } from '../theme/scoreTier'
 
 interface HomeScreenProps {
 	navigation: any
@@ -252,6 +249,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 		)
 	}
 
+	const heroTier = getScoreTier(lastSession?.score ?? 0)
+	const heroTierStyle = SCORE_TIER_CARD_SURFACE[heroTier]
+
 	return (
 		<SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
 			<ScrollView
@@ -276,7 +276,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 				</View>
 
 				{/* Hero Stat Card */}
-				<View style={styles.heroCard}>
+				<View style={[styles.heroCard, { backgroundColor: heroTierStyle.bg, borderColor: heroTierStyle.border }]}>
 					{lastSession ? (
 						<View style={styles.heroInner}>
 							<ScoreRing score={lastSession.score} size="lg" animated />
@@ -370,23 +370,23 @@ const styles = StyleSheet.create({
 		paddingBottom: spacing[3],
 	},
 	greeting: {
-		fontSize: typography.size.xl,
-		fontWeight: typography.weight.bold,
+		...typography.roles.headingMd,
 		color: colors.text.primary,
 	},
 	tagline: {
-		fontSize: typography.size.xs,
+		...typography.roles.caption,
 		fontWeight: typography.weight.medium,
 		color: colors.brand.cyan,
 		letterSpacing: typography.tracking.widest,
+		textTransform: 'uppercase',
 		marginTop: 2,
 	},
 	heroCard: {
 		marginHorizontal: spacing.screenPadding,
 		marginTop: spacing[3],
-		backgroundColor: glass.orange.bg,
+		backgroundColor: colors.bg.secondary,
 		borderWidth: 1,
-		borderColor: glass.orange.border,
+		borderColor: colors.border.default,
 		borderRadius: radius.card,
 		padding: spacing.cardPadding,
 		minHeight: 140,
@@ -400,20 +400,20 @@ const styles = StyleSheet.create({
 		flex: 1,
 	},
 	heroLabel: {
-		fontSize: typography.size.xs,
+		...typography.roles.caption,
 		fontWeight: typography.weight.medium,
 		color: colors.text.secondary,
 		letterSpacing: typography.tracking.widest,
+		textTransform: 'uppercase',
 		marginBottom: spacing[1],
 	},
 	heroScore: {
-		fontSize: typography.size['3xl'],
-		fontWeight: typography.weight.black,
-		color: colors.brand.chrome,
+		...typography.roles.display,
+		color: colors.text.primary,
 		marginBottom: spacing[2],
 	},
 	heroDate: {
-		fontSize: typography.size.xs,
+		...typography.roles.caption,
 		color: colors.text.tertiary,
 		marginTop: spacing[2],
 	},

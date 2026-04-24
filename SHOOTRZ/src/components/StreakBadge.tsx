@@ -37,15 +37,16 @@ const styles = StyleSheet.create({
 		gap: spacing[1],
 	},
 	count: {
-		fontSize: typography.size.sm,
+		...typography.roles.bodyStrong,
 		fontWeight: typography.weight.bold,
 		color: colors.brand.chrome,
 	},
 	label: {
-		fontSize: typography.size.xs,
+		...typography.roles.caption,
 		fontWeight: typography.weight.medium,
 		color: colors.text.secondary,
 		letterSpacing: typography.tracking.wider,
+		textTransform: 'uppercase',
 	},
 	inactive: {
 		color: colors.text.tertiary,

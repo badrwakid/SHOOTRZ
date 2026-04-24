@@ -8,7 +8,8 @@ import {
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
-import { colors, typography, spacing, radius, glass, shadows } from '../constants/theme'
+import { colors, typography, spacing, radius } from '../constants/theme'
+import { semanticTokens } from '../theme/tokens'
 import { PrimaryButton } from '../components/PrimaryButton'
 import { IconButton } from '../components/IconButton'
 import { storageService } from '../services/storage.service'
@@ -27,7 +28,7 @@ export const DrillDetailScreen: React.FC<DrillDetailScreenProps> = ({ drill, onC
 
 	useEffect(() => {
 		storageService.getDrillCompletionCount(drill.id).then(setCompletionCount).catch(() => {})
-	}, [])
+	}, [drill.id])
 
 	const getDifficultyColor = () => {
 		switch (drill.difficulty) {
@@ -64,7 +65,14 @@ export const DrillDetailScreen: React.FC<DrillDetailScreenProps> = ({ drill, onC
 			{/* Header */}
 			<View style={[styles.headerBg, { backgroundColor: diffColor + '15' }]}>
 				<View style={styles.headerTop}>
-					<IconButton icon="chevron-back" onPress={onClose} size={40} color={colors.text.primary} />
+					<IconButton
+						icon="chevron-back"
+						onPress={onClose}
+						size={40}
+						color={colors.text.primary}
+						accessibilityLabel="Back to drill list"
+						accessibilityHint="Closes this drill and returns to the library"
+					/>
 					<View style={styles.headerBadges}>
 						<View style={[styles.badge, { backgroundColor: diffColor + '30' }]}>
 							<Text style={[styles.badgeText, { color: diffColor }]}>
@@ -176,12 +184,12 @@ const styles = StyleSheet.create({
 		flexDirection: 'row',
 		alignItems: 'center',
 		gap: 3,
-		backgroundColor: 'rgba(0,0,0,0.4)',
+		backgroundColor: `${semanticTokens.shadow.base}66`,
 		borderRadius: radius.pill,
 		paddingHorizontal: spacing[2],
 		paddingVertical: 2,
 	},
-	timeText: { fontSize: typography.size.xs, color: colors.text.primary },
+	timeText: { ...typography.roles.caption, color: colors.text.primary },
 	headerCenter: {
 		alignItems: 'center',
 		paddingBottom: spacing[4],
@@ -191,8 +199,7 @@ const styles = StyleSheet.create({
 		paddingTop: spacing[5],
 	},
 	title: {
-		fontSize: typography.size['2xl'],
-		fontWeight: typography.weight.heavy,
+		...typography.roles.headingLg,
 		color: colors.text.primary,
 	},
 	tagRow: {
@@ -208,25 +215,24 @@ const styles = StyleSheet.create({
 		paddingVertical: spacing[1],
 	},
 	categoryText: {
-		fontSize: typography.size.xs,
+		...typography.roles.caption,
 		color: colors.brand.orangeLight,
 		fontWeight: typography.weight.medium,
+		fontFamily: 'DMSansMedium',
 	},
 	completions: {
-		fontSize: typography.size.xs,
+		...typography.roles.caption,
 		color: colors.text.tertiary,
 	},
 	section: { marginTop: spacing.sectionGap },
 	sectionTitle: {
-		fontSize: typography.size.md,
-		fontWeight: typography.weight.bold,
+		...typography.roles.headingSm,
 		color: colors.text.primary,
 		marginBottom: spacing[3],
 	},
 	bodyText: {
-		fontSize: typography.size.base,
+		...typography.roles.body,
 		color: colors.text.secondary,
-		lineHeight: typography.size.base * typography.lineHeight.normal,
 	},
 	stepRow: {
 		flexDirection: 'row',
@@ -243,15 +249,15 @@ const styles = StyleSheet.create({
 		justifyContent: 'center',
 	},
 	stepNumText: {
-		fontSize: typography.size.sm,
-		fontWeight: typography.weight.bold,
+		...typography.roles.caption,
 		color: colors.brand.orange,
+		fontWeight: typography.weight.bold,
+		fontFamily: 'DMSansBold',
 	},
 	stepText: {
 		flex: 1,
-		fontSize: typography.size.base,
+		...typography.roles.body,
 		color: colors.text.primary,
-		lineHeight: typography.size.base * typography.lineHeight.normal,
 	},
 	tipRow: {
 		flexDirection: 'row',
@@ -264,6 +270,7 @@ const styles = StyleSheet.create({
 	},
 	tipText: {
 		flex: 1,
+		...typography.roles.caption,
 		fontSize: typography.size.sm,
 		color: colors.text.primary,
 		lineHeight: typography.size.sm * typography.lineHeight.normal,

@@ -1,6 +1,7 @@
 import React from 'react'
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native'
-import { colors, typography, spacing } from '../constants/theme'
+import { spacing } from '../constants/theme'
+import { useTokens } from '../theme/useTokens'
 
 interface SectionHeaderProps {
 	title: string
@@ -9,11 +10,22 @@ interface SectionHeaderProps {
 }
 
 export function SectionHeader({ title, subtitle, action }: SectionHeaderProps) {
+	const t = useTokens()
+
 	return (
 		<View style={styles.container}>
 			<View style={styles.left}>
-				<Text style={styles.title}>{title}</Text>
-				{subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+				<Text style={[t.typography.bodyStrong, { color: t.tokens.text.primary }]}>{title}</Text>
+				{subtitle ? (
+					<Text
+						style={[
+							t.typography.caption,
+							{ color: t.tokens.text.secondary, marginTop: spacing[1] },
+						]}
+					>
+						{subtitle}
+					</Text>
+				) : null}
 			</View>
 			{action ? (
 				<TouchableOpacity
@@ -22,7 +34,14 @@ export function SectionHeader({ title, subtitle, action }: SectionHeaderProps) {
 					accessibilityRole="button"
 					accessibilityLabel={action.label}
 				>
-					<Text style={styles.action}>{action.label} →</Text>
+					<Text
+						style={[
+							t.typography.caption,
+							{ color: t.tokens.brand.primary },
+						]}
+					>
+						{action.label} →
+					</Text>
 				</TouchableOpacity>
 			) : null}
 		</View>
@@ -38,21 +57,5 @@ const styles = StyleSheet.create({
 	},
 	left: {
 		flex: 1,
-	},
-	title: {
-		fontSize: typography.size.md,
-		fontWeight: typography.weight.bold,
-		color: colors.text.primary,
-		letterSpacing: typography.tracking.tight,
-	},
-	subtitle: {
-		fontSize: typography.size.sm,
-		color: colors.text.secondary,
-		marginTop: 2,
-	},
-	action: {
-		fontSize: typography.size.sm,
-		color: colors.brand.orange,
-		fontWeight: typography.weight.semibold,
 	},
 })

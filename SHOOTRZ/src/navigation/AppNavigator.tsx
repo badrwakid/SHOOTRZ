@@ -12,7 +12,8 @@ import { WorkoutsScreen } from '../screens/WorkoutsScreen'
 import { ProgressScreen } from '../screens/ProgressScreen'
 import { ProfileScreen } from '../screens/ProfileScreen'
 import { ChatScreen } from '../screens/ChatScreen'
-import { colors, typography, spacing } from '../constants/theme'
+import { spacing } from '../constants/theme'
+import { useTokens } from '../theme/useTokens'
 import { hapticFeedback } from '../utils/hapticFeedback'
 
 const Tab = createBottomTabNavigator()
@@ -27,7 +28,10 @@ const linking = {
 	},
 }
 
-function TabIcon({ name, focused, color }: { name: string; focused: boolean; color: string }) {
+type TabIconName = keyof typeof Ionicons.glyphMap
+type TabIconProps = { name: TabIconName; focused: boolean; color: string; brandPrimary: string }
+
+function TabIcon({ name, focused, color, brandPrimary }: TabIconProps) {
 	return (
 		<View style={{ alignItems: 'center' }}>
 			{focused ? (
@@ -36,20 +40,22 @@ function TabIcon({ name, focused, color }: { name: string; focused: boolean; col
 						width: 24,
 						height: 2,
 						borderRadius: 1,
-						backgroundColor: colors.brand.orange,
-						marginBottom: 4,
+						backgroundColor: brandPrimary,
+						marginBottom: spacing[1],
 					}}
 				/>
 			) : (
 				<View style={{ height: 6 }} />
 			)}
-			<Ionicons name={name as any} size={22} color={color} />
+			<Ionicons name={name} size={22} color={color} />
 		</View>
 	)
 }
 
 export const AppNavigator: React.FC = () => {
 	const insets = useSafeAreaInsets()
+	const t = useTokens()
+	const brandPrimary = t.tokens.brand.primary
 
 	const tabListeners = useCallback(
 		() => ({
@@ -64,22 +70,22 @@ export const AppNavigator: React.FC = () => {
 				screenOptions={{
 					headerShown: false,
 					tabBarStyle: {
-						backgroundColor: colors.bg.secondary,
+						backgroundColor: t.tokens.bg.secondary,
 						borderTopWidth: 1,
-						borderTopColor: colors.border.subtle,
-						paddingBottom: Math.max(4, insets.bottom),
-						paddingTop: 0,
-						height: 49 + insets.bottom,
+						borderTopColor: t.tokens.border.subtle,
+						paddingTop: spacing[1],
+						paddingBottom: Math.max(6, insets.bottom),
+						paddingHorizontal: spacing[1],
+						height: 56 + insets.bottom,
 					},
-					tabBarActiveTintColor: colors.brand.orange,
-					tabBarInactiveTintColor: colors.text.tertiary,
+					tabBarActiveTintColor: brandPrimary,
+					tabBarInactiveTintColor: t.tokens.text.tertiary,
 					tabBarLabelStyle: {
-						fontSize: typography.size.xs,
-						fontWeight: typography.weight.semibold,
+						...t.typography.caption,
 						marginTop: 0,
 					},
 					tabBarItemStyle: {
-						paddingVertical: 0,
+						paddingVertical: spacing[1],
 					},
 				}}
 			>
@@ -89,7 +95,12 @@ export const AppNavigator: React.FC = () => {
 					listeners={tabListeners}
 					options={{
 						tabBarIcon: ({ color, focused }) => (
-							<TabIcon name={focused ? 'home' : 'home-outline'} focused={focused} color={color} />
+							<TabIcon
+								name={focused ? 'home' : 'home-outline'}
+								focused={focused}
+								color={color}
+								brandPrimary={brandPrimary}
+							/>
 						),
 					}}
 				/>
@@ -99,7 +110,12 @@ export const AppNavigator: React.FC = () => {
 					listeners={tabListeners}
 					options={{
 						tabBarIcon: ({ color, focused }) => (
-							<TabIcon name={focused ? 'analytics' : 'analytics-outline'} focused={focused} color={color} />
+							<TabIcon
+								name={focused ? 'analytics' : 'analytics-outline'}
+								focused={focused}
+								color={color}
+								brandPrimary={brandPrimary}
+							/>
 						),
 						tabBarLabel: 'Analyze',
 					}}
@@ -110,7 +126,12 @@ export const AppNavigator: React.FC = () => {
 					listeners={tabListeners}
 					options={{
 						tabBarIcon: ({ color, focused }) => (
-							<TabIcon name={focused ? 'basketball' : 'basketball-outline'} focused={focused} color={color} />
+							<TabIcon
+								name={focused ? 'basketball' : 'basketball-outline'}
+								focused={focused}
+								color={color}
+								brandPrimary={brandPrimary}
+							/>
 						),
 					}}
 				/>
@@ -120,7 +141,12 @@ export const AppNavigator: React.FC = () => {
 					listeners={tabListeners}
 					options={{
 						tabBarIcon: ({ color, focused }) => (
-							<TabIcon name={focused ? 'barbell' : 'barbell-outline'} focused={focused} color={color} />
+							<TabIcon
+								name={focused ? 'barbell' : 'barbell-outline'}
+								focused={focused}
+								color={color}
+								brandPrimary={brandPrimary}
+							/>
 						),
 					}}
 				/>
@@ -130,7 +156,12 @@ export const AppNavigator: React.FC = () => {
 					listeners={tabListeners}
 					options={{
 						tabBarIcon: ({ color, focused }) => (
-							<TabIcon name={focused ? 'chatbubbles' : 'chatbubbles-outline'} focused={focused} color={color} />
+							<TabIcon
+								name={focused ? 'chatbubbles' : 'chatbubbles-outline'}
+								focused={focused}
+								color={color}
+								brandPrimary={brandPrimary}
+							/>
 						),
 					}}
 				/>
@@ -140,7 +171,12 @@ export const AppNavigator: React.FC = () => {
 					listeners={tabListeners}
 					options={{
 						tabBarIcon: ({ color, focused }) => (
-							<TabIcon name={focused ? 'stats-chart' : 'stats-chart-outline'} focused={focused} color={color} />
+							<TabIcon
+								name={focused ? 'stats-chart' : 'stats-chart-outline'}
+								focused={focused}
+								color={color}
+								brandPrimary={brandPrimary}
+							/>
 						),
 					}}
 				/>
@@ -150,7 +186,12 @@ export const AppNavigator: React.FC = () => {
 					listeners={tabListeners}
 					options={{
 						tabBarIcon: ({ color, focused }) => (
-							<TabIcon name={focused ? 'person' : 'person-outline'} focused={focused} color={color} />
+							<TabIcon
+								name={focused ? 'person' : 'person-outline'}
+								focused={focused}
+								color={color}
+								brandPrimary={brandPrimary}
+							/>
 						),
 					}}
 				/>

@@ -1,0 +1,356 @@
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;900&family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0A0E14;font-family:'DM Sans',sans-serif;padding:20px;color:#F1F5F9}
+.kicker{font-size:10px;font-weight:700;color:#94A3B8;letter-spacing:2px;margin-bottom:4px}
+.title{font-family:'Barlow Condensed',sans-serif;font-size:28px;font-weight:900;color:#F1F5F9;letter-spacing:-.5px;line-height:1}
+.badge{display:inline-block;background:#22C55E;color:#052E16;font-size:10px;font-weight:700;letter-spacing:1.5px;padding:3px 8px;border-radius:4px;margin-left:8px;vertical-align:middle}
+.sub{font-size:12px;color:#94A3B8;margin:6px 0 18px;max-width:680px;line-height:1.55}
+.section{margin-bottom:26px}
+.h{font-size:11px;font-weight:700;color:#64748B;letter-spacing:2px;text-transform:uppercase;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.h::before{content:'';width:16px;height:1px;background:#334155}
+.card{background:#151C26;border:1px solid rgba(148,163,184,.14);border-radius:14px;padding:14px 16px}
+
+/* Strategy */
+.strat{background:linear-gradient(135deg,rgba(236,90,40,.06),rgba(20,199,224,.04));border:1px solid rgba(236,90,40,.25);border-radius:14px;padding:14px 16px;font-size:13px;color:#E2E8F0;line-height:1.65}
+.strat b{color:#F1F5F9}
+
+/* Scale table */
+.scale{width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed}
+.scale th{text-align:left;padding:8px 10px;font-size:10px;font-weight:700;color:#64748B;letter-spacing:1.5px;border-bottom:1px solid rgba(148,163,184,.14);background:#151C26}
+.scale td{padding:14px 10px;border-bottom:1px solid rgba(148,163,184,.07);vertical-align:middle}
+.scale tr:last-child td{border-bottom:0}
+.scale td:first-child{width:14%}.scale td:nth-child(2){width:40%}.scale td:nth-child(3){width:18%}.scale td:nth-child(4){width:28%}
+.tok{font-family:'JetBrains Mono',monospace;font-size:11px;color:#14C7E0}
+.specs{font-family:'JetBrains Mono',monospace;font-size:10px;color:#94A3B8;line-height:1.6;white-space:pre-wrap}
+.specs b{color:#F1F5F9;font-weight:600}
+.use-note{font-size:11px;color:#CBD5E1;line-height:1.55}
+.use-note b{color:#F1F5F9;font-weight:600}
+
+/* Sample sizes */
+.s-4xl{font-family:'Barlow Condensed',sans-serif;font-size:48px;font-weight:900;letter-spacing:-1.2px;line-height:.95;color:#F1F5F9}
+.s-3xl{font-family:'Barlow Condensed',sans-serif;font-size:38px;font-weight:900;letter-spacing:-.8px;line-height:1;color:#F1F5F9}
+.s-2xl{font-family:'Barlow Condensed',sans-serif;font-size:30px;font-weight:700;letter-spacing:2px;line-height:1;color:#F1F5F9;text-transform:uppercase}
+.s-xl{font-family:'DM Sans',sans-serif;font-size:24px;font-weight:700;letter-spacing:-.4px;line-height:1.2;color:#F1F5F9}
+.s-lg{font-family:'DM Sans',sans-serif;font-size:20px;font-weight:700;letter-spacing:-.3px;line-height:1.25;color:#F1F5F9}
+.s-md{font-family:'DM Sans',sans-serif;font-size:17px;font-weight:600;line-height:1.35;color:#F1F5F9;letter-spacing:-.1px}
+.s-base{font-family:'DM Sans',sans-serif;font-size:15px;font-weight:400;line-height:1.5;color:#E2E8F0}
+.s-sm{font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;line-height:1.45;color:#94A3B8}
+.s-xs{font-family:'DM Sans',sans-serif;font-size:11px;font-weight:700;line-height:1.3;color:#64748B;letter-spacing:2px;text-transform:uppercase}
+
+/* Hero */
+.hero{background:#0F141B;border-radius:16px;padding:22px;border:1px solid rgba(148,163,184,.14);overflow:hidden;position:relative}
+.hero::before{content:'';position:absolute;top:-40%;right:-10%;width:300px;height:300px;border-radius:150px;background:radial-gradient(circle,rgba(236,90,40,.15) 0%,transparent 70%);pointer-events:none}
+.hero > *{position:relative;z-index:1}
+
+/* Semantic alias cards */
+.alias-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.alias{background:#151C26;border:1px solid rgba(148,163,184,.14);border-radius:12px;padding:12px 14px}
+.alias-tok{font-family:'JetBrains Mono',monospace;font-size:11px;color:#14C7E0;margin-bottom:4px}
+.alias-maps{font-family:'JetBrains Mono',monospace;font-size:9px;color:#64748B;margin-bottom:8px}
+.alias-maps span{color:#94A3B8}
+.alias-where{font-size:10px;color:#94A3B8;line-height:1.5;border-top:1px solid rgba(148,163,184,.07);padding-top:6px;margin-top:4px}
+
+/* Usage map */
+.screens{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.scr{background:#151C26;border:1px solid rgba(148,163,184,.14);border-radius:12px;padding:12px 14px}
+.scr-t{font-size:13px;font-weight:700;color:#F1F5F9;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.scr-b{font-size:11px;color:#CBD5E1;line-height:1.65}
+.scr-b b{color:#F1F5F9;font-weight:600}
+.scr-b code{font-family:'JetBrains Mono',monospace;font-size:10px;background:#1C2432;padding:1px 5px;border-radius:3px;color:#14C7E0;white-space:nowrap}
+
+/* Do/Don't */
+.rules-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.rule{border-radius:12px;padding:12px 14px}
+.rule-do{background:rgba(34,197,94,.06);border:1px solid rgba(34,197,94,.25)}
+.rule-dont{background:rgba(239,68,68,.06);border:1px solid rgba(239,68,68,.25)}
+.rule-t{font-size:11px;font-weight:700;letter-spacing:1.5px;margin-bottom:8px}
+.rule-do .rule-t{color:#22C55E}
+.rule-dont .rule-t{color:#EF4444}
+.rule ul{padding-left:14px;font-size:12px;color:#CBD5E1;line-height:1.7}
+.rule li{margin-bottom:3px}
+.rule b{color:#F1F5F9;font-weight:600}
+
+/* A11y */
+.a11y-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.a11y{background:#151C26;border:1px solid rgba(148,163,184,.14);border-radius:12px;padding:12px 14px;font-size:11px;color:#CBD5E1;line-height:1.6}
+.a11y-t{font-size:12px;font-weight:700;color:#F1F5F9;margin-bottom:6px}
+.a11y b{color:#F1F5F9}
+
+/* Json */
+.json{background:#0A0E14;border:1px solid rgba(148,163,184,.14);border-radius:12px;padding:14px 16px;font-family:'JetBrains Mono',monospace;font-size:11px;line-height:1.55;color:#E2E8F0;overflow-x:auto;white-space:pre}
+.json .k{color:#14C7E0}.json .s{color:#EC5A28}.json .n{color:#F59E0B}.json .c{color:#64748B;font-style:italic}
+
+/* Migration */
+.mig-steps{display:flex;flex-direction:column;gap:8px}
+.mig-step{display:flex;gap:12px;padding:10px 12px;background:#0F141B;border-radius:8px;border-left:3px solid #14C7E0}
+.mig-n{width:24px;height:24px;border-radius:12px;background:#14C7E0;color:#051018;font-size:12px;font-weight:900;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.mig-body{font-size:12px;color:#CBD5E1;line-height:1.55}
+.mig-body b{color:#F1F5F9;font-weight:600}
+.mig-body code{font-family:'JetBrains Mono',monospace;font-size:10px;background:#1C2432;padding:1px 5px;border-radius:3px;color:#14C7E0;white-space:nowrap}
+</style></head><body>
+
+<div class="kicker">05 · TYPOGRAPHY</div>
+<div class="title">TYPE SCALE<span class="badge">v2 · PRODUCTION READY</span></div>
+<div class="sub">Two-family system: <b>Barlow Condensed</b> (display, numerics, energy) + <b>DM Sans</b> (everything else). 9 sizes → 11 semantic aliases. Built for React Native mobile-first legibility.</div>
+
+<!-- 1 STRATEGY -->
+<div class="section">
+  <div class="h">1 · Typography Strategy</div>
+  <div class="strat">
+    <b>Two voices, one system.</b> <b>Barlow Condensed</b> is reserved for <b>numerics and stadium-voltage callouts</b> — the jumbotron typeface. It's loud on purpose and only used when the content earns it (your score, your streak, your section hero).
+    <br><br>
+    <b>DM Sans</b> does all the heavy lifting — every heading, every piece of body copy, every label and piece of meta. It has a warm, humanist geometry that reads quickly on small screens without feeling "app-generic".
+    <br><br>
+    <b>Scale is musical, not mechanical.</b> 11→13→15→17→20→24 on the body side, 30→38→48 on the display side. Each step is a perceptible jump; nothing nearly-matches-something-else.
+  </div>
+</div>
+
+<!-- 2 HERO PREVIEW -->
+<div class="section">
+  <div class="h">2 · In-Context Hero</div>
+  <div class="hero">
+    <div class="s-xs">LAST SESSION · 2 DAYS AGO</div>
+    <div class="s-4xl" style="margin-top:6px">82</div>
+    <div class="s-3xl" style="color:#FF7B3D;margin-top:14px">PERFECT THE GAME</div>
+    <div class="s-2xl" style="color:#14C7E0;margin-top:10px">GAME-SPEED DRILLS</div>
+    <div class="s-xl" style="margin-top:14px">Today's session</div>
+    <div class="s-lg" style="margin-top:2px">Good morning, Marcus</div>
+    <div class="s-md" style="margin-top:8px">Coach J · 3 new drills ready</div>
+    <div class="s-base" style="margin-top:8px">Your knee bend needs work tonight. You flex about 15% less than your best sessions — drill 2 targets exactly this.</div>
+    <div class="s-sm" style="margin-top:6px">6 shots analyzed · 4 clean makes</div>
+  </div>
+</div>
+
+<!-- 3 FULL SCALE -->
+<div class="section">
+  <div class="h">3 · Full Size Scale</div>
+  <div class="card" style="padding:0;overflow:hidden">
+    <table class="scale">
+      <tr><th>TOKEN</th><th>SAMPLE</th><th>SPECS</th><th>PRIMARY USE</th></tr>
+      <tr><td class="tok">display.4xl</td><td><span class="s-4xl">82</span></td><td class="specs">Barlow Condensed<b> 900</b>
+48 / 46 (0.96)
+tracking <b>-1.2px</b></td><td class="use-note"><b>Hero score numeric.</b> Results screen score, home dashboard last-score ring center.</td></tr>
+      <tr><td class="tok">display.3xl</td><td><span class="s-3xl">SHOOTRZ</span></td><td class="specs">Barlow Condensed<b> 900</b>
+38 / 38 (1.0)
+tracking <b>-0.8px</b></td><td class="use-note"><b>Wordmark + hero callouts.</b> Onboarding titles, results screen tier name.</td></tr>
+      <tr><td class="tok">display.2xl</td><td><span class="s-2xl">PERFECT THE GAME</span></td><td class="specs">Barlow Condensed<b> 700</b>
+30 / 30 (1.0)
+tracking <b>+2px</b> · UPPER</td><td class="use-note"><b>Section hero callouts.</b> "PERFECT THE GAME" banner, program titles, stadium-style headers.</td></tr>
+      <tr><td class="tok">body.xl</td><td><span class="s-xl">Today's session</span></td><td class="specs">DM Sans<b> 700</b>
+24 / 29 (1.2)
+tracking <b>-0.4px</b></td><td class="use-note"><b>Major page heading.</b> Screen H1 (Progress, Workouts, Profile).</td></tr>
+      <tr><td class="tok">body.lg</td><td><span class="s-lg">Good morning, Marcus</span></td><td class="specs">DM Sans<b> 700</b>
+20 / 25 (1.25)
+tracking <b>-0.3px</b></td><td class="use-note"><b>Screen title / greeting.</b> Home greeting, modal title, sheet title.</td></tr>
+      <tr><td class="tok">body.md</td><td><span class="s-md">Coach J · 3 new drills ready</span></td><td class="specs">DM Sans<b> 600</b>
+17 / 23 (1.35)
+tracking <b>-0.1px</b></td><td class="use-note"><b>Important label / card title.</b> "Coach J", workout card titles, key CTAs.</td></tr>
+      <tr><td class="tok">body.base</td><td><span class="s-base">Default body copy paragraph</span></td><td class="specs">DM Sans<b> 400</b>
+15 / 22 (1.5)
+tracking <b>0</b></td><td class="use-note"><b>Default body copy.</b> Chat bubbles, workout descriptions, paragraphs.</td></tr>
+      <tr><td class="tok">body.sm</td><td><span class="s-sm">Supporting text / descriptions</span></td><td class="specs">DM Sans<b> 500</b>
+13 / 19 (1.45)
+tracking <b>0</b></td><td class="use-note"><b>Supporting / secondary.</b> Card subtitles, help text, empty-state body, tab labels.</td></tr>
+      <tr><td class="tok">body.xs</td><td><span class="s-xs">LAST SESSION · 2 DAYS AGO</span></td><td class="specs">DM Sans<b> 700</b>
+11 / 14 (1.3)
+tracking <b>+2px</b> · UPPER</td><td class="use-note"><b>Metadata / overline.</b> Timestamps, sectioning overlines, system labels — never body copy.</td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- 4 SEMANTIC ALIASES -->
+<div class="section">
+  <div class="h">4 · Semantic Aliases · What To Reach For</div>
+  <div class="alias-grid">
+    <div class="alias"><div class="alias-tok">display.hero</div><div class="alias-maps">→ <span>display.4xl</span></div><div class="alias-where">Hero score. One per screen. Results screen center, Progress header.</div></div>
+    <div class="alias"><div class="alias-tok">display.section</div><div class="alias-maps">→ <span>display.2xl</span></div><div class="alias-where">Section callouts. UPPERCASE. "PERFECT THE GAME", "TRAIN WITH COACH J".</div></div>
+    <div class="alias"><div class="alias-tok">heading.h1</div><div class="alias-maps">→ <span>body.xl</span></div><div class="alias-where">Screen H1. Progress / Workouts / Profile page titles.</div></div>
+    <div class="alias"><div class="alias-tok">heading.h2</div><div class="alias-maps">→ <span>body.lg</span></div><div class="alias-where">Greeting, sheet titles, prominent inline headers.</div></div>
+    <div class="alias"><div class="alias-tok">heading.h3</div><div class="alias-maps">→ <span>body.md</span></div><div class="alias-where">Card titles, list section headers, sub-modal titles.</div></div>
+    <div class="alias"><div class="alias-tok">body.default</div><div class="alias-maps">→ <span>body.base</span></div><div class="alias-where">Default paragraphs, chat, workout descriptions.</div></div>
+    <div class="alias"><div class="alias-tok">body.strong</div><div class="alias-maps">→ <span>body.base · weight 600</span></div><div class="alias-where">Emphasized body. Never use all-caps for emphasis.</div></div>
+    <div class="alias"><div class="alias-tok">label.default</div><div class="alias-maps">→ <span>body.sm · weight 600</span></div><div class="alias-where">Form labels, card-metric labels, list-row titles.</div></div>
+    <div class="alias"><div class="alias-tok">label.small</div><div class="alias-maps">→ <span>body.xs · weight 600</span></div><div class="alias-where">Compact chip labels, badge labels.</div></div>
+    <div class="alias"><div class="alias-tok">meta.default</div><div class="alias-maps">→ <span>body.sm · weight 500</span></div><div class="alias-where">Timestamps in-sentence, status phrases, helper copy.</div></div>
+    <div class="alias"><div class="alias-tok">meta.caps</div><div class="alias-maps">→ <span>body.xs · weight 700 · UPPER</span></div><div class="alias-where">Overlines above hero numerics, section dividers, system status labels.</div></div>
+  </div>
+</div>
+
+<!-- 5 SCREEN MAP -->
+<div class="section">
+  <div class="h">5 · Screen Usage Map</div>
+  <div class="screens">
+    <div class="scr">
+      <div class="scr-t">🏠 Home</div>
+      <div class="scr-b">
+        <b>meta.caps</b> <code>LAST SESSION</code><br>
+        <b>display.hero</b> <code>82</code> ring center<br>
+        <b>heading.h2</b> <code>Good morning, Marcus</code><br>
+        <b>heading.h3</b> <code>Coach J insight</code> (card titles)<br>
+        <b>body.default</b> insight paragraph<br>
+        <b>meta.default</b> "2 days ago", "5/7 days"
+      </div>
+    </div>
+    <div class="scr">
+      <div class="scr-t">🎥 MVP Analysis</div>
+      <div class="scr-b">
+        <b>meta.caps</b> <code>REC · FRAME YOUR BODY</code><br>
+        <b>display.hero</b> 3-2-1 countdown<br>
+        <b>body.md</b> "Analyzing your form…"<br>
+        <b>body.sm</b> tips row beneath framing guide<br>
+        <b>label.small</b> on record button
+      </div>
+    </div>
+    <div class="scr">
+      <div class="scr-t">📊 Results</div>
+      <div class="scr-b">
+        <b>meta.caps</b> <code>YOUR SCORE · SESSION · 6 SHOTS</code><br>
+        <b>display.hero</b> 82 in ring<br>
+        <b>display.section</b> tier name "GREAT SHOOTER"<br>
+        <b>heading.h3</b> "Coach J says"<br>
+        <b>body.default</b> insight paragraph<br>
+        <b>label.default</b> each biomechanic metric
+      </div>
+    </div>
+    <div class="scr">
+      <div class="scr-t">📈 Progress</div>
+      <div class="scr-b">
+        <b>heading.h1</b> <code>Progress</code><br>
+        <b>display.hero</b> current-streak number<br>
+        <b>heading.h3</b> chart titles<br>
+        <b>meta.caps</b> <code>7 DAYS · 30 DAYS · ALL</code> segment<br>
+        <b>label.small</b> axis + sparkline labels
+      </div>
+    </div>
+    <div class="scr">
+      <div class="scr-t">💬 Chat · Coach J</div>
+      <div class="scr-b">
+        <b>heading.h3</b> "Coach J" header<br>
+        <b>meta.caps</b> <code>ONLINE · TRAINED ON YOUR SHOTS</code><br>
+        <b>body.default</b> message bubbles<br>
+        <b>meta.default</b> timestamps, "typing…"<br>
+        <b>label.default</b> quick-reply chips
+      </div>
+    </div>
+    <div class="scr">
+      <div class="scr-t">👤 Profile</div>
+      <div class="scr-b">
+        <b>heading.h2</b> username<br>
+        <b>body.sm</b> bio · city · handedness<br>
+        <b>display.hero</b> lifetime score avg<br>
+        <b>display.section</b> <code>ACHIEVEMENTS</code> section header<br>
+        <b>meta.caps</b> achievement names
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 6 DO/DON'T -->
+<div class="section">
+  <div class="h">6 · Hierarchy Enforcement</div>
+  <div class="rules-grid">
+    <div class="rule rule-do">
+      <div class="rule-t">DO</div>
+      <ul>
+        <li><b>Max 1 display.hero per screen.</b> If you have two giant numbers, the hierarchy is broken.</li>
+        <li><b>Max 2 condensed styles per screen</b> total (e.g. one hero number + one section callout).</li>
+        <li><b>Use DM Sans for all headings</b>. Condensed is for numerics + stadium callouts only.</li>
+        <li><b>Vertical rhythm:</b> <b>8pt</b> between meta.caps and display · <b>12pt</b> between heading and body · <b>20pt</b> between content blocks.</li>
+        <li><b>Uppercase only for meta.caps + display.section.</b> Never uppercase headings or body.</li>
+        <li><b>Let the scale do the work.</b> Need emphasis? Bump one size up before reaching for color.</li>
+      </ul>
+    </div>
+    <div class="rule rule-dont">
+      <div class="rule-t">DON'T</div>
+      <ul>
+        <li><b>Don't use Barlow Condensed for paragraphs.</b> It's a display face; it tires eyes at small sizes.</li>
+        <li><b>Don't stack two 48px numbers vertically.</b> One hero, rest scale down.</li>
+        <li><b>Don't invent sizes.</b> Nothing between 17 and 20. No 14, no 18. If you feel the need — audit the hierarchy instead.</li>
+        <li><b>Don't uppercase body.sm or body.base.</b> All caps kills readability below 14pt.</li>
+        <li><b>Don't mix font families within a sentence.</b> Mono/display callouts go on their own line or as their own element.</li>
+        <li><b>Don't rely on weight alone</b> for hierarchy — always pair with size change.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- 7 A11Y -->
+<div class="section">
+  <div class="h">7 · Readability &amp; Accessibility</div>
+  <div class="a11y-grid">
+    <div class="a11y"><div class="a11y-t">Interactive minimums</div>
+      <b>Tap-target text</b> ≥ 13px (tab bar label), <b>button label</b> ≥ 14px bold, <b>form input</b> ≥ 15px (prevents iOS zoom on focus). Never smaller.
+    </div>
+    <div class="a11y"><div class="a11y-t">Metadata minimums</div>
+      <b>body.xs (11px)</b> is the floor — only for meta/overlines. Always paired with a larger primary element; never a standalone sentence.
+    </div>
+    <div class="a11y"><div class="a11y-t">Line-height discipline</div>
+      Body <b>1.5</b>, headings <b>1.2–1.35</b>, display <b>0.95–1.0</b>. Tight display, loose body. Breaks only at word boundaries — never mid-word.
+    </div>
+    <div class="a11y"><div class="a11y-t">Dynamic Type</div>
+      Scale all roles up to <b>1.5× (extra-large)</b>. Condensed display clamps at 1.3× (it already runs tight). iOS <code style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#14C7E0">allowFontScaling</code> on by default except in fixed-layout badges.
+    </div>
+    <div class="a11y"><div class="a11y-t">iOS · Android deltas</div>
+      Android renders <b>~0.5pt smaller</b>. Add <code style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#14C7E0">Platform.select</code> +0.5 on body.sm / body.xs. Barlow Condensed tracks tighter on Android — add <b>+0.3px tracking</b> to display tokens on Android.
+    </div>
+    <div class="a11y"><div class="a11y-t">Font loading fallback</div>
+      <code style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#14C7E0">System-ui</code> stack mirrors the metrics closely — no layout shift when web fonts arrive. Use <b>font-display: optional</b> on web surfaces.
+    </div>
+  </div>
+</div>
+
+<!-- 8 JSON -->
+<div class="section">
+  <div class="h">8 · Final Tokens · theme/typography.ts</div>
+  <div class="json">{
+  <span class="k">"fontFamily"</span>: {
+    <span class="k">"display"</span>: <span class="s">"BarlowCondensed-Black"</span>,      <span class="c">// 900</span>
+    <span class="k">"display.bold"</span>: <span class="s">"BarlowCondensed-Bold"</span>,  <span class="c">// 700</span>
+    <span class="k">"body.regular"</span>: <span class="s">"DMSans-Regular"</span>,
+    <span class="k">"body.medium"</span>:  <span class="s">"DMSans-Medium"</span>,
+    <span class="k">"body.semibold"</span>:<span class="s">"DMSans-SemiBold"</span>,
+    <span class="k">"body.bold"</span>:    <span class="s">"DMSans-Bold"</span>,
+    <span class="k">"mono"</span>:         <span class="s">"JetBrainsMono-Medium"</span>
+  },
+
+  <span class="k">"size"</span>: { <span class="k">"4xl"</span>:<span class="n">48</span>, <span class="k">"3xl"</span>:<span class="n">38</span>, <span class="k">"2xl"</span>:<span class="n">30</span>, <span class="k">"xl"</span>:<span class="n">24</span>, <span class="k">"lg"</span>:<span class="n">20</span>, <span class="k">"md"</span>:<span class="n">17</span>, <span class="k">"base"</span>:<span class="n">15</span>, <span class="k">"sm"</span>:<span class="n">13</span>, <span class="k">"xs"</span>:<span class="n">11</span> },
+
+  <span class="k">"lineHeight"</span>: { <span class="k">"4xl"</span>:<span class="n">46</span>, <span class="k">"3xl"</span>:<span class="n">38</span>, <span class="k">"2xl"</span>:<span class="n">30</span>, <span class="k">"xl"</span>:<span class="n">29</span>, <span class="k">"lg"</span>:<span class="n">25</span>, <span class="k">"md"</span>:<span class="n">23</span>, <span class="k">"base"</span>:<span class="n">22</span>, <span class="k">"sm"</span>:<span class="n">19</span>, <span class="k">"xs"</span>:<span class="n">14</span> },
+
+  <span class="k">"weight"</span>: { <span class="k">"regular"</span>:<span class="s">"400"</span>, <span class="k">"medium"</span>:<span class="s">"500"</span>, <span class="k">"semibold"</span>:<span class="s">"600"</span>, <span class="k">"bold"</span>:<span class="s">"700"</span>, <span class="k">"black"</span>:<span class="s">"900"</span> },
+
+  <span class="k">"tracking"</span>: { <span class="k">"tightest"</span>:<span class="n">-1.2</span>, <span class="k">"tighter"</span>:<span class="n">-0.8</span>, <span class="k">"tight"</span>:<span class="n">-0.3</span>, <span class="k">"normal"</span>:<span class="n">0</span>, <span class="k">"wide"</span>:<span class="n">0.3</span>, <span class="k">"wider"</span>:<span class="n">2</span> },
+
+  <span class="k">"roles"</span>: {
+    <span class="k">"display.hero"</span>:    { <span class="k">"family"</span>:<span class="s">"display"</span>,       <span class="k">"size"</span>:<span class="s">"4xl"</span>, <span class="k">"lineHeight"</span>:<span class="s">"4xl"</span>, <span class="k">"weight"</span>:<span class="s">"black"</span>,    <span class="k">"tracking"</span>:<span class="s">"tightest"</span> },
+    <span class="k">"display.section"</span>: { <span class="k">"family"</span>:<span class="s">"display.bold"</span>,  <span class="k">"size"</span>:<span class="s">"2xl"</span>, <span class="k">"lineHeight"</span>:<span class="s">"2xl"</span>, <span class="k">"weight"</span>:<span class="s">"bold"</span>,     <span class="k">"tracking"</span>:<span class="s">"wider"</span>, <span class="k">"textTransform"</span>:<span class="s">"uppercase"</span> },
+    <span class="k">"heading.h1"</span>:      { <span class="k">"family"</span>:<span class="s">"body.bold"</span>,     <span class="k">"size"</span>:<span class="s">"xl"</span>,  <span class="k">"lineHeight"</span>:<span class="s">"xl"</span>,  <span class="k">"weight"</span>:<span class="s">"bold"</span>,     <span class="k">"tracking"</span>:<span class="s">"tight"</span> },
+    <span class="k">"heading.h2"</span>:      { <span class="k">"family"</span>:<span class="s">"body.bold"</span>,     <span class="k">"size"</span>:<span class="s">"lg"</span>,  <span class="k">"lineHeight"</span>:<span class="s">"lg"</span>,  <span class="k">"weight"</span>:<span class="s">"bold"</span>,     <span class="k">"tracking"</span>:<span class="s">"tight"</span> },
+    <span class="k">"heading.h3"</span>:      { <span class="k">"family"</span>:<span class="s">"body.semibold"</span>, <span class="k">"size"</span>:<span class="s">"md"</span>,  <span class="k">"lineHeight"</span>:<span class="s">"md"</span>,  <span class="k">"weight"</span>:<span class="s">"semibold"</span>, <span class="k">"tracking"</span>:<span class="s">"normal"</span> },
+    <span class="k">"body.default"</span>:    { <span class="k">"family"</span>:<span class="s">"body.regular"</span>,  <span class="k">"size"</span>:<span class="s">"base"</span>,<span class="k">"lineHeight"</span>:<span class="s">"base"</span>,<span class="k">"weight"</span>:<span class="s">"regular"</span>,  <span class="k">"tracking"</span>:<span class="s">"normal"</span> },
+    <span class="k">"body.strong"</span>:     { <span class="k">"family"</span>:<span class="s">"body.semibold"</span>, <span class="k">"size"</span>:<span class="s">"base"</span>,<span class="k">"lineHeight"</span>:<span class="s">"base"</span>,<span class="k">"weight"</span>:<span class="s">"semibold"</span>, <span class="k">"tracking"</span>:<span class="s">"normal"</span> },
+    <span class="k">"label.default"</span>:   { <span class="k">"family"</span>:<span class="s">"body.semibold"</span>, <span class="k">"size"</span>:<span class="s">"sm"</span>,  <span class="k">"lineHeight"</span>:<span class="s">"sm"</span>,  <span class="k">"weight"</span>:<span class="s">"semibold"</span>, <span class="k">"tracking"</span>:<span class="s">"wide"</span> },
+    <span class="k">"label.small"</span>:     { <span class="k">"family"</span>:<span class="s">"body.semibold"</span>, <span class="k">"size"</span>:<span class="s">"xs"</span>,  <span class="k">"lineHeight"</span>:<span class="s">"xs"</span>,  <span class="k">"weight"</span>:<span class="s">"semibold"</span>, <span class="k">"tracking"</span>:<span class="s">"wide"</span> },
+    <span class="k">"meta.default"</span>:    { <span class="k">"family"</span>:<span class="s">"body.medium"</span>,   <span class="k">"size"</span>:<span class="s">"sm"</span>,  <span class="k">"lineHeight"</span>:<span class="s">"sm"</span>,  <span class="k">"weight"</span>:<span class="s">"medium"</span>,   <span class="k">"tracking"</span>:<span class="s">"normal"</span> },
+    <span class="k">"meta.caps"</span>:       { <span class="k">"family"</span>:<span class="s">"body.bold"</span>,     <span class="k">"size"</span>:<span class="s">"xs"</span>,  <span class="k">"lineHeight"</span>:<span class="s">"xs"</span>,  <span class="k">"weight"</span>:<span class="s">"bold"</span>,     <span class="k">"tracking"</span>:<span class="s">"wider"</span>, <span class="k">"textTransform"</span>:<span class="s">"uppercase"</span> }
+  }
+}</div>
+</div>
+
+<!-- 9 MIGRATION -->
+<div class="section">
+  <div class="h">9 · Migration Checklist</div>
+  <div class="mig-steps">
+    <div class="mig-step"><div class="mig-n">1</div><div class="mig-body"><b>Add tokens first.</b> Ship <code>theme/typography.ts</code> behind <code>FF_TYPE_V2</code>. Zero visible changes yet — tokens exist, nothing consumes them.</div></div>
+    <div class="mig-step"><div class="mig-n">2</div><div class="mig-body"><b>Introduce <code>&lt;Text role="…"&gt;</code> wrapper.</b> One component that resolves a role to style. Every new feature uses it; old code gets migrated opportunistically.</div></div>
+    <div class="mig-step"><div class="mig-n">3</div><div class="mig-body"><b>Codemod existing <code>&lt;Text&gt;</code> usages</b> that match common patterns — <code>fontSize: 24, fontWeight: '700'</code> → <code>role="heading.h1"</code>. Flag ambiguous ones for manual review.</div></div>
+    <div class="mig-step"><div class="mig-n">4</div><div class="mig-body"><b>Screen-by-screen visual regression.</b> Chromatic snapshots for Home, Analysis, Results, Progress, Chat, Profile — diff against baseline. Acceptable: ≤2px layout shift, 0 readability regressions.</div></div>
+    <div class="mig-step"><div class="mig-n">5</div><div class="mig-body"><b>Lint rule</b>: <code>no-inline-font-size</code> blocks <code>fontSize: N</code> / <code>fontWeight: …</code> outside <code>theme/</code>. Error at PR-time; allowlist for migration-in-progress files.</div></div>
+    <div class="mig-step"><div class="mig-n">6</div><div class="mig-body"><b>Font loading audit.</b> Verify Barlow Condensed Black / Bold and DM Sans Regular/Medium/SemiBold/Bold are bundled in the Expo asset manifest. Run on low-end Android device — no FOUT, no layout jump.</div></div>
+    <div class="mig-step"><div class="mig-n">7</div><div class="mig-body"><b>Flip FF on.</b> 1% → 10% → 100% over one week. Rollback is a feature flag flip — safe by construction.</div></div>
+  </div>
+</div>
+
+</body></html>
