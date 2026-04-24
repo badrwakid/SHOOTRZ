@@ -1,7 +1,8 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
 from ..recommender.model_loader import load_recommender
 from ..recommender.recommend_service import recommend_drill
+from ..utils.supabase_auth import AuthenticatedUser, get_authenticated_user
 
 router = APIRouter()
 _rec = None
@@ -15,7 +16,10 @@ def get_recommender():
 
 # BUG FIX: Made async to avoid blocking the asyncio event loop
 @router.post("/recommend")
-async def recommend(payload: dict):
+async def recommend(
+    payload: dict,
+    user: AuthenticatedUser = Depends(get_authenticated_user),
+):
     try:
         user_vec = payload["user_vec"]
         user_context = payload["user_context"]
