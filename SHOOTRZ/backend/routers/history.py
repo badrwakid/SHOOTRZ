@@ -1,10 +1,11 @@
 import logging
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from typing import Optional
 from datetime import datetime
 
 from ..contracts.history import HistoryResponse, HistoryStatsResponse
 from ..storage.db import get_user_history, get_video_metrics
+from ..utils.supabase_auth import AuthenticatedUser, get_authenticated_user
 
 
 router = APIRouter(prefix="", tags=["history"])
@@ -14,6 +15,7 @@ logger = logging.getLogger(__name__)
 @router.get("/history/{user_id}", response_model=HistoryResponse)
 async def history(
 	user_id: str,
+	user: AuthenticatedUser = Depends(get_authenticated_user),
 	limit: Optional[int] = 50,
 	offset: Optional[int] = 0,
 	start_date: Optional[str] = None,
@@ -26,6 +28,8 @@ async def history(
 	Bearer token (user-scoped, correct MVP scores from analysis_summaries).
 	This endpoint is unauthenticated and uses legacy video rows only.
 	"""
+	if user.user_id != user_id:
+		raise HTTPException(status_code=403, detail="Cannot access another user's history")
 	try:
 		logger.warning(
 			"legacy /history/%s used — prefer GET /api/user/analysis-history",
@@ -84,12 +88,17 @@ async def history(
 
 
 @router.get("/history/{user_id}/stats", response_model=HistoryStatsResponse)
-async def get_history_stats(user_id: str):
+async def get_history_stats(
+	user_id: str,
+	user: AuthenticatedUser = Depends(get_authenticated_user),
+):
 	"""
 	Get aggregated statistics from user's history.
-	
+
 	Returns total sessions, average scores, improvement trends, etc.
 	"""
+	if user.user_id != user_id:
+		raise HTTPException(status_code=403, detail="Cannot access another user's history")
 	try:
 		videos = get_user_history(user_id)
 		
