@@ -162,12 +162,21 @@ def sanitize_context_for_llm(context: Dict[str, Any]) -> Dict[str, Any]:
                 if len(json.dumps(out, default=str)) <= MAX_CONTEXT_CHARS:
                     break
 
-        # Phase 3: last resort — truncate the whole serialized blob
+        # Phase 3: last resort — return a minimal safe fallback
         if len(json.dumps(out, default=str)) > MAX_CONTEXT_CHARS:
             logger.warning(
                 "sanitize_context_for_llm: context still over limit after trimming; "
-                "returning truncated payload",
+                "returning minimal fallback",
                 extra={"size": len(json.dumps(out, default=str))},
             )
+            return {
+                "user": out.get("user", {}),
+                "stats": {},
+                "recent_sessions": [],
+                "goals": [],
+                "primary_goal": None,
+                "generated_at": out.get("generated_at"),
+                "_truncated": True,
+            }
 
     return out

@@ -98,4 +98,34 @@ def test_sanitize_str_removes_injection():
 def test_sanitize_str_handles_non_string():
     from backend.chat.context_builder import _sanitize_str
     assert isinstance(_sanitize_str(42), str)
-    assert isinstance(_sanitize_str(None), str)
+    assert _sanitize_str(None) == ""  # None must produce empty string, not "None"
+
+
+def test_sanitize_hard_cap_triggers_phase1_loop():
+    """Phase 1 while loop must fire when 5 sessions × 7000 chars > 32K."""
+    from backend.chat.context_builder import sanitize_context_for_llm
+
+    # 5 sessions × 7000-char summary ≈ 35 000 chars after the initial [:5] slice
+    context = {"recent_sessions": [{"summary": "x" * 7000}] * 10}
+    result = sanitize_context_for_llm(context)
+    assert len(json.dumps(result)) <= 32_000
+
+
+def test_sanitize_phase3_fallback_never_exceeds_cap():
+    """Phase 3 must return a minimal dict, not the oversized payload.
+
+    Uses a realistic user section (6 small fields) plus a huge stats dict
+    full of integers (no strings for Phase 2 to truncate), which forces
+    Phase 3 to activate and return the safe fallback.
+    """
+    from backend.chat.context_builder import sanitize_context_for_llm
+
+    user_section = {"name": "Badr", "skill_level": "intermediate", "position": "SG"}
+    # stats with 5000 numeric entries (~65 KB) — Phase 2 can't truncate (no strings)
+    enormous_stats = {str(i): i for i in range(5000)}
+    context = {"user": user_section, "stats": enormous_stats, "recent_sessions": []}
+    result = sanitize_context_for_llm(context)
+    assert len(json.dumps(result)) <= 32_000
+    assert result.get("_truncated") is True
+    # The safe fallback should still preserve the small user section
+    assert result.get("stats") == {}

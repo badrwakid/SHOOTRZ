@@ -86,10 +86,20 @@ COMMENT ON COLUMN users.username IS 'Unique username for user identification and
 --      Extended profile data auto-created by on_user_created trigger.
 -- -----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS user_profiles (
-  user_id     uuid        PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-  bio         text,
-  avatar_url  text,
-  updated_at  timestamptz DEFAULT now()
+  user_id                   uuid             PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  bio                       text,
+  avatar_url                text,
+  primary_goal              text,
+  coaching_style            text,
+  training_frequency        text,
+  preferred_drill_duration  int,
+  age                       int,
+  height_cm                 double precision,
+  weight_kg                 double precision,
+  dominant_hand             text,
+  years_playing             int,
+  notifications_enabled     boolean          DEFAULT true,
+  updated_at                timestamptz      DEFAULT now()
 );
 
 
