@@ -4,7 +4,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
 from ..services.llm import llm_service
@@ -151,8 +151,8 @@ async def get_sessions(
 @router.get("/user/analysis-history")
 async def get_analysis_history(
     user: AuthenticatedUser = Depends(get_authenticated_user),
-    limit: int = 100,
-    offset: int = 0,
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
 ):
     """MVP shot history: sessions + analysis_summaries + metrics (authenticated)."""
     try:
