@@ -8,7 +8,7 @@ import pytest
 def _set_test_env(monkeypatch):
     """Ensure tests run with deterministic local env values."""
     monkeypatch.setenv("SUPABASE_URL", "http://localhost:54321")
-    monkeypatch.setenv("SUPABASE_KEY", "test-anon-key")
+    monkeypatch.setenv("SUPABASE_ANON_KEY", "test-anon-key")
     monkeypatch.setenv("SUPABASE_SERVICE_KEY", "test-service-role-key")
     monkeypatch.setenv("SHOOTRZ_ENV", "test")
     monkeypatch.setenv("GEMINI_API_KEY", "test-gemini-key")
