@@ -20,7 +20,7 @@ from typing import Dict, Optional, Tuple
 
 import cv2
 import numpy as np
-from fastapi import APIRouter, UploadFile, File, HTTPException, Query, Request
+from fastapi import APIRouter, UploadFile, File, Header, HTTPException, Query, Request
 from fastapi.responses import FileResponse
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -100,6 +100,8 @@ async def analyze_video(
     request: Request,
     file: UploadFile = File(...),
     shooting_side: str = Query(default="auto"),
+    skill_level: str = Query(default="intermediate", pattern="^(beginner|intermediate|advanced)$"),
+    authorization: Optional[str] = Header(default=None, alias="Authorization"),
 ):
     """Queue a video for analysis.
 
@@ -172,11 +174,21 @@ async def analyze_video(
             pass
         raise HTTPException(status_code=429, detail="server_busy_retry") from exc
 
+    # Extract user_id from token (optional — anonymous uploads still work)
+    user_id: Optional[str] = None
+    if authorization:
+        try:
+            from ..utils.supabase_auth import get_authenticated_user
+            auth_user = get_authenticated_user(authorization)
+            user_id = auth_user.user_id
+        except Exception:
+            pass  # Continue as anonymous
+
     try:
         # Feed the service an object that quacks like UploadFile so it can
         # keep its existing _persist_upload helper.
         wrapped = _RewoundUpload(tmp_path, filename=file.filename or "upload.mp4")
-        response = await service.queue_job_async(wrapped, shooting_side or "auto")
+        response = await service.queue_job_async(wrapped, shooting_side or "auto", user_id=user_id, skill_level=skill_level)
     except Exception:
         _analysis_semaphore.release()
         try:

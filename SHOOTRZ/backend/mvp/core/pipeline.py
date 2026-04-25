@@ -138,6 +138,7 @@ class MVPPipeline:
         peak_memory_sampler=None,
         save_overlay: Optional[bool] = None,
         outputs_base_dir: Optional[Path] = None,
+        skill_level: str = "intermediate",
     ) -> Dict[str, Any]:
         """
         Process video through complete pipeline.
@@ -501,7 +502,7 @@ class MVPPipeline:
             metrics_derivation = MetricsDerivation({
                 "metrics": self.config.get("metrics", {}),
                 "scoring": self.config.get("scoring", {})
-            })
+            }, skill_level=skill_level)
             metrics = metrics_derivation.derive_metrics(angles_df, shot_window)
             if ball_release_metric is not None:
                 metrics.append(ball_release_metric)

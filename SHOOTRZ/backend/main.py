@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import logging.config
 import multiprocessing
 import time
 from contextlib import asynccontextmanager
@@ -27,6 +28,28 @@ from .routers import analysis
 from .routers import chat
 from .routers.recommendation_routes import router as recommendation_router
 
+LOGGING_CONFIG = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "json": {
+            "()": "pythonjsonlogger.json.JsonFormatter",
+            "format": "%(asctime)s %(levelname)s %(name)s %(message)s",
+        },
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "json",
+        },
+    },
+    "root": {
+        "handlers": ["console"],
+        "level": "INFO",
+    },
+}
+
+logging.config.dictConfig(LOGGING_CONFIG)
 
 logger = logging.getLogger(__name__)
 
