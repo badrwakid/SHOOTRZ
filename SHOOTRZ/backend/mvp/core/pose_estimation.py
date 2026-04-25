@@ -116,8 +116,13 @@ class MVPPoseEstimator:
                 }
             )
 
+        # Apply multi-frame confidence calibration now that the full frame
+        # list is available.  This penalises joints whose x-position has high
+        # variance over a local window, reducing noise from flicker artefacts.
+        self.apply_multiframe_calibration()
+
         return self.pose_results
-    
+
     def determine_shooting_side(
         self,
         shooting_side: str = "auto"
@@ -297,6 +302,117 @@ class MVPPoseEstimator:
         with open(output_path, 'w') as f:
             json.dump(summary, f, indent=2)
     
+    def apply_multiframe_calibration(
+        self,
+        joints: List[str] = None,
+        window: int = 5,
+    ) -> None:
+        """
+        Apply multi-frame confidence calibration to self.pose_results in-place.
+
+        For each joint in *joints*, penalises confidence for frames where the
+        joint's x-position has high variance across the surrounding window.
+
+        Note:
+            This method is called automatically at the end of
+            :meth:`process_frame_stream`.  If ``pose_results`` is populated by
+            any other means (e.g. direct assignment in tests or alternative
+            ingestion paths), callers must invoke this method explicitly to
+            apply calibration before reading confidence values.
+
+        Args:
+            joints: Joint names (keys in BASKETBALL_KEYPOINTS) to calibrate.
+                    Defaults to the eight primary shooting joints.
+            window: Window size passed to calibrate_confidence_multiframe.
+        """
+        if joints is None:
+            joints = [
+                "right_elbow", "left_elbow",
+                "right_knee", "left_knee",
+                "right_wrist", "left_wrist",
+                "right_shoulder", "left_shoulder",
+            ]
+
+        for joint_name in joints:
+            joint_idx = BASKETBALL_KEYPOINTS.get(joint_name)
+            if joint_idx is None:
+                continue  # Unknown joint — skip gracefully
+
+            # Build the per-frame dicts expected by calibrate_confidence_multiframe
+            frame_dicts = []
+            for result in self.pose_results:
+                landmarks = result["landmarks"]
+                confidence = result["confidence"]
+                if joint_idx < len(landmarks) and joint_idx < len(confidence):
+                    x, y, z = landmarks[joint_idx]
+                    frame_dicts.append(
+                        {joint_name: {"x": float(x), "y": float(y), "z": float(z),
+                                      "conf": float(confidence[joint_idx])}}
+                    )
+                else:
+                    frame_dicts.append({})  # Missing joint — pass through
+
+            calibrated = calibrate_confidence_multiframe(frame_dicts, joint=joint_name, window=window)
+
+            # Write adjusted confidences back into pose_results
+            for result, cal_frame in zip(self.pose_results, calibrated):
+                joint_data = cal_frame.get(joint_name)
+                if joint_data is None:
+                    continue
+                # confidence may be a list or numpy array; normalise to list
+                conf_list = list(result["confidence"])
+                conf_list[joint_idx] = joint_data["conf"]
+                result["confidence"] = conf_list
+
     def close(self):
         """Release MediaPipe resources."""
         self.detector.close()
+
+
+# ---------------------------------------------------------------------------
+# Standalone multi-frame confidence calibration
+# ---------------------------------------------------------------------------
+
+def calibrate_confidence_multiframe(
+    frames: list,
+    joint: str,
+    window: int = 5,
+) -> list:
+    """
+    Penalize confidence for joints with high positional variance in a local window.
+
+    For each frame i, compute std of the joint's x-position over frames
+    [i-half, i+half].  Adjusted confidence::
+
+        adj_conf = original_conf * exp(-10 * local_std)
+
+    Args:
+        frames: List of per-frame dicts, each containing joint data like
+                ``{joint_name: {"x": float, "y": float, "conf": float}, ...}``.
+        joint:  The joint key to calibrate (e.g. ``"right_elbow"``).
+        window: Number of surrounding frames for std computation (default 5).
+
+    Returns:
+        New list of frame dicts with adjusted confidence for the specified
+        joint.  Frames missing the joint key are returned unchanged.
+    """
+    if not frames:
+        return frames
+
+    positions = np.array([f.get(joint, {}).get("x", np.nan) for f in frames], dtype=float)
+    half = window // 2
+    calibrated = []
+    for i, frame in enumerate(frames):
+        lo, hi = max(0, i - half), min(len(frames), i + half + 1)
+        local_std = float(np.nanstd(positions[lo:hi]))
+        if np.isnan(local_std):  # entire window is missing frames → no penalty
+            local_std = 0.0
+        joint_data = frame.get(joint)
+        if joint_data is None:
+            calibrated.append(frame)
+            continue
+        original_conf = float(joint_data.get("conf", 0.0))
+        adj_conf = original_conf * float(np.exp(-10.0 * local_std))
+        new_joint = {**joint_data, "conf": max(0.0, adj_conf)}
+        calibrated.append({**frame, joint: new_joint})
+    return calibrated
