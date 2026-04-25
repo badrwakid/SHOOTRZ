@@ -100,6 +100,7 @@ async def analyze_video(
     request: Request,
     file: UploadFile = File(...),
     shooting_side: str = Query(default="auto"),
+    skill_level: str = Query(default="intermediate", pattern="^(beginner|intermediate|advanced)$"),
     authorization: Optional[str] = Header(default=None, alias="Authorization"),
 ):
     """Queue a video for analysis.
@@ -187,7 +188,7 @@ async def analyze_video(
         # Feed the service an object that quacks like UploadFile so it can
         # keep its existing _persist_upload helper.
         wrapped = _RewoundUpload(tmp_path, filename=file.filename or "upload.mp4")
-        response = await service.queue_job_async(wrapped, shooting_side or "auto", user_id=user_id)
+        response = await service.queue_job_async(wrapped, shooting_side or "auto", user_id=user_id, skill_level=skill_level)
     except Exception:
         _analysis_semaphore.release()
         try:

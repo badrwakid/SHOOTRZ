@@ -148,7 +148,7 @@ def _worker_warmup() -> None:
         logger.warning("Worker warmup: mediapipe.solutions.pose unavailable: %s", exc)
 
 
-def _run_pipeline_sync(video_path: str, shooting_side: str, save_overlay: bool) -> Dict[str, Any]:
+def _run_pipeline_sync(video_path: str, shooting_side: str, save_overlay: bool, skill_level: str = "intermediate") -> Dict[str, Any]:
     """Top-level (picklable) callable executed inside a worker subprocess."""
     pipeline = MVPPipeline()
     proc = psutil.Process(os.getpid())
@@ -159,6 +159,7 @@ def _run_pipeline_sync(video_path: str, shooting_side: str, save_overlay: bool) 
         shooting_side,
         peak_memory_sampler=lambda: proc.memory_info().rss / 1024 ** 2,
         save_overlay=save_overlay,
+        skill_level=skill_level,
     )
     elapsed_s = time.perf_counter() - t_start
     mem_after_mb = proc.memory_info().rss / 1024 ** 2
@@ -225,12 +226,13 @@ class MVPJobService:
         upload: UploadFile,
         shooting_side: str = "auto",
         user_id: Optional[str] = None,
+        skill_level: str = "intermediate",
     ) -> MVPAnalyzeQueuedResponse:
         """Non-blocking queue: spawns a ProcessPool task the event loop can forget."""
         job_id, video_path = self._persist_upload(upload)
-        self.job_store.upsert(job_id, {"status": "queued", "user_id": user_id})
+        self.job_store.upsert(job_id, {"status": "queued", "user_id": user_id, "skill_level": skill_level})
         task = asyncio.create_task(
-            self._process_video_job_async(job_id, video_path, shooting_side, user_id=user_id)
+            self._process_video_job_async(job_id, video_path, shooting_side, user_id=user_id, skill_level=skill_level)
         )
         self._running_tasks.add(task)
         task.add_done_callback(self._running_tasks.discard)
@@ -276,6 +278,7 @@ class MVPJobService:
         video_path: str,
         shooting_side: str,
         user_id: Optional[str] = None,
+        skill_level: str = "intermediate",
     ) -> None:
         """Event-loop-friendly job driver.
 
@@ -297,7 +300,7 @@ class MVPJobService:
                 result = await asyncio.wait_for(
                     loop.run_in_executor(
                         executor,
-                        partial(_run_pipeline_sync, video_path, shooting_side, save_overlay),
+                        partial(_run_pipeline_sync, video_path, shooting_side, save_overlay, skill_level),
                     ),
                     timeout=float(_JOB_TIMEOUT_S),
                 )

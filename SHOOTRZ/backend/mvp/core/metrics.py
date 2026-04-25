@@ -180,10 +180,94 @@ def _dim_score(norm_key: str, value: float) -> Optional[float]:
 class MetricsDerivation:
     """Derives metrics from angles and shot window."""
 
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: Dict[str, Any], skill_level: str = "intermediate"):
         self.config = config
         self.metrics_config = config.get("metrics", {})
         self.scoring_config = config.get("scoring", {})
+        self.skill_level = skill_level
+
+    def _target_of(self, norm_key: str) -> Tuple[Optional[float], Optional[float]]:
+        """Return ``(lo, hi)`` for the active skill tier, falling back to base target_range.
+
+        Prefers ``by_skill[skill_level].target_range`` when the tier is present in
+        ``normative_ranges.json``.  Falls back to the base ``optimal_range`` /
+        ``target_range`` (same logic as the module-level ``_target_of``), then to
+        ``_FALLBACK_RANGES``.
+        """
+        cfg = _NORMATIVE_RANGES.get(norm_key, {})
+        by_skill = cfg.get("by_skill", {})
+        tier = by_skill.get(self.skill_level, {})
+        if tier:
+            tr = tier.get("target_range")
+            if isinstance(tr, list) and len(tr) == 2:
+                return float(tr[0]), float(tr[1])
+        # Fall back to module-level behaviour
+        return _target_of(norm_key)
+
+    def _dim_score(self, norm_key: str, value: float) -> Optional[float]:
+        """Instance-level dim_score that uses ``self._target_of`` for skill-aware ranges.
+
+        Signature matches the module-level ``_dim_score(norm_key, value)`` convention.
+
+        When a ``by_skill`` tier is active, the good_range is derived from the
+        tier's ``target_range`` (widened by 50% each side of the midpoint) so
+        that stricter tiers (advanced) yield a proportionally narrower acceptance
+        band rather than inheriting the broader JSON good_range calibrated for
+        intermediate players.  Metrics that have no ``by_skill`` block fall back
+        to the module-level behaviour (JSON good_range or synthetic derivation).
+        """
+        opt = self._target_of(norm_key)
+        if opt[0] is None or opt[1] is None or not math.isfinite(value):
+            return None
+        opt_lo, opt_hi = opt
+
+        # Determine whether this metric has a skill tier defined.
+        cfg = _NORMATIVE_RANGES.get(norm_key, {})
+        has_skill_tier = bool(cfg.get("by_skill", {}).get(self.skill_level))
+
+        if has_skill_tier:
+            # Derive good_range from the tier's target_range so the band scales
+            # with the tier — advanced stays tight, beginner gets wide.
+            opt_mid = (opt_lo + opt_hi) / 2.0
+            opt_half = max((opt_hi - opt_lo) / 2.0, 1.0)
+            good_lo = opt_mid - opt_half * 1.5
+            good_hi = opt_mid + opt_half * 1.5
+        else:
+            gr = _good_range_of(norm_key)
+            if gr is None:
+                opt_mid = (opt_lo + opt_hi) / 2.0
+                opt_half = max((opt_hi - opt_lo) / 2.0, 1.0)
+                good_lo = opt_mid - opt_half * 1.5
+                good_hi = opt_mid + opt_half * 1.5
+            else:
+                good_lo, good_hi = gr
+                good_lo = min(good_lo, opt_lo)
+                good_hi = max(good_hi, opt_hi)
+
+        good_width = max(good_hi - good_lo, 1.0)
+
+        if opt_lo <= value <= opt_hi:
+            return 100.0
+
+        if good_lo <= value <= good_hi:
+            if value < opt_lo:
+                span = max(opt_lo - good_lo, 1e-3)
+                frac = (value - good_lo) / span
+            else:
+                span = max(good_hi - opt_hi, 1e-3)
+                frac = (good_hi - value) / span
+            return 70.0 + 30.0 * max(0.0, min(1.0, frac))
+
+        if value < good_lo:
+            dist = good_lo - value
+        else:
+            dist = value - good_hi
+
+        if dist <= good_width:
+            return 70.0 - 40.0 * (dist / good_width)
+        if dist <= 2.0 * good_width:
+            return max(0.0, 30.0 - 30.0 * ((dist - good_width) / good_width))
+        return 0.0
 
     def derive_metrics(
         self,
@@ -674,7 +758,7 @@ class MetricsDerivation:
             confidence = float(metric.get("confidence", 0.0) or 0.0)
             if confidence < low_conf_threshold:
                 continue
-            sub_score = _dim_score(mapping["norm_key"], value)
+            sub_score = self._dim_score(mapping["norm_key"], value)
             if sub_score is None:
                 continue
             weight = float(mapping["weight"]) * confidence
@@ -682,7 +766,7 @@ class MetricsDerivation:
             weight_sum += weight
             total_conf += confidence
             contributing += 1
-            lo, hi = _target_of(mapping["norm_key"])
+            lo, hi = self._target_of(mapping["norm_key"])
             breakdown.append(
                 {
                     "metric": name,
