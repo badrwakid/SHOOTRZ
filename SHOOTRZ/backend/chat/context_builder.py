@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
-from ..storage.db import db
+from ..storage.supabase_client import get_service_client
 
 logger = logging.getLogger(__name__)
 
@@ -60,10 +60,26 @@ def build_user_context(
     Gemini 429 token explosion that occurred when full MVP payloads were
     sent in the system prompt.
     """
-    user = db.get_user(user_id)
-    profile = db.get_user_profile(user_id)
-    stats = db.get_user_stats(user_id)
-    summaries = db.get_recent_summaries(user_id, limit=options.max_recent_summaries)
+    summary_limit = getattr(options, "max_recent_summaries", 5) if options else 5
+
+    try:
+        sb = get_service_client()
+        resp = sb.rpc(
+            "get_coach_context",
+            {"p_user_id": user_id, "p_summary_limit": summary_limit},
+        ).execute()
+        ctx_data = resp.data or {}
+    except Exception:
+        logger.exception(
+            "build_user_context: RPC get_coach_context failed; returning empty context",
+            extra={"user_id": user_id},
+        )
+        ctx_data = {}
+    user = ctx_data.get("user") or {}
+    profile = ctx_data.get("profile") or {}
+    stats = ctx_data.get("stats") or {}
+    summaries = ctx_data.get("summaries") or []
+
     if not summaries:
         logger.info(
             "build_user_context: no analysis_summaries rows for user",
