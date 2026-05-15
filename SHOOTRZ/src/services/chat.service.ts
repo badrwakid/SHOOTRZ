@@ -26,6 +26,13 @@ async function buildUserLocalContext() {
 	return {}
 }
 
+function sanitizeMessages(messages: ChatRequestDto['messages']): ChatRequestDto['messages'] {
+	return messages
+		.filter(m => typeof m?.content === 'string')
+		.map(m => ({ role: m.role, content: m.content.trim() }))
+		.filter(m => m.content.length > 0)
+}
+
 function parseSSEEvents(
 	raw: string,
 	callbacks: StreamCallbacks,
@@ -104,7 +111,7 @@ export const chatService = {
 				Authorization: `Bearer ${token}`,
 			},
 			body: JSON.stringify({
-				messages: payload.messages,
+				messages: sanitizeMessages(payload.messages),
 				user_local_context: userLocalContext,
 				include_raw_artifacts: payload.includeRawArtifacts ?? false,
 				model: payload.model,
@@ -137,7 +144,7 @@ export const chatService = {
 		const userLocalContext = await buildUserLocalContext()
 
 		const body = JSON.stringify({
-			messages: payload.messages,
+			messages: sanitizeMessages(payload.messages),
 			user_local_context: userLocalContext,
 			include_raw_artifacts: payload.includeRawArtifacts ?? false,
 			model: payload.model,

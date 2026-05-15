@@ -30,7 +30,12 @@ from fastapi.testclient import TestClient
 MAX_POLL_S = 1.0  # Every poll must return in under 1 second.
 
 
-def _fake_pipeline_result(video_path: str, shooting_side: str, save_overlay: bool) -> Dict[str, Any]:
+def _fake_pipeline_result(
+    video_path: str,
+    shooting_side: str,
+    save_overlay: bool,
+    _skill_level: str = "intermediate",
+) -> Dict[str, Any]:
     """Picklable stand-in for ``_run_pipeline_sync`` that simulates a 3s job."""
     time.sleep(3.0)
     return {

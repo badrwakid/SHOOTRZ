@@ -86,10 +86,19 @@ def test_build_user_context_makes_single_rpc_call():
         include_raw_artifacts = False
 
     mock_client = _make_mock_client({
-        "user": {"id": "u1", "name": "Test User", "skill_level": "intermediate",
-                 "position": "SG", "dominant_hand": "right"},
-        "profile": {"coaching_style": "motivational", "primary_goal": "improve form",
-                    "training_frequency": 3, "years_playing": 5},
+        "user": {
+            "id": "u1",
+            "name": "Test User",
+            "skill_level": "intermediate",
+            "position": "SG",
+        },
+        "profile": {
+            "coaching_style": "motivational",
+            "primary_goal": "improve form",
+            "training_frequency": 3,
+            "years_playing": 5,
+            "dominant_hand": "right",
+        },
         "stats": {"total_sessions": 5, "avg_score": 72.0},
         "summaries": [
             {
@@ -129,6 +138,7 @@ def test_build_user_context_makes_single_rpc_call():
     assert context["user"]["name"] == "Test User"
     assert context["user"]["skill_level"] == "intermediate"
     assert context["user"]["coaching_style"] == "motivational"
+    assert context["user"]["dominant_hand"] == "right"
 
     # recent_sessions built from summaries
     assert len(context["recent_sessions"]) == 1

@@ -11,6 +11,9 @@
  * - Parallel consumers during an in-flight fetch share the same promise.
  * - ``bump()`` (called after a new analysis completes) invalidates the cache.
  * - ``refresh()`` forces a re-fetch regardless of TTL.
+ * - Screens (Home, Progress) call ``ensureFresh`` on navigation focus; after the
+ *   ``CACHE_TTL_MS`` window that triggers a new network read without forcing a
+ *   request on every tab switch. Race results still respect ``requestSeqRef``.
  * - Everything is scoped per ``user.id``; switching users clears the cache.
  */
 import React, {
@@ -25,6 +28,7 @@ import React, {
 import { apiService } from '../services/api.service'
 import { useAuth } from './AuthContext'
 import type { HistoryResponse, HistorySession } from '../types/contracts'
+import { eventBus } from '../utils/eventBus'
 
 const CACHE_TTL_MS = 30_000
 
@@ -52,6 +56,9 @@ export const HistoryProvider: React.FC<{ children: React.ReactNode }> = ({ child
 	const [version, setVersion] = useState(0)
 	const fetchedAtRef = useRef<number>(0)
 	const inFlightRef = useRef<Promise<HistorySession[]> | null>(null)
+	const inFlightCountRef = useRef(0)
+	const requestSeqRef = useRef(0)
+	const latestAppliedReqRef = useRef(0)
 	const lastUserIdRef = useRef<string | null | undefined>(user?.id)
 
 	// Wipe cache on user change.
@@ -60,37 +67,60 @@ export const HistoryProvider: React.FC<{ children: React.ReactNode }> = ({ child
 			lastUserIdRef.current = user?.id
 			fetchedAtRef.current = 0
 			inFlightRef.current = null
+			inFlightCountRef.current = 0
+			requestSeqRef.current = 0
+			latestAppliedReqRef.current = 0
 			setSessions([])
 			setError(null)
 			setVersion(v => v + 1)
 		}
 	}, [user?.id])
 
-	const doFetch = useCallback(async (): Promise<HistorySession[]> => {
-		if (!user?.id) {
+	const doFetch = useCallback(async (opts?: { force?: boolean }): Promise<HistorySession[]> => {
+		const force = Boolean(opts?.force)
+		const requestUserId = user?.id
+		if (!requestUserId) {
 			setSessions([])
 			return []
 		}
-		if (inFlightRef.current) return inFlightRef.current
+		if (!force && inFlightRef.current) return inFlightRef.current
+		inFlightCountRef.current += 1
 		setLoading(true)
+		const reqId = ++requestSeqRef.current
 		const p = (async () => {
 			try {
 				const resp: HistoryResponse = await apiService.getAnalysisHistory(100, 0)
 				const list = resp?.sessions ?? []
-				setSessions(list)
-				setError(null)
-				fetchedAtRef.current = Date.now()
-				setVersion(v => v + 1)
+				// Newest request wins: stale responses should not overwrite fresh data.
+				const sameUser = lastUserIdRef.current === requestUserId
+				if (sameUser && reqId >= latestAppliedReqRef.current) {
+					latestAppliedReqRef.current = reqId
+					setSessions(list)
+					setError(null)
+					fetchedAtRef.current = Date.now()
+					setVersion(v => v + 1)
+				}
 				return list
 			} catch (e: any) {
-				setError(e?.message || 'Failed to fetch history')
+				const sameUser = lastUserIdRef.current === requestUserId
+				if (sameUser && reqId >= latestAppliedReqRef.current) {
+					setError(e?.message || 'Failed to fetch history')
+				}
 				return []
 			} finally {
-				setLoading(false)
-				inFlightRef.current = null
+				inFlightCountRef.current = Math.max(0, inFlightCountRef.current - 1)
+				if (inFlightCountRef.current === 0) {
+					setLoading(false)
+				}
+				// Only clear shared in-flight pointer when this request is the current shared one.
+				if (inFlightRef.current === p) {
+					inFlightRef.current = null
+				}
 			}
 		})()
-		inFlightRef.current = p
+		if (!force) {
+			inFlightRef.current = p
+		}
 		return p
 	}, [user?.id])
 
@@ -104,7 +134,15 @@ export const HistoryProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
 	const refresh = useCallback(async (): Promise<HistorySession[]> => {
 		fetchedAtRef.current = 0
-		return doFetch()
+		return doFetch({ force: true })
+	}, [doFetch])
+
+	useEffect(() => {
+		const unsubscribe = eventBus.on('user:updated', () => {
+			fetchedAtRef.current = 0
+			void doFetch({ force: true })
+		})
+		return unsubscribe
 	}, [doFetch])
 
 	const bump = useCallback(() => {

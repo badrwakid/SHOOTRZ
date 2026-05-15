@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react'
+import React, { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo } from 'react'
 import {
 	View,
 	Text,
@@ -18,10 +18,12 @@ import { PrimaryButton } from '../components/PrimaryButton'
 import { ChatBubble } from '../components/ChatBubble'
 import { TypingIndicator } from '../components/TypingIndicator'
 import { CoachContextChip } from '../components/CoachContextChip'
+import { useAuth } from '../context/AuthContext'
 import { chatService } from '../services/chat.service'
-import { chatStorageService } from '../services/chat-storage.service'
+import { GUEST_USER_ID, chatStorageService } from '../services/chat-storage.service'
 import { hapticFeedback } from '../utils/hapticFeedback'
 import type { ChatMessageDto } from '../types/contracts'
+import { eventBus } from '../utils/eventBus'
 
 interface UiMessage {
 	id: string
@@ -59,6 +61,8 @@ function toPersistedMessages(msgs: UiMessage[]): ChatMessageDto[] {
 }
 
 export const ChatScreen: React.FC = () => {
+	const { user } = useAuth()
+	const storageUserId = user?.id ?? GUEST_USER_ID
 	const [messages, setMessages] = useState<UiMessage[]>([COACH_GREETING])
 	const [inputText, setInputText] = useState('')
 	const [isSending, setIsSending] = useState(false)
@@ -69,38 +73,94 @@ export const ChatScreen: React.FC = () => {
 	const listRef = useRef<FlatList>(null)
 	const abortRef = useRef<(() => void) | null>(null)
 	const streamingIdRef = useRef<string | null>(null)
+	const prevStorageUserRef = useRef<string | undefined>(undefined)
+	const skipSaveOnceRef = useRef(false)
+	const currentStorageUserRef = useRef(storageUserId)
+	const loadRequestIdRef = useRef(0)
+	const userSessionIdRef = useRef(0)
 
-	useEffect(() => {
-		chatService.getChatHistory(50).then(serverMsgs => {
+	const loadMessages = useCallback(async () => {
+		const requestId = loadRequestIdRef.current + 1
+		const requestUserId = storageUserId
+		loadRequestIdRef.current = requestId
+		const isRequestCurrent = () =>
+			currentStorageUserRef.current === requestUserId &&
+			loadRequestIdRef.current === requestId
+
+		try {
+			const serverMsgs = await chatService.getChatHistory(50)
+			if (!isRequestCurrent()) {
+				return
+			}
 			if (serverMsgs && serverMsgs.length > 0) {
 				const loaded = toUiMessages(
 					serverMsgs.map(m => ({ role: m.role, content: m.content })),
 				)
 				setMessages([COACH_GREETING, ...loaded])
-			} else {
-				chatStorageService.loadConversation().then(saved => {
-					if (saved && saved.length > 0) {
-						const loaded = toUiMessages(saved)
-						setMessages([COACH_GREETING, ...loaded])
-					}
-				})
+				return
 			}
-		}).catch(() => {
-			chatStorageService.loadConversation().then(saved => {
-				if (saved && saved.length > 0) {
-					const loaded = toUiMessages(saved)
-					setMessages([COACH_GREETING, ...loaded])
-				}
-			})
+			const saved = await chatStorageService.loadConversation(requestUserId)
+			if (!isRequestCurrent()) {
+				return
+			}
+			if (saved && saved.length > 0) {
+				const loaded = toUiMessages(saved)
+				setMessages([COACH_GREETING, ...loaded])
+			}
+		} catch {
+			const saved = await chatStorageService.loadConversation(requestUserId)
+			if (!isRequestCurrent()) {
+				return
+			}
+			if (saved && saved.length > 0) {
+				const loaded = toUiMessages(saved)
+				setMessages([COACH_GREETING, ...loaded])
+			}
+		}
+	}, [storageUserId])
+
+	useLayoutEffect(() => {
+		currentStorageUserRef.current = storageUserId
+		userSessionIdRef.current += 1
+		const prev = prevStorageUserRef.current
+		if (prev !== undefined && prev !== storageUserId) {
+			abortRef.current?.()
+			abortRef.current = null
+			streamingIdRef.current = null
+			skipSaveOnceRef.current = true
+		}
+		prevStorageUserRef.current = storageUserId
+		setMessages([COACH_GREETING])
+		setLastContextUsed(null)
+		setIsSending(false)
+	}, [storageUserId])
+
+	useEffect(() => {
+		loadMessages()
+		return () => {
+			abortRef.current?.()
+		}
+	}, [loadMessages])
+
+	useEffect(() => {
+		const unsubscribe = eventBus.on('user:updated', () => {
+			setLastContextUsed(null)
+			loadMessages()
 		})
-		return () => { abortRef.current?.() }
-	}, [])
+		return unsubscribe
+	}, [loadMessages])
 
 	useEffect(() => {
 		if (!streamingIdRef.current) {
-			chatStorageService.saveConversation(toPersistedMessages(messages)).catch(() => {})
+			if (skipSaveOnceRef.current) {
+				skipSaveOnceRef.current = false
+				return
+			}
+			chatStorageService
+				.saveConversation(storageUserId, toPersistedMessages(messages))
+				.catch(() => {})
 		}
-	}, [messages])
+	}, [messages, storageUserId])
 
 	const contextLabel = useMemo(() => {
 		if (!lastContextUsed) return null
@@ -121,6 +181,11 @@ export const ChatScreen: React.FC = () => {
 
 			const userId = `user-${Date.now()}`
 			const assistantId = `assistant-${Date.now()}`
+			const requestUserId = storageUserId
+			const sessionId = userSessionIdRef.current
+			const isCurrentSession = () =>
+				currentStorageUserRef.current === requestUserId &&
+				userSessionIdRef.current === sessionId
 			streamingIdRef.current = assistantId
 
 			setMessages(prev => [
@@ -131,7 +196,11 @@ export const ChatScreen: React.FC = () => {
 			setIsSending(true)
 
 			const outbound = [
-				...messages.filter(m => m.id !== 'greeting' && m.status === 'sent').slice(-20).map(m => ({ role: m.role, content: m.content })),
+				...messages
+					.filter(m => m.id !== 'greeting' && m.status === 'sent')
+					.filter(m => m.content.trim().length > 0)
+					.slice(-20)
+					.map(m => ({ role: m.role, content: m.content })),
 				{ role: 'user' as const, content: trimmed },
 			]
 
@@ -139,6 +208,9 @@ export const ChatScreen: React.FC = () => {
 				{ messages: outbound, includeRawArtifacts },
 				{
 					onChunk: (chunk: string) => {
+						if (!isCurrentSession()) {
+							return
+						}
 						setMessages(prev =>
 							prev.map(m =>
 								m.id === assistantId ? { ...m, content: m.content + chunk, status: 'streaming' } : m,
@@ -146,6 +218,9 @@ export const ChatScreen: React.FC = () => {
 						)
 					},
 					onDone: (metadata?: any) => {
+						if (!isCurrentSession()) {
+							return
+						}
 						streamingIdRef.current = null
 						setMessages(prev =>
 							prev.map(m =>
@@ -157,6 +232,9 @@ export const ChatScreen: React.FC = () => {
 						hapticFeedback.success()
 					},
 					onError: (err: Error) => {
+						if (!isCurrentSession()) {
+							return
+						}
 						streamingIdRef.current = null
 						setMessages(prev => prev.filter(m => m.id !== assistantId))
 						setErrorBanner(err.message || 'Something went wrong')
@@ -166,9 +244,16 @@ export const ChatScreen: React.FC = () => {
 				},
 			)
 				.then(abort => {
+					if (!isCurrentSession()) {
+						abort()
+						return
+					}
 					abortRef.current = abort
 				})
 				.catch((err: Error) => {
+					if (!isCurrentSession()) {
+						return
+					}
 					streamingIdRef.current = null
 					setMessages(prev => prev.filter(m => m.id !== assistantId))
 					setErrorBanner(err.message || 'Something went wrong')
@@ -176,19 +261,19 @@ export const ChatScreen: React.FC = () => {
 					hapticFeedback.warning()
 				})
 		},
-		[isSending, messages, includeRawArtifacts],
+		[isSending, messages, includeRawArtifacts, storageUserId],
 	)
 
 	const handleClear = useCallback(() => {
 		abortRef.current?.()
-		chatStorageService.clearConversation()
+		chatStorageService.clearConversation(storageUserId)
 		chatService.clearChatHistory().catch(() => {})
 		setMessages([COACH_GREETING])
 		setLastContextUsed(null)
 		setErrorBanner(null)
 		setIsSending(false)
 		hapticFeedback.light()
-	}, [])
+	}, [storageUserId])
 
 	const renderItem = useCallback(
 		({ item }: { item: UiMessage }) => {

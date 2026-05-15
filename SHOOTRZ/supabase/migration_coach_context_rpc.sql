@@ -1,29 +1,74 @@
 -- Creates a single RPC to fetch all coach context data in one round-trip.
 -- Replaces the 4 sequential queries in context_builder.py:build_user_context.
 
-CREATE OR REPLACE FUNCTION get_coach_context(p_user_id UUID, p_summary_limit INT DEFAULT 5)
-RETURNS JSON
+CREATE OR REPLACE FUNCTION public.get_coach_context(
+  p_user_id uuid,
+  p_summary_limit int DEFAULT 5
+)
+RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
 AS $$
 DECLARE
-  result JSON;
+  caller_role TEXT := COALESCE(auth.role(), current_setting('request.jwt.claim.role', true), '');
+  v_limit int := GREATEST(1, LEAST(COALESCE(p_summary_limit, 5), 20));
 BEGIN
-  SELECT json_build_object(
-    'user',      (SELECT row_to_json(u)  FROM users u        WHERE u.id = p_user_id),
-    'profile',   (SELECT row_to_json(up) FROM user_profiles up WHERE up.user_id = p_user_id),
-    'stats',     get_user_stats(p_user_id),
-    'summaries', (
-      SELECT COALESCE(json_agg(s ORDER BY s.created_at DESC), '[]'::json)
+  IF auth.uid() IS DISTINCT FROM p_user_id
+     AND caller_role <> 'service_role'
+     AND session_user <> 'postgres' THEN
+    RAISE EXCEPTION 'Not allowed to fetch another user coach context'
+      USING ERRCODE = '42501';
+  END IF;
+
+  RETURN jsonb_build_object(
+    'user', (
+      SELECT COALESCE(row_to_json(u)::jsonb, '{}'::jsonb)
       FROM (
-        SELECT * FROM analysis_summaries
+        SELECT id, name, skill_level, position
+        FROM users
+        WHERE id = p_user_id
+      ) u
+    ),
+    'profile', (
+      SELECT COALESCE(row_to_json(up)::jsonb, '{}'::jsonb)
+      FROM (
+        SELECT
+          coaching_style,
+          primary_goal,
+          training_frequency,
+          years_playing,
+          dominant_hand
+        FROM user_profiles
+        WHERE user_id = p_user_id
+      ) up
+    ),
+    'stats', COALESCE(public.get_user_stats(p_user_id), '{}'::jsonb),
+    'summaries', COALESCE((
+      SELECT jsonb_agg(row_to_json(s)::jsonb)
+      FROM (
+        SELECT created_at, overall_score, score_tier, top_improvements, top_strengths
+        FROM analysis_summaries
         WHERE user_id = p_user_id
         ORDER BY created_at DESC
-        LIMIT p_summary_limit
+        LIMIT v_limit
       ) s
-    )
-  ) INTO result;
-  RETURN result;
+    ), '[]'::jsonb),
+    'recent_chat', COALESCE((
+      SELECT jsonb_agg(row_to_json(ch)::jsonb)
+      FROM (
+        SELECT role, content, created_at
+        FROM chat_history
+        WHERE user_id = p_user_id
+        ORDER BY created_at DESC
+        LIMIT 20
+      ) ch
+    ), '[]'::jsonb)
+  );
 END;
 $$;
+
+REVOKE ALL ON FUNCTION public.get_coach_context(UUID, INT) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.get_coach_context(UUID, INT) FROM anon;
+GRANT EXECUTE ON FUNCTION public.get_coach_context(UUID, INT) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.get_coach_context(UUID, INT) TO service_role;
