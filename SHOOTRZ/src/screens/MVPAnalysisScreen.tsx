@@ -73,6 +73,7 @@ export const MVPAnalysisScreen: React.FC = () => {
 	const [overlayError, setOverlayError] = useState<string | null>(null)
 	const [overlayLocalUri, setOverlayLocalUri] = useState<string | null>(null)
 	const [overlayKey, setOverlayKey] = useState(0)
+	const overlayRequestSeqRef = useRef(0)
 	const [processingLabel, setProcessingLabel] = useState(0)
 	const processingPulse = useRef(new Animated.Value(0.4)).current
 
@@ -90,26 +91,34 @@ export const MVPAnalysisScreen: React.FC = () => {
 	}, [isAnalyzing])
 
 	const downloadOverlayToLocal = async (): Promise<string | null> => {
-		if (!overlayUri || !analysisResult?.run_id) { setOverlayError('No overlay URL.'); return null }
+		if (!overlayUri || !analysisResult?.run_id) return null
 		try {
-			setIsOverlayLoading(true)
 			const cacheDir = (FileSystem as any).cacheDirectory ?? (FileSystem as any).documentDirectory ?? ''
 			const targetPath = `${cacheDir}overlay_${analysisResult.run_id}.mp4`
 			const res = await FileSystem.downloadAsync(overlayUri, targetPath)
-			setOverlayLocalUri(res.uri); setOverlayError(null)
 			return res.uri
-		} catch { setOverlayError('Unable to load overlay.'); return null }
-		finally { setIsOverlayLoading(false) }
+		} catch {
+			return null
+		}
 	}
 
 	useEffect(() => {
+		const reqId = ++overlayRequestSeqRef.current
 		let canceled = false
+		const isActive = () => !canceled && reqId === overlayRequestSeqRef.current
 		const loadOverlay = async () => {
-			if (!overlayUri) return
+			if (!overlayUri) {
+				if (isActive()) {
+					setOverlayError(null)
+					setOverlayLocalUri(null)
+					setIsOverlayLoading(false)
+				}
+				return
+			}
 			setOverlayError(null); setIsOverlayLoading(true); setOverlayLocalUri(null)
 			setOverlayKey(p => p + 1)
 			const localUri = await downloadOverlayToLocal()
-			if (canceled) return
+			if (!isActive()) return
 			if (localUri) { setOverlayLocalUri(localUri); setOverlayError(null) }
 			else { setOverlayError('Could not load overlay.') }
 			setIsOverlayLoading(false)
@@ -128,6 +137,33 @@ export const MVPAnalysisScreen: React.FC = () => {
 	const recordVideo = () => { setShowCameraRecorder(true); hapticFeedback.medium() }
 	const handleVideoRecorded = async (uri: string) => { setShowCameraRecorder(false); await handleAnalyzeVideo(uri) }
 	const handleCameraCancel = () => setShowCameraRecorder(false)
+
+	const completeAnalysisWithRetry = async (jobId: string): Promise<boolean> => {
+		const RETRY_DELAYS_MS = [250, 450, 700, 1000, 1400, 1800, 2200]
+		for (let i = 0; i <= RETRY_DELAYS_MS.length; i++) {
+			try {
+				await apiService.completeMVPAnalysis(jobId)
+				return true
+			} catch (e: any) {
+				const status = e?.response?.status
+				const detail = String(e?.response?.data?.detail || e?.message || '').toLowerCase()
+				const pendingCommitMessage =
+					detail.includes('not completed') ||
+					detail.includes('not finished yet') ||
+					detail.includes('summary not ready') ||
+					detail.includes('job not found')
+				const retryable =
+					(status === 400 && pendingCommitMessage) ||
+					(!status && pendingCommitMessage)
+				if (!retryable || i === RETRY_DELAYS_MS.length) {
+					console.warn('completeMVPAnalysis failed', e)
+					return false
+				}
+				await new Promise(r => setTimeout(r, RETRY_DELAYS_MS[i]))
+			}
+		}
+		return false
+	}
 
 	const handleAnalyzeVideo = async (videoUri: string) => {
 		if (isAnalyzing || lastRequestRef.current === videoUri) return
@@ -170,19 +206,20 @@ export const MVPAnalysisScreen: React.FC = () => {
 						setOverlayError(null); setIsOverlayLoading(true)
 						const jobId = uploadResponse.job_id
 						if (user?.id && jobId) {
+							const persisted = await completeAnalysisWithRetry(jobId)
+							// Trigger immediate shared-history refresh so Home/Progress
+							// reflect the newly persisted analysis without waiting for
+							// navigation-focus cycles. If refresh fails, keep the
+							// previous bump-based invalidation fallback.
 							try {
-								await apiService.completeMVPAnalysis(jobId)
-							} catch (e) {
-								console.warn('completeMVPAnalysis failed, retrying once', e)
-								try {
-									await apiService.completeMVPAnalysis(jobId)
-								} catch (e2) {
-									console.warn('completeMVPAnalysis failed after retry', e2)
+								if (persisted) {
+									await history.refresh()
+								} else {
+									history.bump()
 								}
+							} catch {
+								history.bump()
 							}
-							// Invalidate shared history cache so Home/Progress pick
-							// this session up next time they mount or focus.
-							history.bump()
 						}
 						try {
 							const fmv = (k: string) => { const m = v.metrics.find(m2 => m2.name?.toLowerCase().includes(k)); return Number.isFinite(m?.value) ? (m?.value as number) : 0 }

@@ -57,6 +57,10 @@ class ShotDetector:
         self.stable_window = int(config.get("stable_window_frames", 5))
         self.motion_energy_threshold = float(config.get("motion_energy_threshold", 3.0))
         self.use_legacy_detector = bool(config.get("use_legacy_detector", False))
+        # Bounded search keeps release selection deterministic and avoids
+        # latching onto distant/noisy wrist extrema.
+        self.release_search_max_frames = int(config.get("release_search_max_frames", 45))
+        self.consensus_fallback_deviation = int(config.get("consensus_fallback_deviation", 8))
 
     def detect_shot_window(
         self,
@@ -112,11 +116,15 @@ class ShotDetector:
 
         fid_min = int(frame_ids.min()) if len(frame_ids) else 0
         start_frame = max(fid_min, min(int(start_frame), int(crouch_frame)))
+        release_cap = min(
+            fid_max,
+            int(crouch_frame) + max(10, int(self.release_search_max_frames)),
+        )
 
         if int(crouch_frame) >= int(release_frame):
             diagnostics["warnings"].append("crouch_gte_release_adjusted")
             release_frame = min(
-                fid_max,
+                release_cap,
                 int(crouch_frame) + max(3, self.wrist_peak_window // 3),
             )
             release_conf *= 0.7
@@ -146,6 +154,27 @@ class ShotDetector:
         )
         high_confidence_agreement = heuristic_max_spread <= 5
 
+        release_reason = "scored_candidate"
+        if isinstance(release_diag, dict):
+            chosen = release_diag.get("chosen") or {}
+            release_reason = str(chosen.get("kind") or release_reason)
+        if release_reason == "argmax_fallback":
+            warnings.append("release_argmax_fallback")
+
+        if (
+            heuristic_frames
+            and (heuristic_deviation > self.consensus_fallback_deviation or release_reason == "argmax_fallback")
+        ):
+            # Deterministic bounded fallback to heuristic consensus when the
+            # scored candidate is far from all heuristics or only an argmax
+            # fallback was available.
+            clamped = max(int(crouch_frame) + 1, min(release_cap, consensus_frame))
+            if clamped != int(release_frame):
+                release_frame = clamped
+                release_conf = float(max(0.15, release_conf * 0.75))
+                release_reason = "consensus_fallback"
+                warnings.append("release_consensus_fallback")
+
         frame_selection = {
             "chosen_release": int(release_frame),
             "elbow_peak_frame": elbow_peak,
@@ -157,6 +186,8 @@ class ShotDetector:
             "heuristics_n": len(heuristic_frames),
             "high_confidence_agreement": bool(high_confidence_agreement),
             "confidence_score": float(release_conf),
+            "selection_reason": release_reason,
+            "used_fallback": release_reason != "scored_candidate",
             "crouch_frame": int(crouch_frame),
             "warnings": warnings,
             "candidates": diagnostics.get("candidates", {}).get("release", {}).get("candidates", []),
@@ -416,7 +447,10 @@ class ShotDetector:
                 ef = int(row["frame_id"])
             return ef, 0.3, diag
 
-        after = wrist_df[wrist_df["frame_id"] > crouch_frame].copy()
+        release_cap = int(crouch_frame) + max(10, int(self.release_search_max_frames))
+        after = wrist_df[
+            (wrist_df["frame_id"] > crouch_frame) & (wrist_df["frame_id"] <= release_cap)
+        ].copy()
         if after.empty:
             return crouch_frame, 0.3, diag
 
@@ -436,6 +470,8 @@ class ShotDetector:
         prominences = props.get("prominences")
         if prominences is None or len(prominences) != len(peaks):
             prominences = np.ones(len(peaks), dtype=float) * 0.02
+        ideal_offset = 18.0
+        offset_span = 16.0
         for pi_idx, pi in enumerate(peaks):
             fid = int(fids[pi])
             elb = _row_at_frame(angles_df, fid)
@@ -444,7 +480,9 @@ class ShotDetector:
             prom = float(prominences[pi_idx])
             prom_n = min(1.0, prom / 0.05)
             wconf = float(confs[pi])
-            score = 0.45 * elbow_score + 0.35 * prom_n + 0.20 * wconf
+            offset = abs(float(fid - crouch_frame) - ideal_offset)
+            timing_score = max(0.0, 1.0 - (offset / max(1.0, offset_span)))
+            score = 0.40 * elbow_score + 0.30 * prom_n + 0.20 * wconf + 0.10 * timing_score
             candidates.append((fid, score, "peak"))
 
         if not candidates:

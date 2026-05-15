@@ -30,6 +30,9 @@ class MVPMetric(BaseModel):
     verdict: str
     explanation: str
     confidence: float
+    # Optional metadata for degraded/partial metrics where confidence is
+    # unknown or explicitly low due to tracking quality.
+    confidence_reason: Optional[str] = None
     frame_range: Optional[List[int]] = None
     # Exact frame the metric was measured at (peak extension for elbow,
     # deepest knee flex for knee_bend, etc). ``None`` when the metric is
@@ -130,3 +133,13 @@ class MVPResultResponse(BaseModel):
     error: Optional[str] = None
     error_detail: Optional[str] = None
     error_type: Optional[str] = None
+
+
+class CompleteAnalysisResponse(BaseModel):
+    success: bool
+    session_id: Optional[str] = None
+    video_id: Optional[str] = None
+    already_persisted: bool = False
+    summary_persisted: Optional[bool] = None
+    history_visible: Optional[bool] = None
+    message: Optional[str] = None

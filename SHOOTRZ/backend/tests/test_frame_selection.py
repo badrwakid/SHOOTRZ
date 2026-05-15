@@ -86,3 +86,56 @@ def test_early_crouch_warning_present():
     angles_df.loc[angles_df["frame_id"] == 2, "knee_angle"] = 95.0
     result = detector.detect_shot_window(angles_df, pose_df, "right")
     assert "crouch_lt_lead_frames" in result["warnings"]
+
+
+def test_release_argmax_fallback_is_annotated():
+    detector = ShotDetector({"release_search_max_frames": 50, "consensus_fallback_deviation": 6})
+    angles_df, pose_df = _synthetic_dataframes(110, 55)
+
+    # Force a monotonic wrist segment after crouch so peak detection finds no
+    # local maxima and the detector must use argmax fallback.
+    crouch_guess = 40
+    mask = (pose_df["joint"] == "right_wrist") & (pose_df["frame_id"] > crouch_guess)
+    pose_df.loc[mask, "y_norm_smooth"] = np.linspace(0.72, 0.52, mask.sum())
+
+    result = detector.detect_shot_window(angles_df, pose_df, "right")
+    fs = result["frame_selection"]
+
+    assert "release_argmax_fallback" in result["warnings"]
+    assert fs["selection_reason"] in {"argmax_fallback", "consensus_fallback"}
+    assert fs["used_fallback"] is True
+    assert result["release_frame"] > result["crouch_frame"]
+
+
+def test_consensus_fallback_is_bounded_by_release_cap():
+    detector = ShotDetector({"release_search_max_frames": 10, "consensus_fallback_deviation": 2})
+    angles_df, pose_df = _synthetic_dataframes(120, 72)
+    expected_crouch = max(5, 72 - 15)
+
+    # Force an early scored release candidate so consensus fallback path must
+    # reconcile against later heuristic frames and clamp to release cap.
+    detector._detect_release_scored = lambda *args, **kwargs: (
+        expected_crouch + 2,
+        0.8,
+        {"chosen": {"kind": "peak"}, "candidates": []},
+    )
+
+    result = detector.detect_shot_window(angles_df, pose_df, "right")
+    fs = result["frame_selection"]
+    release_cap = result["crouch_frame"] + 10
+
+    assert "release_consensus_fallback" in result["warnings"]
+    assert fs["selection_reason"] == "consensus_fallback"
+    assert result["release_frame"] <= release_cap
+
+
+def test_release_selection_is_deterministic_for_same_input():
+    detector = ShotDetector({"release_search_max_frames": 12, "consensus_fallback_deviation": 3})
+    angles_df, pose_df = _synthetic_dataframes(120, 70, noise_std=3.0, seed=77)
+
+    first = detector.detect_shot_window(angles_df, pose_df, "right")
+    second = detector.detect_shot_window(angles_df, pose_df, "right")
+
+    assert first["release_frame"] == second["release_frame"]
+    assert first["frame_selection"]["selection_reason"] == second["frame_selection"]["selection_reason"]
+    assert first["warnings"] == second["warnings"]

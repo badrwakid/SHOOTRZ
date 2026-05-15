@@ -469,9 +469,7 @@ class MVPJobService:
         elif overall_score > 100:
             overall_score = 100
 
-        metrics = result.get("metrics", [])
-        if not isinstance(metrics, list):
-            metrics = []
+        metrics = self._normalize_metrics(result.get("metrics", []))
 
         sw_payload = dict(result.get("shot_window") or {})
         ev_diag = sw_payload.pop("diagnostics", None)
@@ -544,16 +542,43 @@ class MVPJobService:
 
         return job_result
 
+    def _normalize_metrics(self, raw_metrics: Any) -> list[Dict[str, Any]]:
+        """Return metric payloads with conservative confidence metadata defaults.
+
+        We never fabricate measurable values. When upstream metrics are missing
+        confidence fields, we only add metadata required for graceful
+        degradation in downstream clients.
+        """
+        if not isinstance(raw_metrics, list):
+            return []
+        normalized: list[Dict[str, Any]] = []
+        default_reason = (
+            "Metric confidence missing from upstream stage; treated as low confidence."
+        )
+        for metric in raw_metrics:
+            if not isinstance(metric, dict):
+                continue
+            payload = dict(metric)
+            has_conf = payload.get("confidence") is not None
+            if not has_conf:
+                payload["confidence"] = 0.0
+                payload["confidence_reason"] = default_reason
+                if payload.get("verdict") is None:
+                    payload["verdict"] = "Low Confidence"
+            normalized.append(payload)
+        return normalized
+
     def _build_low_quality_payload(self, result: Dict[str, Any]) -> Dict[str, Any]:
+        metrics = self._normalize_metrics(result.get("metrics", []))
         return {
             "status": "completed_low_quality",
             "contract_version": CONTRACT_VERSION,
             "run_id": result.get("run_id"),
-            "metrics": [],
+            "metrics": metrics,
             "overall_score": 0,
             "feedback_summary": result.get("feedback_summary", "Video quality too low for analysis."),
             "feedback_bullets": result.get("feedback_bullets") or [],
-            "score_components": [],
+            "score_components": result.get("score_components") or [],
             "shot_window": {},
             "events": {},
             "shooting_side": result.get("shooting_side", "right"),
@@ -777,6 +802,10 @@ class MVPJobService:
         self, job_id: str, user_id: str,
     ) -> Optional[Dict[str, Any]]:
         try:
+            logger.info(
+                "persist_commit_stage",
+                extra={"job_id": job_id, "user_id": user_id, "stage": "save_result_for_user"},
+            )
             payload = self.job_store.get(job_id)
             if not payload or payload.get("status") != "completed":
                 logger.warning(
@@ -787,50 +816,99 @@ class MVPJobService:
 
             prev = payload.get("supabase_persisted")
             if isinstance(prev, dict) and prev.get("user_id") == user_id:
+                summary_persisted = bool(prev.get("summary_persisted", True))
+                history_visible = bool(prev.get("history_visible", True))
                 return {
                     "success": True,
                     "session_id": prev.get("session_id"),
                     "video_id": prev.get("video_id"),
+                    "summary_persisted": summary_persisted,
+                    "history_visible": history_visible,
                     "already_persisted": True,
                 }
 
-            session = db.create_session(user_id, {
-                "title": f"Analysis {job_id[:8]}",
-                "overall_score": payload.get("overall_score", 0),
-                "shot_count": 1,
-            })
-            if not session:
-                logger.warning("Failed to create session", extra={"job_id": job_id})
-                return None
-
-            session_id = session["id"]
-
-            video = db.create_video(user_id, {
-                "file_url": f"/mvp/artifacts/{payload.get('run_id', job_id)}/overlay.mp4",
-                "processing_status": "completed",
-                "job_id": job_id,
-            })
-            video_id = video["id"] if video else None
-
-            if video_id:
-                db.add_video_to_session(session_id, video_id)
-
-                raw_metrics = payload.get("metrics", [])
-                if raw_metrics:
-                    metric_rows = [
-                        {
-                            "metric_name": m.get("name", ""),
-                            "value": float(m.get("value", 0)),
-                            "confidence": float(m.get("confidence", 0)),
-                            "unit": m.get("unit", ""),
-                        }
-                        for m in raw_metrics
-                    ]
-                    db.save_metrics(video_id, metric_rows)
+            partial = payload.get("supabase_persisting")
+            if not isinstance(partial, dict) or partial.get("user_id") != user_id:
+                partial = {}
 
             summary = payload.get("supabase_summary")
-            if summary:
-                db.save_analysis_summary(session_id, user_id, summary)
+            if not summary:
+                # The async enrichment/persistence stage has not produced the
+                # summary row yet, so reporting success here would create a
+                # race where /history does not show this analysis immediately.
+                logger.warning(
+                    "save_result_for_user: summary not ready yet",
+                    extra={"job_id": job_id, "user_id": user_id},
+                )
+                return None
+
+            session_id = partial.get("session_id")
+            video_id = partial.get("video_id")
+            reused_partial = bool(session_id and video_id)
+
+            if session_id and not db.get_session(session_id):
+                session_id = None
+            if video_id and not db.get_video(video_id):
+                video_id = None
+
+            if not session_id:
+                session = db.create_session(user_id, {
+                    "title": f"Analysis {job_id[:8]}",
+                    "overall_score": payload.get("overall_score", 0),
+                    "shot_count": 1,
+                })
+                if not session:
+                    logger.warning("Failed to create session", extra={"job_id": job_id})
+                    return None
+                session_id = session["id"]
+            if not video_id:
+                video = db.create_video(user_id, {
+                    "file_url": f"/mvp/artifacts/{payload.get('run_id', job_id)}/overlay.mp4",
+                    "processing_status": "completed",
+                    "job_id": job_id,
+                })
+                video_id = video["id"] if video else None
+                if not video_id:
+                    logger.warning("Failed to create video", extra={"job_id": job_id})
+                    return None
+
+            payload["supabase_persisting"] = {
+                "user_id": user_id,
+                "session_id": session_id,
+                "video_id": video_id,
+            }
+            self._set_status(job_id, payload)
+
+            raw_metrics = payload.get("metrics", [])
+            metric_rows = [
+                {
+                    "metric_name": m.get("name", ""),
+                    "value": float(m.get("value", 0)),
+                    "confidence": float(m.get("confidence", 0)),
+                    "unit": m.get("unit", ""),
+                }
+                for m in raw_metrics
+            ] if raw_metrics else []
+
+            should_add_link = True
+            should_add_metrics = bool(metric_rows)
+            if reused_partial:
+                should_add_link = not db.session_video_exists(session_id, video_id)
+                should_add_metrics = should_add_metrics and (not db.video_metrics_exist(video_id))
+
+            if should_add_link:
+                db.add_video_to_session(session_id, video_id)
+
+            if should_add_metrics:
+                db.save_metrics(video_id, metric_rows)
+
+            summary_ok = db.persist_analysis_summary(session_id, user_id, summary)
+            if not summary_ok:
+                logger.warning(
+                    "Failed to persist analysis summary",
+                    extra={"job_id": job_id, "session_id": session_id},
+                )
+                return None
 
             db.update_streak(user_id)
 
@@ -838,13 +916,18 @@ class MVPJobService:
                 "success": True,
                 "session_id": session_id,
                 "video_id": video_id,
+                "summary_persisted": True,
+                "history_visible": True,
                 "already_persisted": False,
             }
             payload["supabase_persisted"] = {
                 "user_id": user_id,
                 "session_id": session_id,
                 "video_id": video_id,
+                "summary_persisted": True,
+                "history_visible": True,
             }
+            payload.pop("supabase_persisting", None)
             self._set_status(job_id, payload)
             return out
         except Exception:
