@@ -91,3 +91,7 @@ basketball-training-app/
 # Research model source clones (use pip packages instead)
 models/hrnet/
 models/yolov8/
+
+# AI dev workflow artifacts (internal — not for public repo)
+docs/superpowers/
+docs/latex/
