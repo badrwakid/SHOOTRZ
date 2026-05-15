@@ -87,3 +87,7 @@ overlay.log
 
 # Local project copies not part of SHOOTRZ
 basketball-training-app/
+
+# Research model source clones (use pip packages instead)
+models/hrnet/
+models/yolov8/
