@@ -26,6 +26,7 @@ import { storageService } from '../services/storage.service'
 import type { HistorySession } from '../types/contracts'
 import { hapticFeedback } from '../utils/hapticFeedback'
 import { SCORE_TIER_CARD_SURFACE } from '../theme/scoreTier'
+import { eventBus } from '../utils/eventBus'
 
 interface HomeScreenProps {
 	navigation: any
@@ -48,6 +49,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 	const [recentSessions, setRecentSessions] = useState<any[]>([])
 
 	useEffect(() => { loadData() }, [user?.id])
+	useEffect(() => {
+		const unsubscribe = eventBus.on('user:updated', () => {
+			loadData()
+		})
+		return unsubscribe
+	}, [user?.id])
 	useEffect(() => {
 		// Stale-while-revalidate on tab focus: ``ensureFresh`` is a no-op if the
 		// cache is <30s old, so flipping between Home and other tabs no longer
@@ -120,42 +127,19 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 						date: fmtDate(serverStats.lastSessionDate),
 					})
 					setRecentSessions([])
-				} else {
-					const local = await storageService.getAnalysisHistory(user.id)
-					if (local.length > 0) {
-						const latest = local[0]
-						setLastSession({
-							score: latest.scores.total,
-							date: fmtDate(latest.timestamp),
-						})
-						setRecentSessions(
-							local.slice(0, 3).map(a => ({
-								id: a.id,
-								score: a.scores.total,
-								date: fmtDate(a.timestamp),
-							})),
-						)
-					} else {
-						setLastSession(null)
-						setRecentSessions([])
-					}
-					if (!serverStats) {
-						setStats({
-							dayStreak: 0,
-							totalAnalyses: local.length,
-							averageScore:
-								local.length > 0
-									? Math.round(
-											local.reduce((s, a) => s + a.scores.total, 0) /
-												local.length,
-										)
-									: 0,
-							bestScore:
-								local.length > 0
-									? Math.max(...local.map(a => a.scores.total))
-									: 0,
-						})
-					}
+				} else if (!serverStats) {
+					// For authenticated users, history source-of-truth is the
+					// backend. Falling back to local AsyncStorage here can show
+					// unsynced analyses first, then "revert" to older server rows
+					// on refresh. Keep UI stable and wait for server persistence.
+					setLastSession(null)
+					setRecentSessions([])
+					setStats({
+						dayStreak: 0,
+						totalAnalyses: 0,
+						averageScore: 0,
+						bestScore: 0,
+					})
 				}
 			} else {
 				const [analysisHistory, workoutHistory, drillCompletions] = await Promise.all([

@@ -1,0 +1,101 @@
+\chapter{Introduction}
+\label{chap:introduction}
+
+\section{Problem Statement}
+\label{sec:problem}
+
+Basketball shooting mechanics are among the most studied aspects of the game, yet access to rigorous biomechanical feedback remains a privilege reserved for professional athletes with dedicated coaching staffs, motion-capture laboratories, and sports science departments. The overwhelming majority of amateur, scholastic, and semi-professional players receive either no feedback at all or subjective verbal cues from coaches who may lack the biomechanical vocabulary to articulate what they observe.
+
+This gap is not trivial. Research consistently shows that poor shooting mechanics---inadequate elbow alignment, insufficient knee loading, inconsistent wrist follow-through---are the primary determinants of low shooting accuracy~\cite{Cabarkapa2021}, yet these defects are notoriously difficult to self-correct without quantified, frame-level evidence. Players spend thousands of hours in practice reinforcing flawed patterns because neither they nor their coaches have access to the analytical tools necessary to identify and correct them.
+
+The frustrating part is that the information gap is not inherent to the sport. The biomechanics are well-understood---Cabarkapa et al.~\cite{Cabarkapa2021} and Okazaki et al.~\cite{Okazaki2012} have published precise angular targets for the elbow, knee, and wrist at each phase of the shooting motion. The problem is delivery: that knowledge lives in academic papers and motion-capture labs, not in the gym where it is needed.
+
+\section{Motivation}
+\label{sec:motivation}
+
+Three developments made this project practical to build at this moment.
+
+The first was MediaPipe Pose~\cite{Lugaresi2019} reaching a level of reliability where 33 body landmarks per frame could be extracted from a standard smartphone video without GPU hardware, without a controlled environment, and without a calibration procedure. Earlier pose estimators required lab conditions or expensive depth cameras. MediaPipe 0.10.14 works on footage shot by a phone propped against a water bottle.
+
+The second was large language models maturing past the stage of generating plausible-sounding text toward generating structured, actionable output. SHOOTRZ does not ask Gemini 2.5 Flash~\cite{Gemini2024} to write a coaching essay---it asks the model to fill a defined Pydantic schema: specific verdicts, specific improvement cues, a 0--100 score with a one-line rationale. That constraint turns an LLM from a novelty into a reliable pipeline component.
+
+The third was that modern mobile platforms (Expo, Supabase, FastAPI) now allow a small team to ship a functional full-stack product with authentication, cloud storage, and real-time streaming without maintaining dedicated infrastructure. The operational overhead that would have taken months five years ago now takes days.
+
+Together, these three conditions made it possible to build something in a university project timeline that previously required a sports science lab budget.
+
+\section{Project Vision}
+\label{sec:vision}
+
+SHOOTRZ is a basketball shot analysis platform built around a single idea: take a short phone video of a shot and receive back the same quality of mechanical feedback a professional coach would give---but quantified, repeatable, and available without scheduling an appointment.
+
+The core product is a six-stage computer vision pipeline that takes raw video frames and produces three outputs: joint angles at the key moments in the shot (crouch, release, follow-through), scores for each angle against research-validated biomechanical targets, and natural-language coaching cues from Gemini 2.5 Flash. Every result is persisted to the user's cloud account so they can track whether their mechanics are actually improving over time, not just how a single session felt.
+
+Around the analysis engine, three supporting features were built: a conversational coaching chat that knows the user's most recent metrics, a drill recommendation engine that adapts suggestions to identified weaknesses using a contextual bandit model, and a progress dashboard that aggregates scores over weeks. Together these form a practice loop---analyse, understand, train, re-analyse---that previously required a dedicated coaching staff to sustain.
+
+\section{Objectives}
+\label{sec:objectives}
+
+The project set out to achieve the following objectives:
+
+\begin{enumerate}[label=\arabic*.]
+  \item Build a reliable, end-to-end computer vision pipeline capable of detecting shot events and computing biomechanical metrics from monocular smartphone video under typical amateur recording conditions.
+  \item Ground all metric thresholds in published biomechanics research, distinguishing between the optimal performance envelopes of beginner, intermediate, and advanced players.
+  \item Integrate a large language model to generate natural-language coaching feedback that is contextually personalised to the individual user's profile and recent performance history.
+  \item Implement a drill recommendation engine that adapts suggestions based on identified mechanical weaknesses, using similarity search and a contextual bandit model to balance exploration with exploitation.
+  \item Provide a persistent user account system with secure authentication, analysis history, streak tracking, and profile management.
+  \item Deliver the entire system through a polished mobile application capable of running on both iOS and Android.
+\end{enumerate}
+
+\section{Scope}
+\label{sec:scope}
+
+\subsection{In Scope}
+
+\begin{itemize}
+  \item Mobile video capture and upload for basketball shooting analysis
+  \item Six-stage biomechanical analysis pipeline (pose extraction through metric derivation)
+  \item AI-generated coaching feedback via Gemini 2.5 Flash
+  \item Conversational coaching chat interface
+  \item Personalised drill recommendations (FAISS + LinUCB contextual bandit)
+  \item User authentication (email/password and Google OAuth)
+  \item Cloud-persisted analysis history and streak tracking
+  \item Optional ball trajectory analysis via YOLOv8n
+\end{itemize}
+
+\subsection{Out of Scope}
+
+\begin{itemize}
+  \item Real-time (sub-second) on-device inference
+  \item Multi-camera 3D reconstruction
+  \item Team-level analytics
+  \item Automated drill video playback
+  \item Hardware integration (smart basketballs, wearables)
+\end{itemize}
+
+\section{Target Users}
+\label{sec:users}
+
+The primary target users are basketball players at the amateur to semi-professional development level who practise regularly but lack access to professional coaching or sports science resources. Secondary targets include youth coaches seeking to provide data-backed feedback to large groups of players simultaneously, and independent skill trainers looking to augment their offering with AI-driven analytics.
+
+\section{Expected Impact}
+\label{sec:impact}
+
+Biomechanical shot analysis currently costs somewhere between a professional coaching contract and access to a university sports science lab. SHOOTRZ brings that cost to a phone video and a few seconds of server time. Players who receive precise mechanical feedback---specifically, which joint angle is off and by how much---can direct their practice time toward the actual deficiency rather than repeating the same flawed repetitions indefinitely. Coaching literature consistently links targeted mechanical correction to measurable accuracy improvement~\cite{Cabarkapa2021}; the question has always been delivery, not whether the knowledge exists. The practical impact is most significant for developmental players (scholastic, amateur, semi-professional) who have neither the budget nor the access that elite programmes take for granted.
+
+\section{Technical Innovation}
+\label{sec:innovation}
+
+The technical novelty of SHOOTRZ lies not in any single component but in the integration of several independently mature technologies into a cohesive, mobile-accessible analysis pipeline:
+
+\begin{itemize}
+  \item \textbf{Adaptive shot event detection} using multi-signal temporal fusion (knee flexion, hip descent, wrist trajectory, elbow extension) rather than fixed-frame heuristics.
+  \item \textbf{Confidence-weighted geometric mean scoring} that suppresses unreliable low-confidence metric estimates rather than allowing them to silently corrupt the overall score.
+  \item \textbf{Skill-tiered normative ranges} that adapt assessment thresholds to the user's declared experience level, sourced from peer-reviewed sports science literature~\cite{Cabarkapa2021,Okazaki2012,Struzik2014}.
+  \item \textbf{LLM score override with graceful fallback}: Gemini 2.5 Flash provides a holistic 0--100 assessment that corrects the conservatism of pure rule-based geometric means, with deterministic fallback if the model times out.
+  \item \textbf{Contextual bandit recommendation}: LinUCB~\cite{Li2010} (via the MABWiser library) dynamically balances exploration and exploitation in drill selection, updating as user engagement data accumulates.
+\end{itemize}
+
+\section{Report Organisation}
+\label{sec:organisation}
+
+The remainder of this report is structured as follows. Chapter~\ref{chap:background} provides the background and literature review covering sports analytics, computer vision, and related work. Chapter~\ref{chap:srs} specifies the system requirements in full. Chapter~\ref{chap:design} documents the system architecture and design decisions. Chapter~\ref{chap:implementation} describes the implementation in detail. Chapter~\ref{chap:evaluation} presents the testing strategy and evaluation results. Chapter~\ref{chap:conclusion} concludes with lessons learned and future work.

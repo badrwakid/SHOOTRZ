@@ -1,0 +1,77 @@
+\chapter{Conclusion}
+\label{chap:conclusion}
+
+\section{Lessons Learned}
+\label{sec:lessons_learned}
+
+\subsection{Technical Challenges}
+
+\textbf{The fork-safety problem was invisible until production conditions.}
+During development on macOS (which uses \lstinline|spawn| by default in Python 3.12+), the MediaPipe fork issue never manifested. It appeared only when deploying to Linux, where \lstinline|fork| is the default. Multiprocessing semantics differ across platforms, and explicit \lstinline|set_start_method| calls are safer than relying on platform defaults. Testing on the target deployment platform from the beginning would have caught this significantly earlier.
+
+\textbf{The geometric mean is a harsh scoring function.}
+We chose it because it correctly reflects the multiplicative nature of shooting mechanics---a deeply flawed elbow cannot be compensated by a perfect knee. However, in practice, MediaPipe confidence fluctuations can trigger the same collapse behaviour for a structurally good shot that happens to have one low-confidence frame. Separating ``the metric is genuinely bad'' from ``the metric is low confidence'' required careful threshold tuning and the Gemini AI override mechanism. Future implementations should consider a separate confidence-suppressed score path, distinct from a genuine quality-degraded path.
+
+\textbf{API contract drift is a persistent danger in parallel development.}
+Despite the Pydantic $\leftrightarrow$ TypeScript contract pattern, two incidents occurred where backend response schema changes were not reflected in the TypeScript interfaces, causing silent \lstinline|undefined| values in the UI rather than thrown errors. The fix---enforcing TypeScript \lstinline|strict| mode with exhaustive interface matching---caught subsequent divergences at compile time. Automated schema generation (e.g., running \lstinline|datamodel-code-generator| over the Pydantic models as part of CI) would eliminate this class of error entirely.
+
+\textbf{Streaming SSE from a mobile client is fragile.}
+The EventSource API is not natively supported in React Native; the implementation uses a custom chunked-response parser on top of Axios. Edge cases in how Gemini chunks its streaming output---sometimes splitting JSON boundaries across chunks---required multiple debugging sessions to stabilise. The lesson: streaming response handling requires dedicated integration testing, not just unit tests on the parser itself.
+
+\subsection{AI Pipeline Difficulties}
+
+\textbf{Shooting side detection is harder than it appears.}
+Left-handed players expose a different lateral body geometry in a standard camera frame than right-handed players. The initial implementation assumed a fixed joint ordering, producing systematically wrong elbow and wrist angles for left-handed players. Fixing this was straightforward once diagnosed (threading \lstinline|shooting_side| through the pipeline), but the fix required touching every stage---a reminder that assumptions made early in a pipeline's design propagate through all downstream components.
+
+\textbf{The state machine needs adaptive thresholds.}
+A fixed knee flexion threshold (e.g., 100\textdegree) for shot detection produced false positives for players with a naturally deep crouch and missed detections for players who take a relatively shallow dip. Deriving thresholds from each video's own signal percentile distribution required additional computation but significantly improved reliability across diverse body types and recording distances.
+
+\textbf{MediaPipe confidence scores are not comparable across videos.}
+A frame with confidence 0.6 in one video may reflect genuinely good visibility; in another, under different lighting and clothing conditions, 0.6 might be near-noise. Computing per-joint confidence percentiles within each video run rather than applying global thresholds resolved this. The broader lesson: model confidence scores require per-context calibration before they can be used as decision boundaries.
+
+\subsection{Mobile and Backend Integration Problems}
+
+\textbf{Network environment variability during development.}
+Because the backend and mobile client run on separate processes (and often separate devices during physical testing), URL configuration---especially when moving between WiFi networks or using physical devices instead of simulators---was a recurring friction point. The \lstinline|set-expo-ip.js| startup script that auto-detects and injects the local IP was added mid-project to address this.
+
+\textbf{Video codec compatibility.}
+iOS devices record in HEVC (H.265) by default, which OpenCV on Linux cannot always decode without additional FFmpeg support. During development, test videos needed to be manually re-encoded to H.264. A transcoding step (via FFmpeg or a cloud transcoder) before pipeline submission is necessary for a production deployment but was not implemented within the project timeline.
+
+\textbf{AsyncStorage quota management.}
+Without explicit size caps, locally cached analyses and chat history grew unboundedly, eventually causing silent write failures on lower-end Android devices. Implementing the 200-entry and 500-entry caps was a late-stage addition that would have been simpler to design in from the start.
+
+\subsection{Engineering Lessons}
+
+\textbf{Test against the real database, not mocks, for authentication and RLS.}
+Several integration tests that passed with mocked Supabase responses produced different behaviour against a real Supabase instance because RLS policies were not replicated in the mocks. Where feasible, integration tests should run against a dedicated test Supabase project with the same schema.
+
+\textbf{Structured logging from day one.}
+Several early bug investigations required manually parsing unstructured \lstinline|print()| statements scattered through the pipeline. Migrating to \lstinline|logging.getLogger(__name__)| with structured \lstinline|extra={}| fields was a significant improvement but required touching dozens of files. Beginning with structured logging would have made debugging considerably faster.
+
+\textbf{Rate limiting is not optional.}
+Before the semaphore and per-IP rate limiting were implemented, a single client submitting a rapid sequence of uploads could saturate all CPU cores and make the service unresponsive. Resource limits belong in the system design from the start, not as a hardening step after the core feature is built.
+
+\section{Future Work}
+\label{sec:future_work}
+
+\begin{enumerate}[label=\arabic*.]
+  \item \textbf{Move analysis persistence into the pipeline}: Eliminate the client-crash race condition by auto-writing to Supabase inside the job service, using the HTTP call from the client only as an acknowledgment/deduplication signal.
+  \item \begin{sloppypar}\textbf{Gate all user-scoped routes with authentication middleware}: Complete the security hardening identified in the production-readiness audit by adding the \lstinline|get_authenticated_user| FastAPI dependency to the history, user, feedback, and recommendation routers.\end{sloppypar}
+  \item \textbf{Generate TypeScript interfaces from Pydantic models automatically}: Run \lstinline|datamodel-code-generator| over the backend contracts as part of the development workflow, eliminating manual contract synchronisation.
+  \item \textbf{Implement a labelled shot detection evaluation dataset}: Annotate a corpus of 200+ basketball shot videos with ground-truth phase frames to compute precision, recall, and frame-detection error distribution rigorously.
+  \item \textbf{Integrate LightGBM for shot success prediction}: Use a dataset of labelled makes and misses correlated with the computed biomechanical feature vectors to train a classifier that augments the rule-based score with an empirical success probability estimate.
+  \item \textbf{Add WebSocket or SSE job status notifications}: Replace the 2-second polling loop with a push notification mechanism to reduce result delivery latency from 0--2 seconds to near-zero.
+  \item \textbf{Implement multi-camera support}: Use two synchronised smartphones to enable genuine stereo 3D pose reconstruction and measurement of depth-axis mechanics (elbow drift, wrist snap direction) that monocular estimation cannot reliably capture.
+  \item \begin{sloppypar}\textbf{Transition to a distributed job queue}: Replace the per-instance \lstinline|ProcessPoolExecutor| with Celery backed by Redis, allowing horizontal backend scaling without changing the client API. The existing \lstinline|DurableJobStore| interface (\lstinline|enqueue|, \lstinline|get|, \lstinline|update|, \lstinline|expire|) was designed to be replaceable with a Redis-backed implementation.\end{sloppypar}
+\end{enumerate}
+
+\section{Conclusion}
+\label{sec:final_conclusion}
+
+SHOOTRZ demonstrates that professional-grade biomechanical basketball shot analysis is deliverable to any player with a smartphone and an internet connection. The system combines a six-stage computer vision pipeline grounded in peer-reviewed sports biomechanics literature, a large language model constrained to produce structured coaching feedback, and a personalised drill recommendation engine that adapts to mechanical weaknesses over time---all accessible through a cross-platform mobile application.
+
+The most significant engineering contributions of this project are the multi-signal shot detection state machine with per-video adaptive thresholds, the two-layer scoring model that combines deterministic rule-based assessment with LLM holistic override, and the full contextual bandit recommendation pipeline implemented in a production-quality mobile application. The system was subjected to a structured production-readiness audit that identified and resolved 50 out of 55 issues before submission, with the remaining five documented transparently alongside concrete remediation plans.
+
+The limitations are real: monocular pose estimation cannot recover depth-axis mechanics, the absence of a formally labelled evaluation dataset limits the rigour of detection accuracy claims, and several API endpoints lack authentication middleware. These are documented honestly because the purpose of this project was to build something that works in practice and to understand precisely where the gaps are---not to claim a completeness that the codebase does not yet have.
+
+Basketball coaching knowledge has been quantified, published, and validated by biomechanics researchers for decades. SHOOTRZ is an attempt to move that knowledge from papers and labs into the gym, one analysis at a time.

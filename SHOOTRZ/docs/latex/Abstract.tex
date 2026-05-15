@@ -1,0 +1,19 @@
+\chapter*{Abstract}
+\addcontentsline{toc}{chapter}{Abstract}
+
+Basketball shooting accuracy is determined primarily by the consistency of a player's joint mechanics at the moment of release, yet quantified biomechanical feedback has historically been available only to elite athletes with access to motion-capture laboratories and dedicated sports science staff. The overwhelming majority of players develop their mechanics through subjective coaching cues alone, with no objective, frame-level evidence to guide correction.
+
+This thesis presents SHOOTRZ, an AI-powered basketball shot mechanics analysis platform that delivers professional-grade biomechanical feedback to any player with a standard smartphone camera. The system accepts a short video recording of a basketball shot and processes it through a six-stage computer vision pipeline: video loading with adaptive frame sampling, per-frame pose estimation using MediaPipe Pose (33 landmarks), Savitzky--Golay signal smoothing, multi-signal shot event detection via a state machine, joint angle computation from landmark triplets, and metric scoring against research-validated normative ranges sourced from peer-reviewed sports biomechanics literature.
+
+Three primary joint metrics are computed: elbow extension at release (optimal range 170--180\textdegree), knee flexion at crouch (optimal range 105--115\textdegree), and wrist follow-through angle (optimal range 18--28\textdegree), with normative targets drawn from Cabarkapa et al.\ (2021), Okazaki et al.\ (2012), and Struzik et al.\ (2014) respectively. An overall shot quality score on a 0--100 scale is computed as a confidence-weighted geometric mean of available component scores. When available, Gemini 2.5 Flash provides a holistic AI score and natural-language coaching cues via a structured Pydantic output schema, with deterministic fallback to the rule-based score on timeout or error.
+
+The backend is implemented in Python 3.11 using FastAPI, with concurrent job execution through a \texttt{ProcessPoolExecutor} gated by an asyncio semaphore (maximum 8 simultaneous analyses). Job state is persisted in SQLite with a 72-hour retention window; completed analyses are committed to Supabase (PostgreSQL with Row-Level Security) and linked to the user account. The mobile frontend is built with React Native 0.81.5 and Expo 54, supporting both iOS and Android.
+
+Beyond single-shot analysis, SHOOTRZ provides a conversational AI coaching interface with full user-history context injection, and a personalised drill recommendation engine combining FAISS nearest-neighbour search with a LinUCB contextual bandit model. A production-readiness audit identified 55 issues across seven severity categories, of which 50 were resolved prior to submission.
+
+Evaluation on a development test corpus demonstrates that the fused shot detector correctly identifies the release frame within $\pm$5 frames of manual annotation in the majority of cases, and that pose estimation coverage exceeds 85\% on well-lit indoor footage. The system sustains approximately 24 analysis jobs per minute under sustained concurrent load. Limitations including the monocular pose depth constraint and the absence of a formally labelled evaluation dataset are documented alongside a concrete roadmap for future development.
+
+\vspace{1em}
+\noindent\textbf{Keywords:} basketball biomechanics, pose estimation, computer vision, large language models, mobile computing, contextual bandit, sports analytics
+
+\clearpage

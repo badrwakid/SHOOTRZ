@@ -89,6 +89,15 @@ export const ProgressScreen: React.FC = () => {
 		history.ensureFresh().catch(() => {})
 	}, [user?.id, history])
 
+	useEffect(() => {
+		const unsub = navigation.addListener('focus', () => {
+			// Revalidate on tab focus so newly completed analyses appear
+			// immediately when returning from Analyze/Home.
+			history.ensureFresh().catch(() => {})
+		})
+		return unsub
+	}, [navigation, history])
+
 	const onRefresh = async () => {
 		setRefreshing(true)
 		try {

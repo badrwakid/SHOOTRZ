@@ -1,0 +1,176 @@
+\documentclass[11pt,final]{tsukuthesis}
+
+% ── Core packages (required by template) ──────────────────────────────────────
+\usepackage{graphicx}
+\usepackage[numbers,square,comma,sort&compress]{natbib}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{float}
+\usepackage{IEEEtrantools}
+\usepackage{setspace}
+\usepackage{rotating}
+\usepackage{multirow}
+\usepackage{amsmath}
+\usepackage{fancyhdr}
+\usepackage[table]{xcolor}
+\usepackage{listings}
+
+% ── Additional packages ───────────────────────────────────────────────────────
+\usepackage{booktabs}       % professional table rules
+\usepackage{longtable}      % multi-page tables
+\usepackage{url}            % URL formatting
+% microtype removed — conflicts with tsukuthesis, causes \showhyphens warning
+\usepackage[hidelinks]{hyperref}
+% set LaTeX paper-size lengths so hyperref does not warn about \paperheight=0pt
+\setlength{\paperheight}{11in}
+\setlength{\paperwidth}{8.5in}
+% caption / subcaption removed — conflicts with tsukuthesis \@makecaption
+% subcaption removed — not needed and causes setstretch clash
+\let\labelindent\relax      % tsukuthesis pre-defines this; let enumitem win
+\usepackage{enumitem}       % list customisation
+\usepackage{textcomp}       % \textdegree, \textbackslash, etc.
+\usepackage{lmodern}        % improved font rendering
+
+% ── Template-defined custom commands ─────────────────────────────────────────
+\def\newblock{\hskip .11em plus .33em minus .07em}
+\newcommand{\parag}{\par \vspace{10pt}}
+\newcommand\tabcaption{\def\@captype{table}\caption}
+
+% ── Page geometry ─────────────────────────────────────────────────────────────
+\setlength\parindent{0.25in}
+\setlength{\headheight}{15.2pt}
+\clubpenalty=10000
+\widowpenalty=10000
+\setcounter{secnumdepth}{4}
+
+% ── Code listing style ────────────────────────────────────────────────────────
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codeblue}{rgb}{0.13,0.29,0.53}
+\definecolor{codebg}{rgb}{0.97,0.97,0.97}
+
+% ── Custom listings languages ─────────────────────────────────────────────────
+\lstdefinelanguage{JavaScript}{
+  keywords={const,let,var,function,return,if,else,while,for,
+             async,await,true,false,null,undefined,break,continue,new,this},
+  sensitive=true,
+  comment=[l]{//},
+  morecomment=[s]{/*}{*/},
+  morestring=[b]',
+  morestring=[b]"
+}
+
+\lstdefinelanguage{TypeScript}{
+  language=JavaScript,
+  morekeywords={string,number,boolean,any,void,interface,type,enum,readonly,
+                export,import,from,as,extends,implements,class,abstract}
+}
+
+\lstset{
+    backgroundcolor=\color{codebg},
+    basicstyle=\ttfamily\footnotesize,
+    breaklines=true,
+    breakatwhitespace=false,
+    frame=single,
+    framerule=0.4pt,
+    rulecolor=\color{gray!40},
+    keywordstyle=\color{codeblue}\bfseries,
+    commentstyle=\color{codegray}\itshape,
+    stringstyle=\color{red!65!black},
+    showstringspaces=false,
+    numbers=left,
+    numberstyle=\tiny\color{codegray},
+    numbersep=8pt,
+    captionpos=b,
+    tabsize=2,
+    xleftmargin=1.5em,
+    framexleftmargin=1.5em,
+    escapeinside={(*@}{@*)},
+}
+
+% ── Figure placeholder (use until real screenshots are uploaded) ──────────────
+\newcommand{\figplaceholder}[2][5.5cm]{%
+  \begin{center}
+    \setlength{\fboxsep}{6pt}%
+    \fbox{\begin{minipage}[c][#1][c]{0.82\textwidth}
+      \centering\color{gray!60}\small\itshape #2
+    \end{minipage}}%
+  \end{center}}
+
+% ── Framed figure command — subtle gray border for white-background images ────
+% Usage: \figurebox[image-width]{path/to/image.png}
+\newcommand{\figurebox}[2][0.85\textwidth]{%
+  {\setlength{\fboxsep}{5pt}%
+   \setlength{\fboxrule}{0.5pt}%
+   \fcolorbox{gray!45}{white}{\includegraphics[width=#1]{#2}}}}
+
+% ── Row alternating colour for tables ─────────────────────────────────────────
+\rowcolors{2}{gray!8}{white}
+
+% ── Header / footer ───────────────────────────────────────────────────────────
+\pagestyle{fancy}
+\renewcommand{\chaptermark}[1]{\markboth{\chaptername~\thechapter.~#1}{}}
+\fancyhead[LO]{\leftmark}
+\fancyhead[RO]{\thepage}
+\fancyfoot[CO]{}
+
+% ── Thesis metadata ───────────────────────────────────────────────────────────
+\title{SHOOTRZ: AI-Powered Basketball Shooting Analysis\\
+       and Performance Feedback System}
+
+\author{Badr Wakid Sayed Mohamed \\
+        Karim Mohamed ElBatran \\
+        Hamza Tamer Draz \\
+        Adam Tamer ElSayed \\
+        Hassan Samaha}
+
+\degree{Computing \& Digital Technology}
+\school{School of Computing \& Digital Technology}
+\university{ESLSCA University}
+\degreeyear{May 2026}
+\advisor{Dr.\ Walaa Hassan}
+\prevdegrees{}
+\field{Artificial Intelligence \& Data Science}
+\country{Egypt}
+
+\bibliographystyle{IEEEtran}
+
+% ── Silence lmtt/bx/n missing-font warning ────────────────────────────────────
+% \bfseries inside listings requests bold-extended (bx) monospace, but Latin
+% Modern Typewriter only ships bold (b). This hook runs after lmodern has
+% registered its font tables, so the substitution declaration succeeds silently.
+\AtBeginDocument{%
+  \DeclareFontShape{OT1}{lmtt}{bx}{n}{<->ssub*lmtt/b/n}{}%
+  \DeclareFontShape{OT1}{lmtt}{bx}{it}{<->ssub*lmtt/b/it}{}%
+}
+
+% ═════════════════════════════════════════════════════════════════════════════
+\begin{document}
+% ═════════════════════════════════════════════════════════════════════════════
+
+\maketitle
+
+% ── Front matter ─────────────────────────────────────────────────────────────
+\input{Abstract}
+\input{Acknowledgments}
+
+\tableofcontents
+\listoftables
+\listoffigures
+
+% ── Main chapters ─────────────────────────────────────────────────────────────
+\input{Chapter_1}
+\input{Chapter_2}
+\input{Chapter_3}
+\input{Chapter_4}
+\input{Chapter_5}
+\input{Chapter_6}
+\input{Chapter_7}
+
+% ── Appendices ────────────────────────────────────────────────────────────────
+\appendix
+\input{Appendices}
+
+% ── Bibliography ──────────────────────────────────────────────────────────────
+\bibliography{dissertationbib}
+
+\end{document}
