@@ -15,24 +15,7 @@ if (__DEV__) {
 		'RangeError: Failed to construct',
 	]);
 
-	// Intercept console.error to suppress network errors
-	const originalError = console.error;
-	console.error = (...args: any[]) => {
-		const message = args.join(' ');
-		const isNetworkError =
-			message.includes('Network request failed') ||
-			message.includes('Network Error') ||
-			message.includes('TypeError: Network request failed') ||
-			message.includes('AuthRetryableFetchError') ||
-			message.includes('RangeError: Failed to construct \'Response\'') ||
-			(message.includes('TypeError') && message.includes('Network')) ||
-			(message.includes('AuthRetryableFetchError') && message.includes('Network'));
-
-		if (!isNetworkError) {
-			originalError.apply(console, args);
-		}
-		// Silently ignore network errors
-	};
+	// LogBox above already suppresses the network error overlays in dev mode
 }
 
 // registerRootComponent calls AppRegistry.registerComponent('main', () => App);

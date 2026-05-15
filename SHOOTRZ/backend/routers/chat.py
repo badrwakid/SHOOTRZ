@@ -1,12 +1,14 @@
 from __future__ import annotations
+# pyright: reportMissingImports=false
 
 import json
 import logging
 import time
 from typing import Any, Dict, Generator, List
 
-from fastapi import APIRouter, Depends, Request
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, Body, Depends, HTTPException, Request
+from pydantic import ValidationError
+from starlette.responses import StreamingResponse
 
 from ..chat.context_builder import (
     ContextBuildOptions,
@@ -41,6 +43,52 @@ def _build_context(payload: ChatRequest, user: AuthenticatedUser):
     )
 
 
+def _parse_chat_payload(payload_raw: Dict[str, Any]) -> ChatRequest:
+    """Normalize legacy client payloads and validate once centrally.
+
+    This avoids FastAPI-level 422s when old clients send slightly different keys
+    (e.g., `userLocalContext`, `includeRawArtifacts`, or message `text`).
+    """
+    raw = payload_raw or {}
+
+    raw_messages = raw.get("messages") if isinstance(raw, dict) else None
+    normalized_messages: List[Dict[str, Any]] = []
+    if isinstance(raw_messages, list):
+        for item in raw_messages:
+            if not isinstance(item, dict):
+                continue
+            role = item.get("role")
+            content = item.get("content")
+            if content is None:
+                content = item.get("text")
+            if not isinstance(content, str):
+                continue
+            trimmed = content.strip()
+            if not trimmed:
+                continue
+            normalized_messages.append({"role": role, "content": trimmed})
+
+    normalized_payload: Dict[str, Any] = {
+        "messages": normalized_messages,
+        "user_local_context": raw.get("user_local_context")
+        if isinstance(raw.get("user_local_context"), dict)
+        else raw.get("userLocalContext"),
+        "include_raw_artifacts": bool(
+            raw.get("include_raw_artifacts", raw.get("includeRawArtifacts", False))
+        ),
+        "model": raw.get("model"),
+    }
+
+    try:
+        return ChatRequest(**normalized_payload)
+    except ValidationError as exc:
+        logger.warning(
+            "Invalid chat payload",
+            extra={"errors": exc.errors(), "payload_keys": list(raw.keys()) if isinstance(raw, dict) else []},
+        )
+        raise HTTPException(status_code=400, detail="Invalid chat payload") from exc
+
+
 # ---------------------------------------------------------------------------
 # Batch endpoint
 # ---------------------------------------------------------------------------
@@ -49,9 +97,10 @@ def _build_context(payload: ChatRequest, user: AuthenticatedUser):
 @limiter.limit("20/minute")
 async def chat(
     request: Request,
-    payload: ChatRequest,
+    payload_raw: Dict[str, Any] = Body(default_factory=dict),
     user: AuthenticatedUser = Depends(get_authenticated_user),
 ):
+    payload = _parse_chat_payload(payload_raw)
     context, context_used = _build_context(payload, user)
     context = sanitize_context_for_llm(context)
     system_prompt = _build_system_prompt(context)
@@ -118,7 +167,8 @@ def _sse_generator(
             elif event_type == "error":
                 yield f"event: error\ndata: {json.dumps(payload)}\n\n"
     except Exception as exc:
-        yield f"event: error\ndata: {json.dumps({'message': str(exc)})}\n\n"
+        logger.exception("Chat stream error")
+        yield f"event: error\ndata: {json.dumps({'message': 'An error occurred processing your request'})}\n\n"
 
     elapsed_ms = int((time.time() - start_ms) * 1000)
     assistant_text = "".join(full_response).strip()
@@ -137,9 +187,10 @@ def _sse_generator(
 @limiter.limit("20/minute")
 async def chat_stream(
     request: Request,
-    payload: ChatRequest,
+    payload_raw: Dict[str, Any] = Body(default_factory=dict),
     user: AuthenticatedUser = Depends(get_authenticated_user),
 ):
+    payload = _parse_chat_payload(payload_raw)
     context, context_used = _build_context(payload, user)
     context = sanitize_context_for_llm(context)
     system_prompt = _build_system_prompt(context)

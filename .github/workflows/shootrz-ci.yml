@@ -10,6 +10,9 @@ on:
       - 'SHOOTRZ/**'
       - '.github/workflows/shootrz-ci.yml'
 
+permissions:
+  contents: read
+
 jobs:
   frontend-typecheck:
     runs-on: ubuntu-latest

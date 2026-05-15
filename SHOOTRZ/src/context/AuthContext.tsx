@@ -7,6 +7,7 @@ import { apiService } from '../services/api.service';
 import * as AuthSession from 'expo-auth-session';
 import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
+import { eventBus } from '../utils/eventBus';
 
 /**
  * Extract PKCE `code` and OAuth errors from Supabase/Google redirect URLs.
@@ -528,13 +529,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const markOnboardingComplete = async () => {
     setIsNewUser(false);
     
-    // Also save to database to persist across app restarts
+    // Persist via backend API only (frontend should not write users directly).
     if (user?.id) {
       try {
-        await supabase
-          .from('users')
-          .update({ has_completed_onboarding: true })
-          .eq('id', user.id);
+        await apiService.updateUserProfile({ hasCompletedOnboarding: true } as any);
+        eventBus.emit('user:updated');
       } catch (error: any) {
         console.error('❌ Failed to save onboarding completion:', error);
       }
@@ -564,41 +563,25 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
 
     try {
-      // Update local state first
-      const updatedUser = { ...user, ...updates };
-      setUser(updatedUser);
-      
-      // Update local storage
-      await storageService.saveUserData(updatedUser);
-      
-      // Update database - especially important for username
-      const dbUpdates: any = {};
-      
-      if (updates.username !== undefined) {
-        dbUpdates.username = updates.username;
+      const payload: Record<string, unknown> = {};
+      if (updates.username !== undefined) payload.username = updates.username;
+      if (updates.name !== undefined) payload.name = updates.name;
+      if (updates.skillLevel !== undefined) payload.skillLevel = updates.skillLevel;
+      if (updates.position !== undefined) payload.position = updates.position;
+      if (updates.primaryGoal !== undefined) payload.primaryGoal = updates.primaryGoal;
+      if (updates.trainingFrequency !== undefined) payload.trainingFrequency = updates.trainingFrequency;
+      if (updates.preferredDrillDuration !== undefined) {
+        payload.preferredDrillDuration = updates.preferredDrillDuration;
       }
-      if (updates.name !== undefined) {
-        dbUpdates.name = updates.name;
-      }
-      if (updates.skillLevel !== undefined) {
-        dbUpdates.skill_level = updates.skillLevel;
-      }
-      if (updates.position !== undefined) {
-        dbUpdates.position = updates.position;
-      }
-      
-      // Only update database if there are fields to update
-      if (Object.keys(dbUpdates).length > 0) {
-        const { error: dbError } = await supabase
-          .from('users')
-          .update(dbUpdates)
-          .eq('id', user.id);
-        
-        if (dbError) {
-          console.error('❌ Failed to update user in database:', dbError);
-          // Don't throw - local update succeeded, database update can retry
-        }
-      }
+      if (updates.dominantHand !== undefined) payload.dominantHand = updates.dominantHand;
+      if (updates.yearsPlaying !== undefined) payload.yearsPlaying = updates.yearsPlaying;
+      if (updates.coachingStyle !== undefined) payload.coachingStyle = updates.coachingStyle;
+      if (updates.age !== undefined) payload.age = updates.age;
+      if (updates.heightCm !== undefined) payload.heightCm = updates.heightCm;
+      if (updates.weightKg !== undefined) payload.weightKg = updates.weightKg;
+
+      await apiService.updateUserProfile(payload as any);
+      eventBus.emit('user:updated');
     } catch (error: any) {
       console.error('❌ Error updating profile:', error);
       throw error;
@@ -649,10 +632,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           scheme: 'shootrz',
           path: 'auth/callback',
         });
-        if (__DEV__) {
-          console.log('[Google OAuth] redirectUri (add exact URL to Supabase Auth → Redirect URLs):', redirectUri);
-        }
-
         // Get OAuth URL from Supabase with the redirect URI
         // Add prompt: 'select_account' to force account picker (always ask which account)
         const { data, error } = await supabase.auth.signInWithOAuth({
@@ -744,9 +723,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               parsed.oauthErrorDescription ||
               parsed.oauthError ||
               'Sign-in was cancelled or denied';
-            if (__DEV__) {
-              console.error('[Google OAuth] provider error in redirect:', parsed.oauthError, msg);
-            }
             return { success: false, error: msg };
           }
 
@@ -864,7 +840,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               
               if (!sessionData?.session) {
                 console.error('❌ Session creation failed - no session in response');
-                console.error('❌ Response data:', JSON.stringify(sessionData, null, 2));
                 return { success: false, error: 'Session creation failed' };
               }
               
