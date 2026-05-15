@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import logging.config
 import multiprocessing
 import time
 from contextlib import asynccontextmanager
@@ -22,11 +23,33 @@ except RuntimeError:
     # Context already set (e.g. during hot reload in dev) — harmless.
     pass
 
-from .routers import history, feedback, db_test, db_integration_test, sessions, mvp, user
+from .routers import history, feedback, sessions, mvp, user
 from .routers import analysis
 from .routers import chat
 from .routers.recommendation_routes import router as recommendation_router
 
+LOGGING_CONFIG = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "json": {
+            "()": "pythonjsonlogger.json.JsonFormatter",
+            "format": "%(asctime)s %(levelname)s %(name)s %(message)s",
+        },
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "json",
+        },
+    },
+    "root": {
+        "handlers": ["console"],
+        "level": "INFO",
+    },
+}
+
+logging.config.dictConfig(LOGGING_CONFIG)
 
 logger = logging.getLogger(__name__)
 
@@ -72,8 +95,6 @@ def create_app() -> FastAPI:
     app.include_router(history.router)
     app.include_router(feedback.router)
     app.include_router(sessions.router)
-    app.include_router(db_test.router)  # Database test endpoint
-    app.include_router(db_integration_test.router)  # Integration test endpoint
     app.include_router(user.router)
     app.include_router(analysis.router)
     app.include_router(recommendation_router, prefix="/api")

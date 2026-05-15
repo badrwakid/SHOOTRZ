@@ -92,7 +92,7 @@ Client polls GET /mvp/result/{job_id}
 ### Ground-truth locations
 
 - **API contracts:** `src/types/contracts.ts` must mirror Pydantic models in `backend/routers/` + `backend/services/llm/output_schemas.py`.
-- **Supabase schema:** `supabase/schema.sql` is **incomplete** — missing `user_profiles`, `analysis_summaries`, `chat_history`, `drill_completions`, `user_streaks`, `session_videos`. Audit plan consolidates them into `supabase/schema_complete.sql`.
+- **Supabase schema:** `supabase/schema_complete.sql` is the canonical schema — includes all tables (`sessions`, `session_videos`, `video_metrics`, `analysis_summaries`, `chat_history`, `drill_completions`, `user_streaks`, `user_profiles`), RLS policies, indexes, and triggers. `supabase/schema.sql` is a legacy partial file; ignore it.
 - **Biomechanics thresholds:** `backend/metrics/normative_ranges.json`. Scoring is a confidence-weighted geometric mean over per-joint angle deviations.
 - **Per-run artifacts:** `backend/outputs/{run_id}/` (do not commit; runtime state).
 - **Environment:** `SHOOTRZ/.env` (frontend, `EXPO_PUBLIC_*`) and `SHOOTRZ/backend/.env` (backend). `.env.example` files TBD.

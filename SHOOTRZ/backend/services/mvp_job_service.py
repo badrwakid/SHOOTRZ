@@ -148,7 +148,7 @@ def _worker_warmup() -> None:
         logger.warning("Worker warmup: mediapipe.solutions.pose unavailable: %s", exc)
 
 
-def _run_pipeline_sync(video_path: str, shooting_side: str, save_overlay: bool) -> Dict[str, Any]:
+def _run_pipeline_sync(video_path: str, shooting_side: str, save_overlay: bool, skill_level: str = "intermediate") -> Dict[str, Any]:
     """Top-level (picklable) callable executed inside a worker subprocess."""
     pipeline = MVPPipeline()
     proc = psutil.Process(os.getpid())
@@ -159,6 +159,7 @@ def _run_pipeline_sync(video_path: str, shooting_side: str, save_overlay: bool) 
         shooting_side,
         peak_memory_sampler=lambda: proc.memory_info().rss / 1024 ** 2,
         save_overlay=save_overlay,
+        skill_level=skill_level,
     )
     elapsed_s = time.perf_counter() - t_start
     mem_after_mb = proc.memory_info().rss / 1024 ** 2
@@ -224,12 +225,14 @@ class MVPJobService:
         self,
         upload: UploadFile,
         shooting_side: str = "auto",
+        user_id: Optional[str] = None,
+        skill_level: str = "intermediate",
     ) -> MVPAnalyzeQueuedResponse:
         """Non-blocking queue: spawns a ProcessPool task the event loop can forget."""
         job_id, video_path = self._persist_upload(upload)
-        self.job_store.upsert(job_id, {"status": "queued"})
+        self.job_store.upsert(job_id, {"status": "queued", "user_id": user_id, "skill_level": skill_level})
         task = asyncio.create_task(
-            self._process_video_job_async(job_id, video_path, shooting_side)
+            self._process_video_job_async(job_id, video_path, shooting_side, user_id=user_id, skill_level=skill_level)
         )
         self._running_tasks.add(task)
         task.add_done_callback(self._running_tasks.discard)
@@ -274,6 +277,8 @@ class MVPJobService:
         job_id: str,
         video_path: str,
         shooting_side: str,
+        user_id: Optional[str] = None,
+        skill_level: str = "intermediate",
     ) -> None:
         """Event-loop-friendly job driver.
 
@@ -295,7 +300,7 @@ class MVPJobService:
                 result = await asyncio.wait_for(
                     loop.run_in_executor(
                         executor,
-                        partial(_run_pipeline_sync, video_path, shooting_side, save_overlay),
+                        partial(_run_pipeline_sync, video_path, shooting_side, save_overlay, skill_level),
                     ),
                     timeout=float(_JOB_TIMEOUT_S),
                 )
@@ -366,7 +371,7 @@ class MVPJobService:
             # client sees.
             delete_upload = False
             asyncio.create_task(
-                self._persist_supabase_and_cleanup(job_id, job_result, video_path)
+                self._persist_supabase_and_cleanup(job_id, job_result, video_path, user_id=user_id)
             )
         finally:
             if delete_upload:
@@ -381,14 +386,24 @@ class MVPJobService:
         job_id: str,
         job_result: Dict[str, Any],
         video_path: str,
+        user_id: Optional[str] = None,
     ) -> None:
         """Persist to Supabase off the event loop. Never invalidates the
         already-stored ``completed`` result."""
         try:
-            await asyncio.to_thread(self._save_to_supabase, job_id, job_result)
-            self._set_status(job_id, job_result)
-        except Exception:
-            logger.exception("Supabase persist failed", extra={"job_id": job_id})
+            try:
+                await asyncio.to_thread(self._save_to_supabase, job_id, job_result)
+                self._set_status(job_id, job_result)
+            except Exception:
+                logger.exception("Supabase persist failed", extra={"job_id": job_id})
+
+            # Auto-persist to user account if upload was authenticated
+            if user_id and job_result.get("status") == "completed":
+                try:
+                    await asyncio.to_thread(self.save_result_for_user, job_id, user_id)
+                    logger.info("Auto-persisted analysis to Supabase", extra={"job_id": job_id, "user_id": user_id})
+                except Exception:
+                    logger.exception("Auto-persist to Supabase failed", extra={"job_id": job_id})
         finally:
             try:
                 if os.path.exists(video_path):
