@@ -1,255 +1,259 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react'
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  FlatList,
-  Modal,
-  ColorValue,
-} from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { DrillCard } from '../components/DrillCard';
-import { EmptyState } from '../components/EmptyState';
-import { DRILLS, Drill } from '../constants/drills';
-import { SHOOTRZ_THEME, COMPONENT_STYLES } from '../constants/theme';
-import { DrillDetailScreen } from './DrillDetailScreen';
+	View,
+	Text,
+	StyleSheet,
+	FlatList,
+	TouchableOpacity,
+	Modal,
+} from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
+import { Ionicons } from '@expo/vector-icons'
+import { colors, typography, spacing, radius } from '../constants/theme'
+import { semanticTokens } from '../theme/tokens'
+import { DrillDetailScreen } from './DrillDetailScreen'
+import { EmptyState } from '../components/EmptyState'
+import { hapticFeedback } from '../utils/hapticFeedback'
+import { DRILLS, Drill } from '../constants/drills'
+
+const CATEGORIES = ['all', 'shooting', 'form', 'footwork', 'follow-through']
+const DIFFICULTIES = ['all', 'beginner', 'intermediate', 'advanced']
 
 export const DrillsScreen: React.FC = () => {
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  const [selectedDifficulty, setSelectedDifficulty] = useState<string>('all');
-  const [selectedDrill, setSelectedDrill] = useState<Drill | null>(null);
+	const [selectedCategory, setSelectedCategory] = useState('all')
+	const [selectedDifficulty, setSelectedDifficulty] = useState('all')
+	const [selectedDrill, setSelectedDrill] = useState<Drill | null>(null)
 
-  const categories = ['all', 'shooting', 'dribbling', 'defense', 'conditioning'];
-  const difficulties = ['all', 'beginner', 'intermediate', 'advanced'];
+	const filteredDrills = useMemo(() => {
+		return DRILLS.filter(d => {
+			if (selectedCategory !== 'all' && d.category.toLowerCase() !== selectedCategory) return false
+			if (selectedDifficulty !== 'all' && d.difficulty !== selectedDifficulty) return false
+			return true
+		})
+	}, [selectedCategory, selectedDifficulty])
 
-  const filteredDrills = DRILLS.filter((drill) => {
-    const categoryMatch = selectedCategory === 'all' || drill.category === selectedCategory;
-    const difficultyMatch = selectedDifficulty === 'all' || drill.difficulty === selectedDifficulty;
-    return categoryMatch && difficultyMatch;
-  });
+	const handleDrillPress = (drill: Drill) => {
+		hapticFeedback.light()
+		setSelectedDrill(drill)
+	}
 
-  const handleDrillPress = (drill: Drill) => {
-    setSelectedDrill(drill);
-  };
+	const renderDrillItem = ({ item }: { item: Drill }) => (
+		<TouchableOpacity
+			style={styles.drillCard}
+			onPress={() => handleDrillPress(item)}
+			activeOpacity={0.75}
+		>
+			<View style={[styles.drillHeader, {
+				backgroundColor:
+					item.difficulty === 'beginner' ? colors.success + '15'
+						: item.difficulty === 'advanced' ? colors.error + '15'
+							: colors.warning + '15',
+			}]}>
+				<View style={[styles.diffBadge, {
+					backgroundColor:
+						item.difficulty === 'beginner' ? colors.success + '30'
+							: item.difficulty === 'advanced' ? colors.error + '30'
+								: colors.warning + '30',
+				}]}>
+					<Text style={[styles.diffText, {
+						color:
+							item.difficulty === 'beginner' ? colors.success
+								: item.difficulty === 'advanced' ? colors.error
+									: colors.warning,
+					}]}>
+						{item.difficulty.toUpperCase()}
+					</Text>
+				</View>
+				{item.duration ? (
+					<View style={styles.durationPill}>
+						<Ionicons name="time-outline" size={12} color={colors.text.primary} />
+						<Text style={styles.durationText}>{item.duration}</Text>
+					</View>
+				) : null}
+			</View>
+			<View style={styles.drillBody}>
+				<Text style={styles.drillName} numberOfLines={2}>{item.name}</Text>
+				<View style={styles.categoryPill}>
+					<Text style={styles.categoryText}>{item.category}</Text>
+				</View>
+			</View>
+		</TouchableOpacity>
+	)
 
-  const renderDrill = ({ item }: { item: Drill }) => (
-    <DrillCard drill={item} onPress={() => handleDrillPress(item)} />
-  );
+	return (
+		<SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+			{/* Category Filter */}
+			<FlatList
+				horizontal
+				data={CATEGORIES}
+				keyExtractor={c => c}
+				showsHorizontalScrollIndicator={false}
+				contentContainerStyle={styles.filterRow}
+				renderItem={({ item: cat }) => (
+					<TouchableOpacity
+						style={[styles.filterPill, selectedCategory === cat && styles.filterPillActive]}
+						onPress={() => { hapticFeedback.selection(); setSelectedCategory(cat) }}
+						activeOpacity={0.8}
+					>
+						<Text style={[styles.filterText, selectedCategory === cat && styles.filterTextActive]}>
+							{cat === 'all' ? 'All' : cat.charAt(0).toUpperCase() + cat.slice(1)}
+						</Text>
+					</TouchableOpacity>
+				)}
+			/>
 
-  return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Training Drills</Text>
-        <Text style={styles.subtitle}>Improve your skills with targeted exercises</Text>
-      </View>
+			{/* Difficulty Filter */}
+			<FlatList
+				horizontal
+				data={DIFFICULTIES}
+				keyExtractor={d => d}
+				showsHorizontalScrollIndicator={false}
+				contentContainerStyle={styles.filterRow}
+				renderItem={({ item: diff }) => (
+					<TouchableOpacity
+						style={[styles.filterPill, selectedDifficulty === diff && styles.filterPillActive]}
+						onPress={() => { hapticFeedback.selection(); setSelectedDifficulty(diff) }}
+						activeOpacity={0.8}
+					>
+						<Text style={[styles.filterText, selectedDifficulty === diff && styles.filterTextActive]}>
+							{diff === 'all' ? 'All' : diff.charAt(0).toUpperCase() + diff.slice(1)}
+						</Text>
+					</TouchableOpacity>
+				)}
+			/>
 
-      {/* Combined Filters */}
-      <View style={styles.combinedFiltersSection}>
-        {/* Category Filter */}
-        <View style={styles.filterRow}>
-          <Text style={styles.filterLabel}>Category:</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll}>
-            {categories.map((category) =>
-              selectedCategory === category ? (
-                <LinearGradient
-                  key={category}
-                  colors={SHOOTRZ_THEME.gradients.primary as [ColorValue, ColorValue]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={[styles.compactFilterButton, styles.activeCompactFilterButton]}
-                >
-                  <TouchableOpacity onPress={() => setSelectedCategory(category)}>
-                    <Text style={styles.activeCompactFilterButtonText}>
-                      {category.charAt(0).toUpperCase() + category.slice(1)}
-                    </Text>
-                  </TouchableOpacity>
-                </LinearGradient>
-              ) : (
-                <TouchableOpacity
-                  key={category}
-                  style={styles.compactFilterButton}
-                  onPress={() => setSelectedCategory(category)}
-                >
-                  <Text style={styles.compactFilterButtonText}>
-                    {category.charAt(0).toUpperCase() + category.slice(1)}
-                  </Text>
-                </TouchableOpacity>
-              )
-            )}
-          </ScrollView>
-        </View>
+			{/* Drill Grid */}
+			{filteredDrills.length === 0 ? (
+				<EmptyState
+					icon="basketball-outline"
+					title="No drills match"
+					message="Try adjusting your filters."
+					action={{ label: 'Clear Filters', onPress: () => { setSelectedCategory('all'); setSelectedDifficulty('all') } }}
+				/>
+			) : (
+				<FlatList
+					data={filteredDrills}
+					renderItem={renderDrillItem}
+					keyExtractor={d => d.id}
+					numColumns={2}
+					contentContainerStyle={styles.grid}
+					columnWrapperStyle={styles.gridRow}
+					showsVerticalScrollIndicator={false}
+					removeClippedSubviews
+				/>
+			)}
 
-        {/* Difficulty Filter */}
-        <View style={styles.filterRow}>
-          <Text style={styles.filterLabel}>Difficulty:</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll}>
-            {difficulties.map((difficulty) =>
-              selectedDifficulty === difficulty ? (
-                <LinearGradient
-                  key={difficulty}
-                  colors={SHOOTRZ_THEME.gradients.secondary as [ColorValue, ColorValue]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={[styles.compactFilterButton, styles.activeCompactFilterButton]}
-                >
-                  <TouchableOpacity onPress={() => setSelectedDifficulty(difficulty)}>
-                    <Text style={styles.activeCompactFilterButtonText}>
-                      {difficulty.charAt(0).toUpperCase() + difficulty.slice(1)}
-                    </Text>
-                  </TouchableOpacity>
-                </LinearGradient>
-              ) : (
-                <TouchableOpacity
-                  key={difficulty}
-                  style={styles.compactFilterButton}
-                  onPress={() => setSelectedDifficulty(difficulty)}
-                >
-                  <Text style={styles.compactFilterButtonText}>
-                    {difficulty.charAt(0).toUpperCase() + difficulty.slice(1)}
-                  </Text>
-                </TouchableOpacity>
-              )
-            )}
-          </ScrollView>
-        </View>
-      </View>
-
-      {/* Results Count */}
-      <View style={styles.resultsHeader}>
-        <Text style={styles.resultsCount}>
-          {filteredDrills.length} drill{filteredDrills.length !== 1 ? 's' : ''} found
-        </Text>
-      </View>
-
-      {/* Drills List */}
-      {filteredDrills.length === 0 ? (
-        <EmptyState
-          icon="🔍"
-          title="No Drills Found"
-          message="Try adjusting your filters to see more drills"
-          actionText="Clear Filters"
-          onAction={() => {
-            setSelectedCategory('all');
-            setSelectedDifficulty('all');
-          }}
-        />
-      ) : (
-        <FlatList
-          data={filteredDrills}
-          renderItem={renderDrill}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.drillsList}
-          showsVerticalScrollIndicator={false}
-        />
-      )}
-
-      {/* Drill Detail Modal */}
-      <Modal
-        visible={selectedDrill !== null}
-        animationType="slide"
-        presentationStyle="fullScreen"
-        onRequestClose={() => setSelectedDrill(null)}
-      >
-        {selectedDrill && (
-          <DrillDetailScreen drill={selectedDrill} onClose={() => setSelectedDrill(null)} />
-        )}
-      </Modal>
-    </SafeAreaView>
-  );
-};
+			{/* Drill Detail Modal */}
+			<Modal
+				visible={selectedDrill !== null}
+				animationType="slide"
+				transparent={false}
+				onRequestClose={() => setSelectedDrill(null)}
+			>
+				{selectedDrill ? (
+					<DrillDetailScreen drill={selectedDrill} onClose={() => setSelectedDrill(null)} />
+				) : null}
+			</Modal>
+		</SafeAreaView>
+	)
+}
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: SHOOTRZ_THEME.colors.background,
-  },
-  header: {
-    padding: SHOOTRZ_THEME.spacing.lg,
-    backgroundColor: SHOOTRZ_THEME.colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: SHOOTRZ_THEME.colors.surfaceElevated,
-  },
-  title: {
-    ...SHOOTRZ_THEME.typography.heading2,
-    marginBottom: SHOOTRZ_THEME.spacing.xs,
-  },
-  subtitle: {
-    ...SHOOTRZ_THEME.typography.body,
-    color: SHOOTRZ_THEME.colors.textSecondary,
-  },
-  combinedFiltersSection: {
-    padding: SHOOTRZ_THEME.spacing.md,
-    backgroundColor: SHOOTRZ_THEME.colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: SHOOTRZ_THEME.colors.surfaceElevated,
-  },
-  filterRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: SHOOTRZ_THEME.spacing.sm,
-  },
-  filterLabel: {
-    ...SHOOTRZ_THEME.typography.bodySmall,
-    fontWeight: '600',
-    color: SHOOTRZ_THEME.colors.textSecondary,
-    marginRight: SHOOTRZ_THEME.spacing.sm,
-    minWidth: 70,
-  },
-  filterScroll: {
-    flexDirection: 'row',
-  },
-  filterButton: {
-    paddingHorizontal: SHOOTRZ_THEME.spacing.md,
-    paddingVertical: SHOOTRZ_THEME.spacing.sm,
-    borderRadius: SHOOTRZ_THEME.borderRadius.xl,
-    backgroundColor: SHOOTRZ_THEME.colors.surfaceElevated,
-    marginRight: SHOOTRZ_THEME.spacing.sm,
-    overflow: 'hidden',
-  },
-  activeFilterButton: {
-    backgroundColor: 'transparent',
-  },
-  filterButtonText: {
-    ...SHOOTRZ_THEME.typography.bodySmall,
-    color: SHOOTRZ_THEME.colors.textSecondary,
-    fontWeight: '500',
-  },
-  activeFilterButtonText: {
-    color: SHOOTRZ_THEME.colors.textPrimary,
-  },
-  compactFilterButton: {
-    paddingHorizontal: SHOOTRZ_THEME.spacing.sm,
-    paddingVertical: SHOOTRZ_THEME.spacing.xs,
-    borderRadius: SHOOTRZ_THEME.borderRadius.lg,
-    backgroundColor: SHOOTRZ_THEME.colors.surfaceElevated,
-    marginRight: SHOOTRZ_THEME.spacing.xs,
-    overflow: 'hidden',
-  },
-  activeCompactFilterButton: {
-    backgroundColor: 'transparent',
-  },
-  compactFilterButtonText: {
-    ...SHOOTRZ_THEME.typography.caption,
-    color: SHOOTRZ_THEME.colors.textSecondary,
-    fontWeight: '500',
-  },
-  activeCompactFilterButtonText: {
-    ...SHOOTRZ_THEME.typography.caption,
-    color: SHOOTRZ_THEME.colors.textPrimary,
-    fontWeight: '600',
-  },
-  resultsHeader: {
-    padding: SHOOTRZ_THEME.spacing.md,
-    backgroundColor: SHOOTRZ_THEME.colors.surface,
-  },
-  resultsCount: {
-    ...SHOOTRZ_THEME.typography.bodySmall,
-    color: SHOOTRZ_THEME.colors.textSecondary,
-  },
-  drillsList: {
-    padding: SHOOTRZ_THEME.spacing.md,
-  },
-});
+	container: { flex: 1, backgroundColor: colors.bg.primary },
+	filterRow: {
+		paddingHorizontal: spacing.screenPadding,
+		paddingVertical: spacing[2],
+		gap: spacing[2],
+	},
+	filterPill: {
+		paddingHorizontal: spacing[3],
+		paddingVertical: spacing[2],
+		borderRadius: radius.pill,
+		borderWidth: 1,
+		borderColor: colors.border.default,
+	},
+	filterPillActive: {
+		backgroundColor: colors.brand.orange,
+		borderColor: colors.brand.orange,
+	},
+	filterText: {
+		...typography.roles.caption,
+		fontSize: typography.size.sm,
+		color: colors.text.secondary,
+	},
+	filterTextActive: {
+		...typography.roles.bodyStrong,
+		color: colors.text.primary,
+	},
+	grid: {
+		paddingHorizontal: spacing.screenPadding,
+		paddingTop: spacing[2],
+		paddingBottom: spacing.tabBarHeight,
+	},
+	gridRow: {
+		gap: spacing[3],
+	},
+	drillCard: {
+		flex: 1,
+		backgroundColor: colors.bg.secondary,
+		borderRadius: radius.card,
+		borderWidth: 1,
+		borderColor: colors.border.default,
+		overflow: 'hidden',
+		marginBottom: spacing[3],
+	},
+	drillHeader: {
+		height: 80,
+		flexDirection: 'row',
+		justifyContent: 'space-between',
+		alignItems: 'flex-start',
+		padding: spacing[2],
+	},
+	diffBadge: {
+		paddingHorizontal: spacing[2],
+		paddingVertical: 2,
+		borderRadius: radius.pill,
+	},
+	diffText: {
+		fontSize: typography.size.xs,
+		fontWeight: typography.weight.bold,
+		letterSpacing: typography.tracking.wide,
+	},
+	durationPill: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 3,
+		backgroundColor: `${semanticTokens.shadow.base}66`,
+		borderRadius: radius.pill,
+		paddingHorizontal: spacing[2],
+		paddingVertical: 2,
+	},
+	durationText: {
+		...typography.roles.caption,
+		color: colors.text.primary,
+	},
+	drillBody: {
+		padding: spacing[3],
+	},
+	drillName: {
+		...typography.roles.caption,
+		fontSize: typography.size.sm,
+		fontWeight: typography.weight.semibold,
+		fontFamily: 'DMSansSemiBold',
+		color: colors.text.primary,
+		marginBottom: spacing[2],
+	},
+	categoryPill: {
+		backgroundColor: colors.brand.orangeDim,
+		borderRadius: radius.pill,
+		paddingHorizontal: spacing[2],
+		paddingVertical: 2,
+		alignSelf: 'flex-start',
+	},
+	categoryText: {
+		...typography.roles.caption,
+		color: colors.brand.orangeLight,
+		fontWeight: typography.weight.medium,
+		fontFamily: 'DMSansMedium',
+	},
+})

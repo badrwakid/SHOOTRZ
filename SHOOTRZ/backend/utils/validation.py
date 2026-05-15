@@ -3,7 +3,7 @@ Input validation utilities for API endpoints and processing functions.
 """
 
 import numpy as np
-from typing import Any, Optional, Tuple
+from typing import Optional, Tuple
 from pathlib import Path
 
 

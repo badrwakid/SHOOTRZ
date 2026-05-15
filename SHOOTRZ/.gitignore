@@ -68,3 +68,26 @@ htmlcov/
 tmp/
 temp/
 *.tmp
+
+# Runtime artifacts
+__graveyard__/
+backend/outputs/
+backend/database/progress.db
+
+# ML artifacts (regenerated at runtime — do not track)
+*.npy
+*.bin
+backend/storage/*.npy
+backend/storage/*.bin
+
+# Ad-hoc test/result files
+test_results.json
+test_health.py
+overlay.log
+
+# Local project copies not part of SHOOTRZ
+basketball-training-app/
+
+# Research model source clones (use pip packages instead)
+models/hrnet/
+models/yolov8/

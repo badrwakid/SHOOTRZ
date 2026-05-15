@@ -1,0 +1,3 @@
+"""
+Core MVP pipeline modules.
+"""

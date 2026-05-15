@@ -7,7 +7,7 @@ Based on:
 """
 
 import numpy as np
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, Optional
 from scipy.signal import savgol_filter
 
 

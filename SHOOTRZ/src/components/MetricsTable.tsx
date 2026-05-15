@@ -1,13 +1,12 @@
-import React from 'react'
 import {
 	View,
 	Text,
 	StyleSheet,
-	ScrollView,
+	// BUG FIX: Removed unused ScrollView import
 	TouchableOpacity,
 	FlatList,
 } from 'react-native'
-import { LinearGradient } from 'expo-linear-gradient'
+// BUG FIX: Removed unused LinearGradient import
 import { Ionicons } from '@expo/vector-icons'
 import { SHOOTRZ_THEME } from '../constants/theme'
 
@@ -222,7 +221,7 @@ const styles = StyleSheet.create({
 	headerTitle: {
 		fontSize: 20,
 		fontWeight: 'bold',
-		color: SHOOTRZ_THEME.colors.text,
+		color: SHOOTRZ_THEME.colors.textPrimary,
 	},
 	headerSubtitle: {
 		fontSize: 14,
@@ -258,7 +257,7 @@ const styles = StyleSheet.create({
 	metricName: {
 		fontSize: 15,
 		fontWeight: '600',
-		color: SHOOTRZ_THEME.colors.text,
+		color: SHOOTRZ_THEME.colors.textPrimary,
 	},
 	metricPhase: {
 		fontSize: 12,

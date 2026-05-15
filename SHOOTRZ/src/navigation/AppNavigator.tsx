@@ -1,122 +1,201 @@
-import React from 'react';
-import { NavigationContainer } from '@react-navigation/native';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Linking from 'expo-linking';
-import { Ionicons } from '@expo/vector-icons';
-import { HomeScreen } from '../screens/HomeScreen';
-import { AnalyzeScreen } from '../screens/AnalyzeScreen';
-import { DrillsScreen } from '../screens/DrillsScreen';
-import { WorkoutsScreen } from '../screens/WorkoutsScreen';
-import { ProgressScreen } from '../screens/ProgressScreen';
-import { ProfileScreen } from '../screens/ProfileScreen';
-import { ChatScreen } from '../screens/ChatScreen';
-import { SHOOTRZ_THEME } from '../constants/theme';
+import React, { useCallback } from 'react'
+import { View } from 'react-native'
+import { NavigationContainer } from '@react-navigation/native'
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import * as Linking from 'expo-linking'
+import { Ionicons } from '@expo/vector-icons'
+import { HomeScreen } from '../screens/HomeScreen'
+import { MVPAnalysisScreen } from '../screens/MVPAnalysisScreen'
+import { DrillsScreen } from '../screens/DrillsScreen'
+import { WorkoutsScreen } from '../screens/WorkoutsScreen'
+import { ProgressScreen } from '../screens/ProgressScreen'
+import { ProfileScreen } from '../screens/ProfileScreen'
+import { ChatScreen } from '../screens/ChatScreen'
+import { spacing } from '../constants/theme'
+import { useTokens } from '../theme/useTokens'
+import { hapticFeedback } from '../utils/hapticFeedback'
 
-const Tab = createBottomTabNavigator();
+const Tab = createBottomTabNavigator()
 
-// Configure linking for deep links
-// Include exp:// scheme for development OAuth redirects
 const linking = {
 	prefixes: [
-		Linking.createURL('/'), // shootrz://
-		'exp://', // exp:// URLs for development (e.g., exp://192.168.56.1:8081)
+		Linking.createURL('/'),
+		'exp://',
 	],
 	config: {
-		// Explicit screen mapping (optional, but helps with deep link routing)
-		screens: {
-			// Navigation screens can be mapped here if needed
-			// For now, we're handling OAuth callbacks in useDeepLinks hook
-		},
+		screens: {},
 	},
-};
+}
+
+type TabIconName = keyof typeof Ionicons.glyphMap
+type TabIconProps = { name: TabIconName; focused: boolean; color: string; brandPrimary: string }
+
+function TabIcon({ name, focused, color, brandPrimary }: TabIconProps) {
+	return (
+		<View style={{ alignItems: 'center' }}>
+			{focused ? (
+				<View
+					style={{
+						width: 24,
+						height: 2,
+						borderRadius: 1,
+						backgroundColor: brandPrimary,
+						marginBottom: spacing[1],
+					}}
+				/>
+			) : (
+				<View style={{ height: 6 }} />
+			)}
+			<Ionicons name={name} size={22} color={color} />
+		</View>
+	)
+}
 
 export const AppNavigator: React.FC = () => {
-  const insets = useSafeAreaInsets();
+	const insets = useSafeAreaInsets()
+	const t = useTokens()
+	const brandPrimary = t.tokens.brand.primary
 
-  return (
-    <NavigationContainer linking={linking}>
-      <Tab.Navigator
-        screenOptions={{
-          headerShown: false,
-          tabBarStyle: {
-            backgroundColor: SHOOTRZ_THEME.colors.background,
-            borderTopWidth: 1,
-            borderTopColor: SHOOTRZ_THEME.colors.surfaceElevated,
-            paddingBottom: Math.max(4, insets.bottom),
-            paddingTop: 4,
-            height: 60 + insets.bottom,
-          },
-          tabBarActiveTintColor: SHOOTRZ_THEME.colors.primary,
-          tabBarInactiveTintColor: SHOOTRZ_THEME.colors.textSecondary,
-          tabBarLabelStyle: {
-            fontSize: 9,
-            fontWeight: '500',
-            marginTop: 1,
-          },
-          tabBarItemStyle: {
-            paddingVertical: 2,
-            paddingHorizontal: 1,
-          },
-        }}
-      >
-        <Tab.Screen
-          name="Home"
-          component={HomeScreen}
-          options={{
-            tabBarIcon: ({ color }) => <Ionicons name="home" size={20} color={color} />,
-          }}
-        />
-        <Tab.Screen
-          name="Analyze"
-          component={AnalyzeScreen}
-          options={{
-            tabBarIcon: ({ color, focused }) => (
-              <Ionicons 
-                name={focused ? "analytics" : "analytics-outline"} 
-                size={22} 
-                color={color} 
-              />
-            ),
-            tabBarLabel: "Analyze",
-          }}
-        />
-        <Tab.Screen
-          name="Drills"
-          component={DrillsScreen}
-          options={{
-            tabBarIcon: ({ color }) => <Ionicons name="basketball" size={20} color={color} />,
-          }}
-        />
-        <Tab.Screen
-          name="Workouts"
-          component={WorkoutsScreen}
-          options={{
-            tabBarIcon: ({ color }) => <Ionicons name="barbell" size={20} color={color} />,
-          }}
-        />
-        <Tab.Screen
-          name="Coach J"
-          component={ChatScreen}
-          options={{
-            tabBarIcon: ({ color }) => <Ionicons name="chatbubbles" size={20} color={color} />,
-          }}
-        />
-        <Tab.Screen
-          name="Progress"
-          component={ProgressScreen}
-          options={{
-            tabBarIcon: ({ color }) => <Ionicons name="stats-chart" size={20} color={color} />,
-          }}
-        />
-        <Tab.Screen
-          name="Profile"
-          component={ProfileScreen}
-          options={{
-            tabBarIcon: ({ color }) => <Ionicons name="person" size={20} color={color} />,
-          }}
-        />
-      </Tab.Navigator>
-    </NavigationContainer>
-  );
-};
+	const tabListeners = useCallback(
+		() => ({
+			tabPress: () => hapticFeedback.selection(),
+		}),
+		[],
+	)
+
+	return (
+		<NavigationContainer linking={linking}>
+			<Tab.Navigator
+				screenOptions={{
+					headerShown: false,
+					tabBarStyle: {
+						backgroundColor: t.tokens.bg.secondary,
+						borderTopWidth: 1,
+						borderTopColor: t.tokens.border.subtle,
+						paddingTop: spacing[1],
+						paddingBottom: Math.max(6, insets.bottom),
+						paddingHorizontal: spacing[1],
+						height: 56 + insets.bottom,
+					},
+					tabBarActiveTintColor: brandPrimary,
+					tabBarInactiveTintColor: t.tokens.text.tertiary,
+					tabBarLabelStyle: {
+						...t.typography.caption,
+						marginTop: 0,
+					},
+					tabBarItemStyle: {
+						paddingVertical: spacing[1],
+					},
+				}}
+			>
+				<Tab.Screen
+					name="Home"
+					component={HomeScreen}
+					listeners={tabListeners}
+					options={{
+						tabBarIcon: ({ color, focused }) => (
+							<TabIcon
+								name={focused ? 'home' : 'home-outline'}
+								focused={focused}
+								color={color}
+								brandPrimary={brandPrimary}
+							/>
+						),
+					}}
+				/>
+				<Tab.Screen
+					name="Analyze"
+					component={MVPAnalysisScreen}
+					listeners={tabListeners}
+					options={{
+						tabBarIcon: ({ color, focused }) => (
+							<TabIcon
+								name={focused ? 'analytics' : 'analytics-outline'}
+								focused={focused}
+								color={color}
+								brandPrimary={brandPrimary}
+							/>
+						),
+						tabBarLabel: 'Analyze',
+					}}
+				/>
+				<Tab.Screen
+					name="Drills"
+					component={DrillsScreen}
+					listeners={tabListeners}
+					options={{
+						tabBarIcon: ({ color, focused }) => (
+							<TabIcon
+								name={focused ? 'basketball' : 'basketball-outline'}
+								focused={focused}
+								color={color}
+								brandPrimary={brandPrimary}
+							/>
+						),
+					}}
+				/>
+				<Tab.Screen
+					name="Workouts"
+					component={WorkoutsScreen}
+					listeners={tabListeners}
+					options={{
+						tabBarIcon: ({ color, focused }) => (
+							<TabIcon
+								name={focused ? 'barbell' : 'barbell-outline'}
+								focused={focused}
+								color={color}
+								brandPrimary={brandPrimary}
+							/>
+						),
+					}}
+				/>
+				<Tab.Screen
+					name="Coach J"
+					component={ChatScreen}
+					listeners={tabListeners}
+					options={{
+						tabBarIcon: ({ color, focused }) => (
+							<TabIcon
+								name={focused ? 'chatbubbles' : 'chatbubbles-outline'}
+								focused={focused}
+								color={color}
+								brandPrimary={brandPrimary}
+							/>
+						),
+					}}
+				/>
+				<Tab.Screen
+					name="Progress"
+					component={ProgressScreen}
+					listeners={tabListeners}
+					options={{
+						tabBarIcon: ({ color, focused }) => (
+							<TabIcon
+								name={focused ? 'stats-chart' : 'stats-chart-outline'}
+								focused={focused}
+								color={color}
+								brandPrimary={brandPrimary}
+							/>
+						),
+					}}
+				/>
+				<Tab.Screen
+					name="Profile"
+					component={ProfileScreen}
+					listeners={tabListeners}
+					options={{
+						tabBarIcon: ({ color, focused }) => (
+							<TabIcon
+								name={focused ? 'person' : 'person-outline'}
+								focused={focused}
+								color={color}
+								brandPrimary={brandPrimary}
+							/>
+						),
+					}}
+				/>
+			</Tab.Navigator>
+		</NavigationContainer>
+	)
+}

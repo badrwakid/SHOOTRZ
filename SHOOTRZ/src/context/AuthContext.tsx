@@ -1,11 +1,82 @@
-import React, { createContext, useState, useContext, useEffect, ReactNode, startTransition } from 'react';
+// BUG FIX: Removed unused startTransition import
+import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
 import { storageService, UserData } from '../services/storage.service';
-import { emailService } from '../services/email.service';
 import { supabase } from '../services/supabase.client';
-import { openBrowserAsync } from 'expo-web-browser';
+import { apiService } from '../services/api.service';
+// BUG FIX: Removed unused openBrowserAsync import (WebBrowser.* is used instead)
 import * as AuthSession from 'expo-auth-session';
+import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
-import { Platform } from 'react-native';
+
+/**
+ * Extract PKCE `code` and OAuth errors from Supabase/Google redirect URLs.
+ * Codes may appear in the query or in the hash (e.g. #code=...&state=...).
+ */
+function parseOAuthRedirectUrl(rawUrl: string): {
+	code: string | null;
+	oauthError: string | null;
+	oauthErrorDescription: string | null;
+} {
+	let oauthError: string | null = null;
+	let oauthErrorDescription: string | null = null;
+	try {
+		const u = new URL(rawUrl);
+		let code = u.searchParams.get('code');
+		oauthError = u.searchParams.get('error');
+		oauthErrorDescription = u.searchParams.get('error_description');
+		if (u.hash && u.hash.length > 1) {
+			const hp = new URLSearchParams(u.hash.startsWith('#') ? u.hash.slice(1) : u.hash);
+			if (!code) {
+				code = hp.get('code');
+			}
+			if (!oauthError) {
+				oauthError = hp.get('error');
+			}
+			if (!oauthErrorDescription) {
+				oauthErrorDescription = hp.get('error_description');
+			}
+		}
+		if (oauthErrorDescription) {
+			try {
+				oauthErrorDescription = decodeURIComponent(
+					oauthErrorDescription.replace(/\+/g, ' '),
+				);
+			} catch {
+				/* use raw */
+			}
+		}
+		return { code, oauthError, oauthErrorDescription };
+	} catch {
+		const codeMatch = rawUrl.match(/(?:^|[?&#])code=([^&#]+)/);
+		const errMatch = rawUrl.match(/[?&#]error=([^&#]+)/);
+		const descMatch = rawUrl.match(/[?&#]error_description=([^&#]+)/);
+		let code: string | null = null;
+		if (codeMatch) {
+			try {
+				code = decodeURIComponent(codeMatch[1]);
+			} catch {
+				code = codeMatch[1];
+			}
+		}
+		if (errMatch) {
+			try {
+				oauthError = decodeURIComponent(errMatch[1]);
+			} catch {
+				oauthError = errMatch[1];
+			}
+		}
+		if (descMatch) {
+			try {
+				oauthErrorDescription = decodeURIComponent(
+					descMatch[1].replace(/\+/g, ' '),
+				);
+			} catch {
+				oauthErrorDescription = descMatch[1];
+			}
+		}
+		return { code, oauthError, oauthErrorDescription };
+	}
+}
 
 interface AuthContextType {
   user: UserData | null;
@@ -46,6 +117,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   
   // Navigation callback ref - allows direct navigation trigger from auth context
   const navigationCallbackRef = React.useRef<(() => void) | null>(null);
+  const prevAuthUserIdRef = React.useRef<string | null>(null);
   
   // Expose method to set navigation callback (used by LoginScreen)
   const setNavigationCallback = React.useCallback((callback: (() => void) | null) => {
@@ -109,7 +181,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           });
           
           setIsNewUser(true);
-          console.log('📋 New user detected');
         } else {
           console.warn('⚠️ Error checking user:', error);
           setIsNewUser(true);
@@ -124,13 +195,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                            dbUser.username !== emailPrefix;
         const hasCompletedOnboarding = dbUser.has_completed_onboarding === true;
         
-        console.log(`📋 Checking status: username="${dbUser.username}", hasUsername=${hasUsername}, hasCompletedOnboarding=${hasCompletedOnboarding}`);
-        
         // User is new if they haven't completed onboarding
         // If they completed onboarding, they're NOT new (even if username is email-prefix)
         const isNew = !hasCompletedOnboarding;
         setIsNewUser(isNew);
-        console.log(`📋 Existing user. Is new: ${isNew}`);
         
         // Update user data with database info if available (consolidate updates)
         const updates: Partial<UserData> = {};
@@ -166,6 +234,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           
           if (isNetworkError) {
             // Network error - fail silently, user is not authenticated
+            prevAuthUserIdRef.current = null;
             await storageService.clearAllData();
             setUser(null);
             setIsLoading(false);
@@ -175,11 +244,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         
         if (data?.session?.user) {
           const u = data.session.user;
+          const prior = prevAuthUserIdRef.current;
+          if (prior && prior !== u.id) {
+            await storageService.clearAnalysisHistoryForUser(prior);
+          }
+          prevAuthUserIdRef.current = u.id;
           const userData = await createUserDataFromSession(u);
           await storageService.saveUserData(userData);
           setUser(userData);
           setIsNewUser(false);
         } else {
+          prevAuthUserIdRef.current = null;
           await storageService.clearAllData();
           setUser(null);
         }
@@ -195,6 +270,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           console.warn('⚠️ Auth initialization error:', error);
         }
         
+        prevAuthUserIdRef.current = null;
         await storageService.clearAllData();
         setUser(null);
         setIsLoading(false);
@@ -202,13 +278,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     };
     
     const sub = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('🔄 Auth state changed:', event);
-      
       try {
         if (session?.user) {
           const u = session.user;
-          console.log('✅ User authenticated:', u.email);
-          
+          const prior = prevAuthUserIdRef.current;
+          if (prior && prior !== u.id) {
+            await storageService.clearAnalysisHistoryForUser(prior);
+          }
+          prevAuthUserIdRef.current = u.id;
+
           // Create user data from session
           const userData = await createUserDataFromSession(u);
           
@@ -229,7 +307,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             setTimeout(() => navigationCallbackRef.current?.(), 50);
           }
         } else {
-          console.log('📝 No session - clearing user state');
+          prevAuthUserIdRef.current = null;
           await storageService.clearAllData();
           setUser(null);
           setIsNewUser(false);
@@ -245,19 +323,29 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     return () => { sub.data.subscription.unsubscribe(); };
   }, [createUserDataFromSession, checkAndSetIsNewUser]);
 
-  const loadUser = async (): Promise<void> => {}
+  /** Warm server-backed stats/history after sign-in so Home/Progress are not empty on first paint. */
+  useEffect(() => {
+    if (!user?.id) {
+      return;
+    }
+    void Promise.allSettled([
+      apiService.getUserStats(),
+      apiService.getUserStreak(),
+      apiService.getAnalysisHistory(20, 0),
+    ]);
+  }, [user?.id]);
+
+  // BUG FIX: Removed empty loadUser function (dead code)
 
   const login = async (
     emailOrUsername: string,
     password: string
   ): Promise<{ success: boolean; error?: string }> => {
     try {
-      console.log('🔐 Starting login process...');
-      console.log('📧 Email/Username:', emailOrUsername);
-
       // Validate input
       if (!emailOrUsername || !password) {
-        return { success: false, error: 'Email/username and password are required' };
+        // BUG FIX: Supabase signInWithPassword only accepts email, not username
+        return { success: false, error: 'Email and password are required' };
       }
 
       const email = emailOrUsername;
@@ -295,11 +383,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     username: string
   ): Promise<{ success: boolean; error?: string }> => {
     try {
-      console.log('📝 Starting signup process...');
-      console.log('📧 Email:', email);
-      console.log('👤 Username:', username);
-      console.log('👤 Name:', name);
-
       // Validate input
       if (!email || !password || !name || !username) {
         return { success: false, error: 'All fields are required' };
@@ -360,15 +443,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
       
       const u = data.user;
-      console.log('✅ Supabase auth user created:', u.id);
       
       // Step 2: Handle database record creation
       // If database trigger is set up, it will automatically create the record
       // Otherwise, try to insert (only works if no email confirmation or session exists)
       
       if (data.session) {
-        // User is immediately logged in (email confirmation disabled)
-        console.log('✅ User has active session, creating database record...');
         const { data: userRecord, error: insertError } = await supabase
           .from('users')
           .insert({
@@ -395,17 +475,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               success: false, 
               error: 'User account created but profile setup failed. Please contact support.' 
             };
-          } else {
-            console.log('✅ User record exists (created by trigger)');
           }
-        } else {
-          console.log('✅ User record created in database:', userRecord);
         }
       } else {
-        // Email confirmation required - trigger will create record automatically
-        console.log('📧 Email confirmation required. Check your email to verify your account.');
-        console.log('✅ Database trigger will create user record automatically.');
-        
         // Still create local user data for better UX (user will see "check email" message)
         const userData: UserData = {
           id: u.id,
@@ -423,7 +495,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         await storageService.saveUserData(userData);
         // Don't set user yet - wait for email confirmation
         setIsNewUser(true);
-        console.log('✅ Signup successful - awaiting email confirmation');
         return { 
           success: true,
           requiresEmailConfirmation: true
@@ -447,7 +518,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       await storageService.saveUserData(userData);
       setUser(userData);
       setIsNewUser(true);
-      console.log('✅ Signup completed successfully');
       return { success: true };
     } catch (error) {
       console.error('❌ Signup error:', error);
@@ -465,7 +535,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           .from('users')
           .update({ has_completed_onboarding: true })
           .eq('id', user.id);
-        console.log('✅ Onboarding completion saved to database');
       } catch (error: any) {
         console.error('❌ Failed to save onboarding completion:', error);
       }
@@ -480,11 +549,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       // Always clear local storage
       await storageService.clearAllData();
-      console.log('✅ Local storage cleared');
 
       await supabase.auth.signOut();
-
-      console.log('✅ Logout completed successfully');
     } catch (error) {
       console.error('❌ Logout error:', error);
       throw error;
@@ -498,8 +564,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
 
     try {
-      console.log('📝 Updating user profile:', Object.keys(updates));
-      
       // Update local state first
       const updatedUser = { ...user, ...updates };
       setUser(updatedUser);
@@ -512,7 +576,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       
       if (updates.username !== undefined) {
         dbUpdates.username = updates.username;
-        console.log('📝 Saving username to database:', updates.username);
       }
       if (updates.name !== undefined) {
         dbUpdates.name = updates.name;
@@ -534,12 +597,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         if (dbError) {
           console.error('❌ Failed to update user in database:', dbError);
           // Don't throw - local update succeeded, database update can retry
-        } else {
-          console.log('✅ User profile updated in database');
         }
       }
-      
-      console.log('✅ Profile updated successfully');
     } catch (error: any) {
       console.error('❌ Error updating profile:', error);
       throw error;
@@ -548,9 +607,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const resetPassword = async (email: string): Promise<{ success: boolean; error?: string }> => {
     try {
-      console.log('🔐 Starting password reset process...');
-      console.log('📧 Email:', email);
-
       if (!email) {
         return { success: false, error: 'Email is required' };
       }
@@ -560,13 +616,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
 
       // Use Supabase password reset with app deep link
-      console.log('🔍 Sending password reset email via Supabase...');
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: 'shootrz://reset-password',
       });
 
       if (error) {
-        console.log('❌ Password reset failed:', error.message);
         let errorMessage = 'Failed to send reset email. Please try again.';
         
         if (error.message.includes('User not found')) {
@@ -582,7 +636,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         return { success: false, error: errorMessage };
       }
 
-      console.log('✅ Password reset email sent successfully');
       return { success: true };
     } catch (error) {
       console.error('❌ Password reset error:', error);
@@ -592,26 +645,22 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     const signInWithGoogle = async (): Promise<{ success: boolean; error?: string }> => {
       try {
-        console.log('🔐 Initiating Google OAuth with Expo AuthSession...');
-        
-        // Use Expo's redirect URI
-        // The proxy is handled automatically by Expo in development
         const redirectUri = AuthSession.makeRedirectUri({
           scheme: 'shootrz',
           path: 'auth/callback',
         });
-        
-        console.log('📱 Using redirect URI:', redirectUri);
-        console.log('📱 Platform:', Platform.OS);
-        console.log('📱 Is Dev Mode:', __DEV__);
-        
+        if (__DEV__) {
+          console.log('[Google OAuth] redirectUri (add exact URL to Supabase Auth → Redirect URLs):', redirectUri);
+        }
+
         // Get OAuth URL from Supabase with the redirect URI
         // Add prompt: 'select_account' to force account picker (always ask which account)
         const { data, error } = await supabase.auth.signInWithOAuth({
           provider: 'google',
           options: {
             redirectTo: redirectUri,
-            skipBrowserRedirect: false, // Let Supabase handle browser redirect
+            // RN has no window — we open the URL with WebBrowser; avoid double navigation
+            skipBrowserRedirect: true,
             queryParams: {
               prompt: 'select_account', // Force Google to show account picker
             },
@@ -628,54 +677,110 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           return { success: false, error: 'Failed to generate OAuth URL' };
         }
         
-        console.log('✅ OAuth URL generated');
-        console.log('🔗 OAuth URL (first 150 chars):', data.url.substring(0, 150) + '...');
-        
         // Use WebBrowser to handle the OAuth flow
         // This properly handles redirects and returns the result
         WebBrowser.maybeCompleteAuthSession();
-        
-        // Open the OAuth URL in browser
-        const result = await WebBrowser.openAuthSessionAsync(
-          data.url,
-          redirectUri
-        );
-        
-        console.log('📋 WebBrowser result type:', result.type);
-        console.log('📋 WebBrowser result:', JSON.stringify(result, null, 2));
-        
+
+        // Some devices return a bare scheme URL from openAuthSessionAsync while the full
+        // callback (with ?code=) arrives on Linking — subscribe before opening the browser.
+        let oauthUrlFromLinking: string | null = null;
+        const linkingSub = Linking.addEventListener('url', ({ url: incoming }) => {
+          if (
+            incoming.includes('code=') ||
+            incoming.includes('error=') ||
+            incoming.includes('auth/callback')
+          ) {
+            oauthUrlFromLinking = incoming;
+          }
+        });
+
+        let result: WebBrowser.WebBrowserAuthSessionResult;
+        try {
+          result = await WebBrowser.openAuthSessionAsync(data.url, redirectUri);
+        } finally {
+          linkingSub.remove();
+        }
+
         if (result.type === 'success') {
-          // Extract the code from the redirect URL
-          const url = result.url;
-          console.log('✅ Auth success, redirect URL:', url);
-          
-          // Parse the URL to extract the code
-          // The URL will be something like: shootrz://auth/callback?code=xxx
-          // OR the proxy URL which we need to handle
-          let code: string | null = null;
-          
-          // Try to extract code from URL (check query params and hash)
-          const queryCodeMatch = url.match(/[?&]code=([^&#]+)/);
-          const hashCodeMatch = url.match(/#.*[?&]code=([^&#]+)/);
-          
-          if (queryCodeMatch) {
-            code = decodeURIComponent(queryCodeMatch[1]);
-            console.log('✅ Extracted code from query params');
-          } else if (hashCodeMatch) {
-            code = decodeURIComponent(hashCodeMatch[1]);
-            console.log('✅ Extracted code from hash');
-          } else {
-            // If no code in URL, Supabase might have already handled it
-            // Check if we have a session
-            console.log('⚠️ No code in URL, checking for existing session...');
+          const browserUrl = result.url || '';
+          const parsedBrowser = parseOAuthRedirectUrl(browserUrl);
+          const linkingRaw = oauthUrlFromLinking;
+          const parsedLinking = linkingRaw
+            ? parseOAuthRedirectUrl(linkingRaw)
+            : null;
+
+          let url = browserUrl;
+          let parsed = parsedBrowser;
+          if (
+            parsedLinking &&
+            linkingRaw &&
+            (parsedLinking.code || parsedLinking.oauthError) &&
+            !parsedBrowser.code &&
+            !parsedBrowser.oauthError
+          ) {
+            url = linkingRaw;
+            parsed = parsedLinking;
+          } else if (
+            parsedLinking &&
+            (parsedLinking.code || parsedLinking.oauthError) &&
+            parsedBrowser.code
+          ) {
+            // Prefer WebBrowser URL when both carry a code (canonical callback)
+            url = browserUrl;
+            parsed = parsedBrowser;
+          } else if (
+            parsedLinking &&
+            linkingRaw &&
+            (parsedLinking.code || parsedLinking.oauthError)
+          ) {
+            url = linkingRaw;
+            parsed = parsedLinking;
+          }
+
+          let code = parsed.code;
+
+          if (parsed.oauthError) {
+            const msg =
+              parsed.oauthErrorDescription ||
+              parsed.oauthError ||
+              'Sign-in was cancelled or denied';
+            if (__DEV__) {
+              console.error('[Google OAuth] provider error in redirect:', parsed.oauthError, msg);
+            }
+            return { success: false, error: msg };
+          }
+
+          // Deep link handler may have exchanged the code already
+          const { data: { session: sessionAfterCallback } } = await supabase.auth.getSession();
+          if (sessionAfterCallback?.user) {
+            const u = sessionAfterCallback.user;
+            const userData: UserData = {
+              id: u.id,
+              email: u.email || '',
+              username: u.user_metadata?.username || u.email?.split('@')[0] || 'user',
+              name: u.user_metadata?.name || 'Basketball Player',
+              skillLevel: 'beginner',
+              position: 'Guard',
+              goals: [],
+              preferences: { notifications: true, darkMode: true, analytics: true, defaultWorkoutDuration: 30 },
+              createdAt: u.created_at || new Date().toISOString(),
+              authProvider: 'supabase',
+            };
+            setUser(userData);
+            setIsLoading(false);
+            if (navigationCallbackRef.current) {
+              setTimeout(() => navigationCallbackRef.current?.(), 100);
+            }
+            return { success: true };
+          }
+
+          if (!code) {
+            await new Promise<void>(resolve => setTimeout(() => resolve(), 600));
             const { data: { session }, error: sessionError } = await supabase.auth.getSession();
             if (sessionError) {
               console.error('❌ Error checking session:', sessionError);
             }
-            if (session) {
-              console.log('✅ Session already exists (Supabase handled it)');
-              console.log('✅ User ID:', session.user.id);
-              // Manually set user state since session exists
+            if (session?.user) {
               const u = session.user;
               const userData: UserData = {
                 id: u.id,
@@ -696,29 +801,31 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               }
               return { success: true };
             }
-            
+
+            if (__DEV__) {
+              console.error(
+                '❌ No code in redirect and no session. URL length=',
+                url.length,
+                'startsWith=',
+                url.slice(0, 80),
+              );
+            }
             console.error('❌ No code found in redirect URL and no existing session');
-            return { success: false, error: 'No authentication code received' };
+            return {
+              success: false,
+              error:
+                'Google sign-in did not return a session. Add the printed redirect URI to Supabase (Auth → URL Configuration → Redirect URLs) and try again.',
+            };
           }
           
           if (code) {
-            // Exchange code for session
-            console.log('📝 Exchanging code for session...');
-            console.log('📋 Code:', code.substring(0, 20) + '...');
-            console.log('📋 Full code length:', code.length);
-            console.log('📋 Actual redirect URL:', url);
-            console.log('📋 Expected redirect URI:', redirectUri);
             
             // CRITICAL: Use the actual redirect URL that was received, not the one we sent
             // Supabase needs the exact redirect URI that was used in the OAuth callback
             // Extract the base redirect URI from the actual URL
-            const actualRedirectUri = url.split('?')[0].split('#')[0]; // Get base URL without params
-            console.log('📋 Using actual redirect URI for exchange:', actualRedirectUri);
+            const actualRedirectUri = url.split('?')[0].split('#')[0];
             
             try {
-              console.log('🔄 Calling exchangeCodeForSession...');
-              console.log('📋 Supabase URL:', process.env.EXPO_PUBLIC_SUPABASE_URL?.substring(0, 50) || 'NOT SET');
-              
               // Try exchanging code with explicit redirect URI
               // Some Supabase versions require the redirect URI to match exactly
               const exchangePromise = supabase.auth.exchangeCodeForSession(code);
@@ -728,9 +835,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 setTimeout(() => reject(new Error('Code exchange timeout after 15 seconds')), 15000);
               });
               
-              console.log('⏳ Waiting for exchange response...');
-              console.log('📋 Checking Supabase URL:', process.env.EXPO_PUBLIC_SUPABASE_URL?.substring(0, 50) || 'NOT SET');
-              
+              // BUG FIX: Properly handle Promise.race rejection — raceError may not be a
+              // Supabase response object, so destructuring {data, error} would throw
               let exchangeResult: any;
               try {
                 exchangeResult = await Promise.race([
@@ -738,17 +844,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                   timeoutPromise
                 ]);
               } catch (raceError: any) {
-                // Check if it's our timeout or a real error
                 if (raceError?.message?.includes('timeout')) {
                   throw raceError;
                 }
-                // If it's not a timeout, it might be the actual exchange result with an error
-                exchangeResult = raceError;
+                // Wrap non-Supabase errors into the expected shape
+                exchangeResult = { data: { session: null }, error: raceError };
               }
               
-              const { data: sessionData, error: exchangeError } = exchangeResult;
-              
-              console.log('📋 Exchange response received');
+              const sessionData = exchangeResult?.data ?? { session: null };
+              const exchangeError = exchangeResult?.error ?? null;
               
               if (exchangeError) {
                 console.error('❌ Code exchange error:', exchangeError);
@@ -758,30 +862,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 return { success: false, error: exchangeError.message || 'Failed to complete sign-in' };
               }
               
-              console.log('📋 Session data received:', {
-                hasSession: !!sessionData?.session,
-                hasUser: !!sessionData?.session?.user,
-                userId: sessionData?.session?.user?.id,
-                email: sessionData?.session?.user?.email,
-              });
-              
               if (!sessionData?.session) {
                 console.error('❌ Session creation failed - no session in response');
                 console.error('❌ Response data:', JSON.stringify(sessionData, null, 2));
                 return { success: false, error: 'Session creation failed' };
               }
               
-              console.log('✅ Session created successfully!');
-              console.log('✅ User ID:', sessionData.session.user.id);
-              console.log('✅ User email:', sessionData.session.user.email);
-              console.log('✅ Session expires at:', sessionData.session.expires_at);
-              
               // CRITICAL: Force trigger onAuthStateChange by manually calling it
               // Sometimes onAuthStateChange doesn't fire immediately after exchangeCodeForSession
-              console.log('🔄 Manually triggering auth state change...');
-              
-              // Get the current session to pass to onAuthStateChange logic
-              console.log('📋 Verifying current session...');
               const { data: { session: currentSession }, error: sessionError } = await supabase.auth.getSession();
               
               if (sessionError) {
@@ -789,8 +877,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               }
               
               if (currentSession && currentSession.user) {
-                console.log('✅ Current session verified - user:', currentSession.user.email);
-                
                 // Manually trigger the state update by calling setUser directly
                 // This ensures navigation happens even if onAuthStateChange is delayed
                 const u = currentSession.user;
@@ -807,14 +893,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                   authProvider: 'supabase',
                 };
                 
-                console.log('📝 Setting user state directly...');
                 setUser(userData);
                 setIsLoading(false);
-                console.log('✅ User state set - isAuthenticated should now be true');
                 
                 // Trigger navigation callback immediately
                 if (navigationCallbackRef.current) {
-                  console.log('🚀 Triggering navigation callback immediately');
                   setTimeout(() => {
                     if (navigationCallbackRef.current) {
                       navigationCallbackRef.current();
@@ -845,12 +928,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                     authProvider: 'supabase',
                   };
                   
-                  console.log('📝 Setting user state from sessionData...');
                   setUser(userData);
                   setIsLoading(false);
                   
                   if (navigationCallbackRef.current) {
-                    console.log('🚀 Triggering navigation callback');
                     setTimeout(() => {
                       if (navigationCallbackRef.current) {
                         navigationCallbackRef.current();
@@ -884,10 +965,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             }
           }
         } else if (result.type === 'cancel') {
-          console.log('⚠️ User canceled OAuth');
           return { success: false, error: 'Sign-in was canceled' };
         } else if (result.type === 'dismiss') {
-          console.log('⚠️ User dismissed OAuth');
           return { success: false, error: 'Sign-in was dismissed' };
         } else {
           console.error('❌ Unknown WebBrowser result type:', result.type);

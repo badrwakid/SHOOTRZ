@@ -1,0 +1,532 @@
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;900&family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0A0E14;font-family:'DM Sans',sans-serif;padding:20px;color:#F1F5F9}
+.kicker{font-size:10px;font-weight:700;color:#94A3B8;letter-spacing:2px;margin-bottom:4px}
+.title{font-family:'Barlow Condensed',sans-serif;font-size:28px;font-weight:900;color:#F1F5F9;letter-spacing:-.5px;line-height:1}
+.sub{font-size:12px;color:#94A3B8;margin:6px 0 18px;max-width:640px;line-height:1.55}
+.section{margin-bottom:26px}
+.h{font-size:11px;font-weight:700;color:#64748B;letter-spacing:2px;text-transform:uppercase;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.h::before{content:'';width:16px;height:1px;background:#334155}
+.h-after{flex:1;height:1px;background:#1C2432;margin-left:8px}
+
+.card{background:#151C26;border:1px solid rgba(148,163,184,.14);border-radius:14px;padding:14px 16px}
+
+/* Direction pills */
+.dir{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:9999px;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase}
+.pill-o{background:rgba(236,90,40,.12);color:#FF7B3D;border:1px solid rgba(236,90,40,.3)}
+.pill-c{background:rgba(20,199,224,.1);color:#5EDCEC;border:1px solid rgba(20,199,224,.3)}
+.pill-g{background:rgba(148,163,184,.08);color:#CBD5E1;border:1px solid rgba(148,163,184,.2)}
+
+/* CONCEPT A — PERFORMANCE LAB */
+.lab-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
+.tier-lab{position:relative;border-radius:16px;padding:14px 12px 16px;background:linear-gradient(180deg,rgba(255,255,255,.04) 0%,rgba(0,0,0,0) 100%);border:1px solid rgba(148,163,184,.14);overflow:hidden;cursor:pointer;transition:transform .25s cubic-bezier(.2,1,.3,1),border-color .25s}
+.tier-lab:hover{transform:translateY(-3px);border-color:rgba(255,255,255,.2)}
+.tier-lab::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--tc)}
+.tier-lab::after{content:'';position:absolute;top:0;left:0;right:0;height:60px;background:radial-gradient(ellipse at 50% 0%,var(--tc-glow) 0%,transparent 70%);opacity:.9;pointer-events:none}
+.tier-lab > *{position:relative;z-index:1}
+.tier-range{font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:600;color:#64748B;letter-spacing:1px;margin-bottom:2px}
+.tier-bar{height:3px;background:rgba(148,163,184,.1);border-radius:2px;margin:6px 0 8px;overflow:hidden;position:relative}
+.tier-bar-fill{height:100%;background:var(--tc);box-shadow:0 0 8px var(--tc);border-radius:2px}
+.tier-num{font-family:'Barlow Condensed',sans-serif;font-size:46px;font-weight:900;line-height:.88;color:var(--tc);letter-spacing:-1.5px;text-shadow:0 0 16px var(--tc-glow)}
+.tier-name{font-size:10px;font-weight:700;letter-spacing:2px;color:#F1F5F9;margin-top:6px}
+.tier-sub{font-size:10px;color:#94A3B8;margin-top:2px;line-height:1.4}
+.tier-icon{position:absolute;top:12px;right:12px;opacity:.8}
+
+/* CONCEPT B — GAME NIGHT PREMIUM */
+.gn-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
+.tier-gn{position:relative;border-radius:18px;padding:16px 14px;overflow:hidden;background:#0F141B;border:1px solid rgba(148,163,184,.12);cursor:pointer;transition:transform .12s,box-shadow .25s}
+.tier-gn:active{transform:scale(.97)}
+.tier-gn.selected{border-color:var(--tc);box-shadow:0 0 0 1px var(--tc),0 8px 32px var(--tc-glow)}
+.tier-gn-med{position:absolute;top:-24px;right:-24px;width:90px;height:90px;border-radius:50%;background:radial-gradient(circle,var(--tc) 0%,transparent 70%);opacity:.3;filter:blur(8px)}
+.tier-gn-ring{position:absolute;top:12px;right:12px;width:36px;height:36px;border-radius:50%;border:2px solid var(--tc);display:flex;align-items:center;justify-content:center;background:#0F141B;box-shadow:0 0 16px var(--tc-glow)}
+.tier-gn-ring-dot{width:10px;height:10px;border-radius:50%;background:var(--tc)}
+.tier-gn-num{font-family:'Barlow Condensed',sans-serif;font-size:52px;font-weight:900;line-height:.88;letter-spacing:-1.5px;background:linear-gradient(180deg,#F1F5F9 0%,var(--tc) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-top:10px}
+.tier-gn-label{font-size:9px;font-weight:700;letter-spacing:2px;color:var(--tc);margin-top:8px}
+.tier-gn-name{font-size:14px;font-weight:700;color:#F1F5F9;margin-top:2px;letter-spacing:-.3px}
+.tier-gn-bar{margin-top:10px;height:2px;background:rgba(148,163,184,.08);border-radius:1px;overflow:hidden}
+.tier-gn-bar-fill{height:100%;background:var(--tc);box-shadow:0 0 6px var(--tc)}
+
+/* Status chips */
+.status-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+.chip-lab{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:14px;background:var(--cbg);border:1px solid var(--cbd);color:var(--cc);font-size:12px;font-weight:600;position:relative;overflow:hidden}
+.chip-lab::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--cc)}
+.chip-dot{width:8px;height:8px;border-radius:4px;background:var(--cc);box-shadow:0 0 10px var(--cc);flex-shrink:0;animation:pulse 2.4s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.7;transform:scale(.85)}}
+.chip-label{flex:1}
+.chip-label .t{display:block;font-weight:700;color:#F1F5F9;letter-spacing:.3px}
+.chip-label .d{display:block;font-size:10px;color:#94A3B8;font-weight:500;letter-spacing:.3px;margin-top:1px}
+
+.chip-gn{background:#151C26;border:1px solid rgba(148,163,184,.14);border-radius:14px;padding:12px 14px;display:flex;align-items:center;gap:12px;position:relative;overflow:hidden}
+.chip-gn-icon{width:36px;height:36px;border-radius:10px;background:var(--cbg);border:1px solid var(--cbd);display:flex;align-items:center;justify-content:center;flex-shrink:0;position:relative}
+.chip-gn-icon::after{content:'';position:absolute;inset:-1px;border-radius:11px;background:radial-gradient(circle,var(--cc) 0%,transparent 70%);opacity:.25;filter:blur(4px);z-index:-1}
+.chip-gn-ic{color:var(--cc)}
+.chip-gn-body{flex:1}
+.chip-gn-t{font-size:13px;font-weight:700;color:#F1F5F9}
+.chip-gn-d{font-size:11px;color:#94A3B8;margin-top:1px}
+.chip-gn-meter{width:26px;height:4px;background:rgba(148,163,184,.1);border-radius:2px;overflow:hidden;align-self:center}
+.chip-gn-meter-fill{height:100%;background:var(--cc);box-shadow:0 0 4px var(--cc)}
+
+/* States row */
+.states{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.state-demo{background:#0F141B;border:1px solid rgba(148,163,184,.14);border-radius:14px;padding:14px}
+.state-demo-l{font-size:9px;font-weight:700;color:#94A3B8;letter-spacing:1.5px;margin-bottom:8px}
+
+/* Spec lists */
+.spec-list{display:flex;flex-direction:column;gap:6px}
+.spec-row{display:flex;gap:10px;padding:7px 10px;background:#0F141B;border-radius:6px;font-size:11px;align-items:center}
+.spec-row code{font-family:'JetBrains Mono',monospace;font-size:10px;color:#14C7E0;background:#1C2432;padding:1px 5px;border-radius:3px}
+.spec-row .k{color:#94A3B8;min-width:90px;font-weight:600}
+.spec-row .v{color:#F1F5F9;flex:1}
+
+/* Before/After */
+.ba-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.ba-card{border-radius:14px;padding:14px 16px}
+.ba-before{background:rgba(239,68,68,.05);border:1px solid rgba(239,68,68,.25)}
+.ba-after{background:rgba(34,197,94,.05);border:1px solid rgba(34,197,94,.25)}
+.ba-tag{font-size:10px;font-weight:700;letter-spacing:1.5px;margin-bottom:8px}
+.ba-before .ba-tag{color:#EF4444}
+.ba-after .ba-tag{color:#22C55E}
+.ba-list{font-size:12px;color:#CBD5E1;line-height:1.7;padding-left:16px}
+.ba-list li{margin-bottom:3px}
+.ba-list b{color:#F1F5F9;font-weight:600}
+
+/* Pick */
+.pick{background:linear-gradient(135deg,rgba(20,199,224,.1),rgba(236,90,40,.05));border:1px solid rgba(20,199,224,.35);border-radius:16px;padding:16px 18px}
+.pick-tag{display:inline-block;background:#14C7E0;color:#051018;font-size:10px;font-weight:700;letter-spacing:1.5px;padding:3px 8px;border-radius:4px;margin-bottom:10px}
+
+.code{background:#0A0E14;border:1px solid rgba(148,163,184,.14);border-radius:10px;padding:10px 12px;font-family:'JetBrains Mono',monospace;font-size:11px;line-height:1.55;color:#E2E8F0;white-space:pre;overflow-x:auto}
+.code .kw{color:#EC5A28}.code .fn{color:#14C7E0}.code .str{color:#22C55E}.code .cm{color:#64748B;font-style:italic}.code .p{color:#94A3B8}
+
+.a11y-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.a11y{background:#151C26;border:1px solid rgba(148,163,184,.14);border-radius:12px;padding:12px 14px}
+.a11y-t{font-size:11px;font-weight:700;color:#F1F5F9;letter-spacing:.3px;margin-bottom:6px}
+.a11y-b{font-size:11px;color:#CBD5E1;line-height:1.55}
+.a11y-b b{color:#F1F5F9;font-weight:600}
+.pat{display:flex;align-items:center;gap:8px;padding:6px 0}
+.pat-sh{width:22px;height:22px;border-radius:4px;background:var(--pc);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.pat-sw{width:14px;height:14px;stroke:#0F141B;stroke-width:3}
+</style></head><body>
+
+<div class="kicker">03 · SEMANTIC</div>
+<div class="title">SCORE &amp; STATUS COLORS</div>
+<div class="sub">Full redesign. Two concepts, complete component specs, premium cinematic dark. Below, after concepts: anatomy, motion, accessibility, RN notes, before/after.</div>
+
+<!-- ─── 1. DIRECTION ─── -->
+<div class="section">
+  <div class="h">1 · Design Direction</div>
+  <div class="dir">
+    <span class="pill pill-o">CINEMATIC</span>
+    <span class="pill pill-c">DIAGNOSTIC</span>
+    <span class="pill pill-g">EARNED</span>
+  </div>
+  <div class="card" style="font-size:13px;color:#CBD5E1;line-height:1.65">
+    <b style="color:#F1F5F9">Cinematic</b> — scores and statuses should feel like broadcast overlays, not web form inputs. Glows, gradients, and emitted light.
+    <b style="color:#F1F5F9"> Diagnostic</b> — tier/status must communicate <i>precisely</i> at a glance. Icons, meters, and color cues all carry the same signal.
+    <b style="color:#F1F5F9"> Earned</b> — higher tiers carry visibly more light. Elite looks like it took work to reach.
+  </div>
+</div>
+
+<!-- ─── 2. TWO CONCEPTS ─── -->
+<div class="section">
+  <div class="h">2 · Concept A — <span style="color:#FF7B3D;margin-left:4px">"Performance Lab"</span><div class="h-after"></div></div>
+  <div style="font-size:12px;color:#94A3B8;margin-bottom:12px;line-height:1.5">Scientific. Diagnostic bar charts + thermal color gradient. Feels like HUD telemetry. For analytical users who care about the <i>why</i>.</div>
+  <div class="lab-grid">
+    <div class="tier-lab" style="--tc:#EF4444;--tc-glow:rgba(239,68,68,.35)">
+      <div class="tier-range">0 — 39</div>
+      <div class="tier-bar"><div class="tier-bar-fill" style="width:25%"></div></div>
+      <div class="tier-num">25</div>
+      <div class="tier-name">POOR</div>
+      <div class="tier-sub">Needs form review</div>
+    </div>
+    <div class="tier-lab" style="--tc:#F59E0B;--tc-glow:rgba(245,158,11,.3)">
+      <div class="tier-range">40 — 59</div>
+      <div class="tier-bar"><div class="tier-bar-fill" style="width:50%"></div></div>
+      <div class="tier-num">52</div>
+      <div class="tier-name">FAIR</div>
+      <div class="tier-sub">Foundation there</div>
+    </div>
+    <div class="tier-lab" style="--tc:#FBBF24;--tc-glow:rgba(251,191,36,.3)">
+      <div class="tier-range">60 — 74</div>
+      <div class="tier-bar"><div class="tier-bar-fill" style="width:68%"></div></div>
+      <div class="tier-num">68</div>
+      <div class="tier-name">GOOD</div>
+      <div class="tier-sub">Repeatable</div>
+    </div>
+    <div class="tier-lab" style="--tc:#22C55E;--tc-glow:rgba(34,197,94,.3)">
+      <div class="tier-range">75 — 89</div>
+      <div class="tier-bar"><div class="tier-bar-fill" style="width:82%"></div></div>
+      <div class="tier-num">82</div>
+      <div class="tier-name">GREAT</div>
+      <div class="tier-sub">Tournament level</div>
+    </div>
+    <div class="tier-lab" style="--tc:#14C7E0;--tc-glow:rgba(20,199,224,.4)">
+      <div class="tier-range">90 — 100</div>
+      <div class="tier-bar"><div class="tier-bar-fill" style="width:95%"></div></div>
+      <div class="tier-num">95</div>
+      <div class="tier-name">ELITE</div>
+      <div class="tier-sub">Top 3% shooters</div>
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px">
+    <div class="card" style="background:rgba(34,197,94,.05);border-color:rgba(34,197,94,.25)"><div style="font-size:10px;font-weight:700;color:#22C55E;letter-spacing:1.5px;margin-bottom:6px">PROS</div><div style="font-size:11px;color:#CBD5E1;line-height:1.6">Information-dense · feels like pro analyst tools · clear progression via meter · supports hard numbers</div></div>
+    <div class="card" style="background:rgba(239,68,68,.05);border-color:rgba(239,68,68,.25)"><div style="font-size:10px;font-weight:700;color:#EF4444;letter-spacing:1.5px;margin-bottom:6px">CONS</div><div style="font-size:11px;color:#CBD5E1;line-height:1.6">Can read as "dashboard-y" if overused · needs disciplined restraint</div></div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="h">3 · Concept B — <span style="color:#14C7E0;margin-left:4px">"Game Night Premium"</span> · <span style="color:#22C55E;font-size:10px;margin-left:6px">RECOMMENDED</span><div class="h-after"></div></div>
+  <div style="font-size:12px;color:#94A3B8;margin-bottom:12px;line-height:1.5">Heroic. Medallion badges + gradient numerics feel like stadium jumbotron / broadcast score cards. Emotional punch, not just data.</div>
+  <div class="gn-grid">
+    <div class="tier-gn" style="--tc:#EF4444;--tc-glow:rgba(239,68,68,.25)">
+      <div class="tier-gn-med"></div>
+      <div class="tier-gn-ring"><div class="tier-gn-ring-dot"></div></div>
+      <div class="tier-gn-num">25</div>
+      <div class="tier-gn-label">0 — 39</div>
+      <div class="tier-gn-name">Poor</div>
+      <div class="tier-gn-bar"><div class="tier-gn-bar-fill" style="width:25%"></div></div>
+    </div>
+    <div class="tier-gn" style="--tc:#F59E0B;--tc-glow:rgba(245,158,11,.25)">
+      <div class="tier-gn-med"></div>
+      <div class="tier-gn-ring"><div class="tier-gn-ring-dot"></div></div>
+      <div class="tier-gn-num">52</div>
+      <div class="tier-gn-label">40 — 59</div>
+      <div class="tier-gn-name">Fair</div>
+      <div class="tier-gn-bar"><div class="tier-gn-bar-fill" style="width:50%"></div></div>
+    </div>
+    <div class="tier-gn selected" style="--tc:#FBBF24;--tc-glow:rgba(251,191,36,.25)">
+      <div class="tier-gn-med"></div>
+      <div class="tier-gn-ring"><div class="tier-gn-ring-dot"></div></div>
+      <div class="tier-gn-num">68</div>
+      <div class="tier-gn-label">60 — 74 · SELECTED</div>
+      <div class="tier-gn-name">Good</div>
+      <div class="tier-gn-bar"><div class="tier-gn-bar-fill" style="width:68%"></div></div>
+    </div>
+    <div class="tier-gn" style="--tc:#22C55E;--tc-glow:rgba(34,197,94,.25)">
+      <div class="tier-gn-med"></div>
+      <div class="tier-gn-ring"><div class="tier-gn-ring-dot"></div></div>
+      <div class="tier-gn-num">82</div>
+      <div class="tier-gn-label">75 — 89</div>
+      <div class="tier-gn-name">Great</div>
+      <div class="tier-gn-bar"><div class="tier-gn-bar-fill" style="width:82%"></div></div>
+    </div>
+    <div class="tier-gn" style="--tc:#14C7E0;--tc-glow:rgba(20,199,224,.35)">
+      <div class="tier-gn-med"></div>
+      <div class="tier-gn-ring"><div class="tier-gn-ring-dot"></div></div>
+      <div class="tier-gn-num">95</div>
+      <div class="tier-gn-label">90 — 100</div>
+      <div class="tier-gn-name">Elite</div>
+      <div class="tier-gn-bar"><div class="tier-gn-bar-fill" style="width:95%"></div></div>
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px">
+    <div class="card" style="background:rgba(34,197,94,.05);border-color:rgba(34,197,94,.25)"><div style="font-size:10px;font-weight:700;color:#22C55E;letter-spacing:1.5px;margin-bottom:6px">PROS</div><div style="font-size:11px;color:#CBD5E1;line-height:1.6">Emotional — score reveals feel like achievements · cinematic · heroic medallion ties to badges/achievements system · memorable</div></div>
+    <div class="card" style="background:rgba(239,68,68,.05);border-color:rgba(239,68,68,.25)"><div style="font-size:10px;font-weight:700;color:#EF4444;letter-spacing:1.5px;margin-bottom:6px">CONS</div><div style="font-size:11px;color:#CBD5E1;line-height:1.6">Larger footprint · glow effects need perf budget · slight learning curve for range semantics</div></div>
+  </div>
+</div>
+
+<!-- ─── 4. RECOMMENDATION ─── -->
+<div class="section">
+  <div class="pick">
+    <div class="pick-tag">PICK CONCEPT B · GAME NIGHT PREMIUM</div>
+    <div style="font-size:13px;color:#E2E8F0;line-height:1.65">
+      SHOOTRZ is <b style="color:#F1F5F9">identity-driven</b>, not a spreadsheet. The score reveal is the <b style="color:#F1F5F9">single biggest emotional moment</b> in every session — a medallion earns the drumroll. Performance Lab still ships for the <b style="color:#F1F5F9">biomechanics breakdown panel</b> on the Results screen (where diagnostic density is the point). Two patterns, two jobs.
+    </div>
+  </div>
+</div>
+
+<!-- ─── 5. STATUS CHIPS ─── -->
+<div class="section">
+  <div class="h">5 · Status Chips · Two Variants</div>
+  <div style="font-size:10px;font-weight:700;color:#94A3B8;letter-spacing:1.5px;margin-bottom:8px">COMPACT · inline toast / row meta</div>
+  <div class="status-row">
+    <div class="chip-lab" style="--cc:#22C55E;--cbg:rgba(34,197,94,.08);--cbd:rgba(34,197,94,.25)"><div class="chip-dot"></div><div class="chip-label"><span class="t">Uploaded</span><span class="d">2s ago · 12 MB</span></div></div>
+    <div class="chip-lab" style="--cc:#F59E0B;--cbg:rgba(245,158,11,.08);--cbd:rgba(245,158,11,.25)"><div class="chip-dot"></div><div class="chip-label"><span class="t">Re-film</span><span class="d">Low lighting</span></div></div>
+    <div class="chip-lab" style="--cc:#EF4444;--cbg:rgba(239,68,68,.08);--cbd:rgba(239,68,68,.25)"><div class="chip-dot"></div><div class="chip-label"><span class="t">Failed</span><span class="d">No pose detected</span></div></div>
+    <div class="chip-lab" style="--cc:#14C7E0;--cbg:rgba(20,199,224,.08);--cbd:rgba(20,199,224,.25)"><div class="chip-dot"></div><div class="chip-label"><span class="t">New drill</span><span class="d">Added by Coach J</span></div></div>
+  </div>
+  <div style="font-size:10px;font-weight:700;color:#94A3B8;letter-spacing:1.5px;margin-bottom:8px">FULL · card banner / system message</div>
+  <div class="status-row">
+    <div class="chip-gn" style="--cc:#22C55E;--cbg:rgba(34,197,94,.1);--cbd:rgba(34,197,94,.3)">
+      <div class="chip-gn-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="chip-gn-ic"><path d="M5 13l4 4L19 7"/></svg></div>
+      <div class="chip-gn-body"><div class="chip-gn-t">Session saved</div><div class="chip-gn-d">Synced to cloud</div></div>
+      <div class="chip-gn-meter"><div class="chip-gn-meter-fill" style="width:100%"></div></div>
+    </div>
+    <div class="chip-gn" style="--cc:#F59E0B;--cbg:rgba(245,158,11,.1);--cbd:rgba(245,158,11,.3)">
+      <div class="chip-gn-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="chip-gn-ic"><path d="M12 9v4M12 17h.01"/><circle cx="12" cy="12" r="10"/></svg></div>
+      <div class="chip-gn-body"><div class="chip-gn-t">Streak at risk</div><div class="chip-gn-d">Train today to keep 7</div></div>
+      <div class="chip-gn-meter"><div class="chip-gn-meter-fill" style="width:65%"></div></div>
+    </div>
+    <div class="chip-gn" style="--cc:#EF4444;--cbg:rgba(239,68,68,.1);--cbd:rgba(239,68,68,.3)">
+      <div class="chip-gn-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="chip-gn-ic"><path d="M18 6L6 18M6 6l12 12"/></svg></div>
+      <div class="chip-gn-body"><div class="chip-gn-t">Couldn't analyze</div><div class="chip-gn-d">Retry with better light</div></div>
+      <div class="chip-gn-meter"><div class="chip-gn-meter-fill" style="width:20%"></div></div>
+    </div>
+    <div class="chip-gn" style="--cc:#14C7E0;--cbg:rgba(20,199,224,.1);--cbd:rgba(20,199,224,.3)">
+      <div class="chip-gn-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="chip-gn-ic"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg></div>
+      <div class="chip-gn-body"><div class="chip-gn-t">Coach J insight</div><div class="chip-gn-d">Bend knees deeper</div></div>
+      <div class="chip-gn-meter"><div class="chip-gn-meter-fill" style="width:80%"></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ─── 6. STATES ─── -->
+<div class="section">
+  <div class="h">6 · Component States · Default / Selected / Disabled / Loading</div>
+  <div class="states">
+    <div class="state-demo"><div class="state-demo-l">DEFAULT</div>
+      <div class="tier-gn" style="--tc:#22C55E;padding:10px 12px;border-radius:12px">
+        <div class="tier-gn-med" style="top:-16px;right:-16px;width:60px;height:60px"></div>
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:34px;font-weight:900;color:#22C55E;line-height:1">82</div>
+        <div style="font-size:9px;color:#22C55E;font-weight:700;letter-spacing:1.5px;margin-top:2px">GREAT</div>
+      </div>
+    </div>
+    <div class="state-demo"><div class="state-demo-l">SELECTED</div>
+      <div class="tier-gn selected" style="--tc:#22C55E;--tc-glow:rgba(34,197,94,.35);padding:10px 12px;border-radius:12px">
+        <div class="tier-gn-med" style="top:-16px;right:-16px;width:60px;height:60px"></div>
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:34px;font-weight:900;color:#22C55E;line-height:1">82</div>
+        <div style="font-size:9px;color:#22C55E;font-weight:700;letter-spacing:1.5px;margin-top:2px">GREAT</div>
+      </div>
+    </div>
+    <div class="state-demo"><div class="state-demo-l">DISABLED (LOCKED)</div>
+      <div style="background:#0F141B;border:1px dashed rgba(148,163,184,.22);border-radius:12px;padding:10px 12px;position:relative">
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:34px;font-weight:900;color:#334155;line-height:1">—</div>
+        <div style="font-size:9px;color:#64748B;font-weight:700;letter-spacing:1.5px;margin-top:2px">RECORD FIRST SHOT</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ─── 7. ANATOMY ─── -->
+<div class="section">
+  <div class="h">7 · Component Specs · Tier Card + Status Chip</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+    <div class="card">
+      <div style="font-size:11px;font-weight:700;color:#F1F5F9;margin-bottom:8px">Tier Card (Game Night)</div>
+      <div class="spec-list">
+        <div class="spec-row"><span class="k">radius</span><span class="v"><code>18px</code></span></div>
+        <div class="spec-row"><span class="k">padding</span><span class="v"><code>16px 14px</code></span></div>
+        <div class="spec-row"><span class="k">bg</span><span class="v"><code>bg.primary</code> (#0F141B)</span></div>
+        <div class="spec-row"><span class="k">border</span><span class="v"><code>1px · border.default</code> → tier color on selected</span></div>
+        <div class="spec-row"><span class="k">glow medallion</span><span class="v">90px radial <code>tier.glow</code>, top-right, blur 8px, opacity .3</span></div>
+        <div class="spec-row"><span class="k">ring badge</span><span class="v">36px · 2px tier border · 10px inner dot · 16px tier glow</span></div>
+        <div class="spec-row"><span class="k">numeric</span><span class="v">Barlow 900, 52px, gradient <code>text.primary → tier.base</code></span></div>
+        <div class="spec-row"><span class="k">label</span><span class="v">DM Sans 700, 9px, tracking 2, <code>tier.base</code></span></div>
+        <div class="spec-row"><span class="k">meter</span><span class="v">2px · <code>chrome.dim</code> track · tier fill + glow</span></div>
+        <div class="spec-row"><span class="k">selected shadow</span><span class="v"><code>shadow.selected.ios</code> + <code>ring.width</code> wrapper · Android <code>elevation:8</code></span></div>
+      </div>
+    </div>
+    <div class="card">
+      <div style="font-size:11px;font-weight:700;color:#F1F5F9;margin-bottom:8px">Status Chip (Full)</div>
+      <div class="spec-list">
+        <div class="spec-row"><span class="k">radius</span><span class="v"><code>14px</code></span></div>
+        <div class="spec-row"><span class="k">padding</span><span class="v"><code>12px 14px</code></span></div>
+        <div class="spec-row"><span class="k">gap</span><span class="v"><code>12px</code></span></div>
+        <div class="spec-row"><span class="k">bg</span><span class="v"><code>bg.secondary</code> (#151C26)</span></div>
+        <div class="spec-row"><span class="k">border</span><span class="v"><code>1px · border.default</code></span></div>
+        <div class="spec-row"><span class="k">icon tile</span><span class="v">36×36, radius 10, <code>state.dim</code> bg · <code>state.base</code> icon + glow aura</span></div>
+        <div class="spec-row"><span class="k">icon stroke</span><span class="v">2.5px round caps (Lucide weight)</span></div>
+        <div class="spec-row"><span class="k">title</span><span class="v">DM Sans 700, 13px, <code>text.primary</code></span></div>
+        <div class="spec-row"><span class="k">desc</span><span class="v">DM Sans 500, 11px, <code>text.secondary</code></span></div>
+        <div class="spec-row"><span class="k">meter (trailing)</span><span class="v">26×4 · state fill · tiny glow</span></div>
+        <div class="spec-row"><span class="k">compact var</span><span class="v">Radius 14 · pulsing dot instead of icon tile</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ─── 8. MOTION ─── -->
+<div class="section">
+  <div class="h">8 · Interaction &amp; Motion</div>
+  <div class="card">
+    <div class="spec-list">
+      <div style="font-size:10px;font-weight:700;color:#14C7E0;letter-spacing:1.5px;margin-bottom:10px">CORE STATES (MOBILE-FIRST)</div>
+      <div class="spec-row"><span class="k" style="color:#F1F5F9">default</span><span class="v">border <code>chrome.dim</code> · opacity 1 · scale 1</span></div>
+      <div class="spec-row"><span class="k" style="color:#FF7B3D">pressed</span><span class="v">scale <code>0.97</code> · <code>timing.fast</code> (120ms, <code>easing.standard</code>) · <code>Haptics.selection()</code></span></div>
+      <div class="spec-row"><span class="k" style="color:#14C7E0">focused</span><span class="v">outline wrapper: <code>borderWidth 3 · borderColor focus.ringColor</code> · no shadow string</span></div>
+      <div class="spec-row"><span class="k" style="color:#14C7E0">selected</span><span class="v">border → <code>tier.base</code> · iOS shadow <code>shadow.selected.ios</code> · Android <code>elevation:8</code> · 200ms · <code>Haptics.impact('light')</code></span></div>
+      <div class="spec-row"><span class="k" style="color:#64748B">disabled</span><span class="v">opacity <code>0.45</code> · <code>pointerEvents:'none'</code> · no haptic · no animation</span></div>
+      <div class="spec-row"><span class="k" style="color:#22C55E">loading</span><span class="v">skeleton pulse <code>1500ms</code> infinite · medallion → shimmering ring · disable press</span></div>
+      <div class="spec-row"><span class="k" style="color:#94A3B8">reduced-motion</span><span class="v">count-up → instant · pulse/confetti → static fade (<code>timing.fast</code>) · scale anims skipped · glows kept</span></div>
+      <div style="font-size:10px;font-weight:700;color:#94A3B8;letter-spacing:1.5px;margin:14px 0 10px">REVEAL &amp; FEEDBACK (numeric tokens)</div>
+      <div class="spec-row"><span class="k" style="color:#14C7E0">reveal</span><span class="v">count-up <code>timing.reveal</code> (1400ms, <code>easing.emphasized</code>) · meter fill +300ms delay, 600ms · glow pulse on finish</span></div>
+      <div class="spec-row"><span class="k" style="color:#14C7E0">tier-up</span><span class="v">confetti burst · scale 1 → 1.15 → 1 · <code>timing.celebration</code> (800ms) · <code>Haptics.notification('success')</code></span></div>
+      <div class="spec-row"><span class="k" style="color:#22C55E">success toast</span><span class="v">slide-down <code>timing.medium</code> (300ms) · meter 0→100% · auto-dismiss 3000ms</span></div>
+      <div class="spec-row"><span class="k" style="color:#EF4444">error shake</span><span class="v">translateX <code>±4px</code> · 3 cycles · 400ms · <code>Haptics.notification('error')</code></span></div>
+      <div class="spec-row"><span class="k" style="color:#94A3B8">_web.hover</span><span class="v"><i>Optional web extension only</i> · translateY <code>-3px</code> + border tint · never required for parity</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ─── 9. TOKENS ─── -->
+<div class="section">
+  <div class="h">9 · Visual Token Set</div>
+  <div class="code">{
+  <span class="str">"tier"</span>: {
+    <span class="str">"poor"</span>:  { <span class="p">"base"</span>:<span class="str">"#EF4444"</span>, <span class="p">"glow"</span>:<span class="str">"rgba(239,68,68,.25)"</span>, <span class="p">"dim"</span>:<span class="str">"rgba(239,68,68,.08)"</span>, <span class="p">"range"</span>:[0,39]  },
+    <span class="str">"fair"</span>:  { <span class="p">"base"</span>:<span class="str">"#F59E0B"</span>, <span class="p">"glow"</span>:<span class="str">"rgba(245,158,11,.25)"</span>, <span class="p">"dim"</span>:<span class="str">"rgba(245,158,11,.08)"</span>, <span class="p">"range"</span>:[40,59] },
+    <span class="str">"good"</span>:  { <span class="p">"base"</span>:<span class="str">"#FBBF24"</span>, <span class="p">"glow"</span>:<span class="str">"rgba(251,191,36,.25)"</span>, <span class="p">"dim"</span>:<span class="str">"rgba(251,191,36,.08)"</span>, <span class="p">"range"</span>:[60,74] },
+    <span class="str">"great"</span>: { <span class="p">"base"</span>:<span class="str">"#22C55E"</span>, <span class="p">"glow"</span>:<span class="str">"rgba(34,197,94,.25)"</span>,  <span class="p">"dim"</span>:<span class="str">"rgba(34,197,94,.08)"</span>,  <span class="p">"range"</span>:[75,89] },
+    <span class="str">"elite"</span>: { <span class="p">"base"</span>:<span class="str">"#14C7E0"</span>, <span class="p">"glow"</span>:<span class="str">"rgba(20,199,224,.35)"</span>, <span class="p">"dim"</span>:<span class="str">"rgba(20,199,224,.1)"</span>,  <span class="p">"range"</span>:[90,100]}
+  },
+  <span class="str">"status"</span>: {
+    <span class="str">"success"</span>: { <span class="p">"base"</span>:<span class="str">"#22C55E"</span>, <span class="p">"bg"</span>:<span class="str">"rgba(34,197,94,.1)"</span>,  <span class="p">"border"</span>:<span class="str">"rgba(34,197,94,.3)"</span>  },
+    <span class="str">"warning"</span>: { <span class="p">"base"</span>:<span class="str">"#F59E0B"</span>, <span class="p">"bg"</span>:<span class="str">"rgba(245,158,11,.1)"</span>, <span class="p">"border"</span>:<span class="str">"rgba(245,158,11,.3)"</span> },
+    <span class="str">"error"</span>:   { <span class="p">"base"</span>:<span class="str">"#EF4444"</span>, <span class="p">"bg"</span>:<span class="str">"rgba(239,68,68,.1)"</span>, <span class="p">"border"</span>:<span class="str">"rgba(239,68,68,.3)"</span>  },
+    <span class="str">"info"</span>:    { <span class="p">"base"</span>:<span class="str">"#14C7E0"</span>, <span class="p">"bg"</span>:<span class="str">"rgba(20,199,224,.1)"</span>, <span class="p">"border"</span>:<span class="str">"rgba(20,199,224,.3)"</span> }
+  },
+  <span class="str">"radius"</span>: { <span class="str">"chip"</span>:14, <span class="str">"tier"</span>:18 },
+
+  <span class="cm">// RN-native shadow tokens — consume directly in StyleSheet, never as a CSS string.</span>
+  <span class="str">"shadow"</span>: {
+    <span class="str">"selected"</span>: {
+      <span class="str">"ios"</span>: {
+        <span class="str">"shadowColor"</span>:  <span class="str">"{tier.base}"</span>,
+        <span class="str">"shadowOpacity"</span>: 0.45,
+        <span class="str">"shadowRadius"</span>:  16,
+        <span class="str">"shadowOffset"</span>:  { <span class="str">"width"</span>:0, <span class="str">"height"</span>:8 }
+      },
+      <span class="str">"android"</span>: { <span class="str">"elevation"</span>: 8 },
+      <span class="str">"ring"</span>:    { <span class="str">"color"</span>:<span class="str">"{tier.base}"</span>, <span class="str">"width"</span>:1 }   <span class="cm">// wrapper border — replaces the 0 0 0 1px inset</span>
+    },
+    <span class="str">"toast"</span>: {
+      <span class="str">"ios"</span>: {
+        <span class="str">"shadowColor"</span>:  <span class="str">"#000"</span>,
+        <span class="str">"shadowOpacity"</span>: 0.45,
+        <span class="str">"shadowRadius"</span>:  20,
+        <span class="str">"shadowOffset"</span>:  { <span class="str">"width"</span>:0, <span class="str">"height"</span>:12 }
+      },
+      <span class="str">"android"</span>: { <span class="str">"elevation"</span>: 12 }
+    }
+  },
+
+  <span class="cm">// Structured focus ring — matches brand v3 contract. Render as wrapper View with borderWidth/borderColor.</span>
+  <span class="str">"focus"</span>: {
+    <span class="str">"ringColor"</span>:  <span class="str">"rgba(20,199,224,0.40)"</span>,
+    <span class="str">"ringWidth"</span>:  3,
+    <span class="str">"ringOffset"</span>: 0
+  },
+
+  <span class="cm">// Motion tokens — pass directly to Reanimated withTiming() / Moti transition={{duration}}.</span>
+  <span class="str">"motion"</span>: {
+    <span class="str">"timing"</span>: { <span class="str">"fast"</span>:120, <span class="str">"medium"</span>:300, <span class="str">"slow"</span>:600, <span class="str">"reveal"</span>:1400, <span class="str">"celebration"</span>:800 },
+    <span class="str">"easing"</span>: {
+      <span class="str">"standard"</span>:    [0.2, 0, 0, 1],      <span class="cm">// Easing.bezier(...)</span>
+      <span class="str">"emphasized"</span>:  [0.2, 1, 0.3, 1],
+      <span class="str">"decelerate"</span>:  [0, 0, 0.2, 1],
+      <span class="str">"accelerate"</span>:  [0.4, 0, 1, 1]
+    },
+    <span class="str">"scale"</span>: { <span class="str">"press"</span>:0.97, <span class="str">"selectedIdle"</span>:1.02, <span class="str">"celebration"</span>:1.15 },
+    <span class="str">"reducedMotion"</span>: {
+      <span class="str">"timing"</span>:  { <span class="str">"fast"</span>:0, <span class="str">"medium"</span>:0, <span class="str">"reveal"</span>:0, <span class="str">"celebration"</span>:150 },
+      <span class="str">"scale"</span>:   { <span class="str">"press"</span>:1, <span class="str">"selectedIdle"</span>:1, <span class="str">"celebration"</span>:1 }
+    }
+  },
+
+  <span class="cm">// Web-only derived values. Generated from the structured tokens above — do NOT consume in RN.</span>
+  <span class="str">"_web"</span>: {
+    <span class="str">"shadow"</span>: {
+      <span class="str">"selected"</span>: <span class="str">"0 0 0 1px {tier.base}, 0 8px 32px {tier.glow}"</span>,
+      <span class="str">"toast"</span>:    <span class="str">"0 12px 40px rgba(0,0,0,0.45)"</span>
+    },
+    <span class="str">"focusShadow"</span>: <span class="str">"0 0 0 3px rgba(20,199,224,0.40)"</span>,
+    <span class="str">"hover"</span>: { <span class="str">"translateY"</span>:<span class="str">"-3px"</span>, <span class="str">"transition"</span>:<span class="str">"250ms cubic-bezier(0.2,1,0.3,1)"</span> }
+  }
+}</div>
+</div>
+
+<!-- ─── 10. A11Y ─── -->
+<div class="section">
+  <div class="h">10 · Accessibility Rules</div>
+  <div class="a11y-grid">
+    <div class="a11y">
+      <div class="a11y-t">Contrast</div>
+      <div class="a11y-b">All tier labels pass <b>AA 4.5:1</b> on <code style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#14C7E0">bg.primary</code>. Numerics (≥32px = "large") pass AAA. Status chip bodies always use <code style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#14C7E0">text.primary</code> not the tint color.</div>
+    </div>
+    <div class="a11y">
+      <div class="a11y-t">Non-color signal</div>
+      <div class="a11y-b">Tier ALWAYS paired with <b>label text</b> (POOR / FAIR / …) + <b>meter width</b>. Status chip ALWAYS paired with <b>distinct icon shape</b> (check / triangle / X / info) — no red-vs-green reliance.</div>
+    </div>
+    <div class="a11y">
+      <div class="a11y-t">Color-blind patterns</div>
+      <div class="a11y-b">
+        <div class="pat"><div class="pat-sh" style="--pc:#22C55E"><svg class="pat-sw" viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7"/></svg></div>Great / Success · check</div>
+        <div class="pat"><div class="pat-sh" style="--pc:#F59E0B"><svg class="pat-sw" viewBox="0 0 24 24" fill="none"><path d="M12 9v6M12 18h.01"/></svg></div>Fair / Warning · !</div>
+        <div class="pat"><div class="pat-sh" style="--pc:#EF4444"><svg class="pat-sw" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12"/></svg></div>Poor / Error · X</div>
+      </div>
+    </div>
+    <div class="a11y">
+      <div class="a11y-t">Touch targets</div>
+      <div class="a11y-b">Tier cards tappable <b>≥ 44×44pt</b>. Chips with actions (dismiss, retry) expose a <b>48×48pt</b> hitbox around icon.</div>
+    </div>
+    <div class="a11y">
+      <div class="a11y-t">Reduced motion</div>
+      <div class="a11y-b">On <code style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#14C7E0">isReduceMotionEnabled</code>: count-up → instant number · medallion pulse → static · confetti → single fade. Glow kept.</div>
+    </div>
+    <div class="a11y">
+      <div class="a11y-t">Light mode</div>
+      <div class="a11y-b">Invert surface + keep tier base. Glows drop to <code style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#14C7E0">alpha .15</code>. Text swaps to <code style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#14C7E0">text.inverse</code>. Same component, two themes.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ─── 11. RN NOTES ─── -->
+<div class="section">
+  <div class="h">11 · React Native Implementation</div>
+  <div class="code"><span class="cm">// TierMedallion.tsx — single source of tier UI</span>
+<span class="kw">import</span> { <span class="fn">MotiView</span> } <span class="kw">from</span> <span class="str">'moti'</span>
+<span class="kw">import</span> { <span class="fn">useTokens</span> } <span class="kw">from</span> <span class="str">'@/theme'</span>
+
+<span class="kw">export const</span> <span class="fn">TierMedallion</span> = ({ score, selected }) =&gt; {
+  <span class="kw">const</span> t = <span class="fn">useTokens</span>()
+  <span class="kw">const</span> tier = <span class="fn">resolveTier</span>(score)          <span class="cm">// → t.tier.great</span>
+  <span class="kw">const</span> animated = <span class="fn">useCountUp</span>(score, 1400)   <span class="cm">// shared reveal hook</span>
+
+  <span class="kw">return</span> (
+    &lt;<span class="fn">MotiView</span>
+      <span class="p">from</span>={{ opacity: <span class="str">0</span>, scale: <span class="str">.94</span> }}
+      <span class="p">animate</span>={{ opacity: <span class="str">1</span>, scale: selected ? <span class="str">1.02</span> : <span class="str">1</span> }}
+      <span class="p">transition</span>={{ type: <span class="str">'timing'</span>, duration: <span class="str">250</span> }}
+      <span class="p">style</span>={[styles.card, selected &amp;&amp; { borderColor: tier.base, shadowColor: tier.base }]}&gt;
+      &lt;<span class="fn">RingBadge</span> <span class="p">color</span>={tier.base} <span class="p">glow</span>={tier.glow} /&gt;
+      &lt;<span class="fn">GradientNumeric</span> <span class="p">value</span>={animated} <span class="p">to</span>={tier.base} /&gt;
+      &lt;<span class="fn">TierLabel</span> <span class="p">tier</span>={tier} /&gt;
+      &lt;<span class="fn">Meter</span> <span class="p">pct</span>={score} <span class="p">color</span>={tier.base} /&gt;
+    &lt;/<span class="fn">MotiView</span>&gt;
+  )
+}</div>
+  <div style="font-size:11px;color:#94A3B8;margin-top:10px;line-height:1.65"><b style="color:#F1F5F9">Stack:</b> Moti for enter/exit + scale, <code style="font-family:'JetBrains Mono',monospace;font-size:10px;background:#1C2432;padding:1px 4px;border-radius:3px;color:#F1F5F9">react-native-linear-gradient</code> for gradient numerics, <code style="font-family:'JetBrains Mono',monospace;font-size:10px;background:#1C2432;padding:1px 4px;border-radius:3px;color:#F1F5F9">expo-haptics</code> for feel, <code style="font-family:'JetBrains Mono',monospace;font-size:10px;background:#1C2432;padding:1px 4px;border-radius:3px;color:#F1F5F9">react-native-reanimated</code> for count-up. One <code style="font-family:'JetBrains Mono',monospace;font-size:10px;background:#1C2432;padding:1px 4px;border-radius:3px;color:#F1F5F9">&lt;TierMedallion&gt;</code> component, used everywhere — Results hero, Progress sparkline thumbnails, Profile ring. Never re-implement.</div>
+</div>
+
+<!-- ─── 12. BEFORE/AFTER ─── -->
+<div class="section">
+  <div class="h">12 · Before vs After</div>
+  <div class="ba-grid">
+    <div class="ba-card ba-before">
+      <div class="ba-tag">BEFORE</div>
+      <ul class="ba-list">
+        <li><b>Flat squares</b> — every tier looked the same shape</li>
+        <li><b>No progression visible</b> — red 40 and green 80 had equal weight</li>
+        <li><b>Static</b> — no reveal animation, no micro-interactions</li>
+        <li><b>Color-only signal</b> — color-blind users got zero cue</li>
+        <li><b>Ad-hoc statuses</b> — toast, banner, inline had 3 different shapes</li>
+        <li><b>Generic dashboard feel</b> — could be any SaaS app</li>
+      </ul>
+    </div>
+    <div class="ba-card ba-after">
+      <div class="ba-tag">AFTER</div>
+      <ul class="ba-list">
+        <li><b>Medallion identity</b> — higher tier visibly earns more light</li>
+        <li><b>Meter + label + icon</b> — meaning in 3 redundant channels</li>
+        <li><b>Cinematic reveals</b> — count-up, ring pulse, tier promotion</li>
+        <li><b>Shape-coded</b> statuses — check / triangle / X / info</li>
+        <li><b>One TierMedallion</b> component — consistent everywhere</li>
+        <li><b>Stadium-broadcast feel</b> — distinctly SHOOTRZ</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+</body></html>

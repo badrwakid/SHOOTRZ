@@ -1,303 +1,202 @@
-# SHOOTRZ - AI-Powered Basketball Training App
+# SHOOTRZ — AI Basketball Shot Mechanics Analyzer
 
-An intelligent basketball training application that analyzes your shooting form using AI-powered video analysis with research-validated accuracy.
+> Upload a video. Get instant biomechanics feedback. Train like a pro.
 
-## 🏀 Features
-
-- **Research-Validated Analysis**: 75-80% accuracy using motion-based phase detection
-- **Real-Time Feedback**: Instant analysis of shooting form with personalized tips
-- **Advanced AI Features**:
-  - Motion-based phase detection (finds exact release moment)
-  - Ball tracking (YOLO + color fallback)
-  - Shooting motion validation
-  - Joint coordination analysis
-  - Camera angle analysis
-  - ML-based shot prediction
-- **Progress Tracking**: Monitor improvement over time
-- **Professional Comparison**: Compare your form to NBA standards
-
-## 🚀 Quick Start
-
-### Prerequisites
-
-- **Backend**: Python 3.8+ with pip
-- **Frontend**: Node.js 18+ with npm
-- **Mobile**: Expo Go app for testing
-
-### Setup Backend
-
-```bash
-cd backend
-python -m venv venv
-# Windows:
-venv\Scripts\activate
-# Mac/Linux:
-source venv/bin/activate
-
-pip install -r requirements.txt
-python app.py
-```
-
-Backend runs on `http://localhost:5000`
-
-### Setup Frontend
-
-```bash
-# From project root
-npm install
-npm start # automatically detects your local IP and updates EXPO_PUBLIC_API_URL
-```
-
-This opens Expo Dev Tools. Scan QR code with Expo Go app to test.
-
-## 📊 How It Works
-
-### 6-Step Analysis Pipeline
-
-1. **Extract Keypoints**: MediaPipe Pose detects 33 body landmarks
-2. **Validate Motion**: Confirms video shows actual shooting motion
-3. **Detect Phases**: Finds key moments (dip, release, follow-through)
-4. **Precise Measurements**: Measures angles at exact release point
-5. **Camera Analysis**: Evaluates camera angle reliability
-6. **Research Scoring**: Compares to professional benchmarks
-
-### Key Difference
-
-**Traditional**: Average angle across all frames → inaccurate
-**SHOOTRZ**: Angle at exact release moment → research-validated
-
-## 🏗️ Architecture
-
-### Frontend (React Native/Expo)
-- **Screens**: Home, Analyze, Progress, Profile, Drills
-- **Navigation**: React Navigation (stack + tabs)
-- **State**: React Context API
-- **Auth**: Firebase Authentication
-- **Storage**: AsyncStorage + Firebase
-
-### Backend (Python/Flask)
-- **Framework**: Flask with CORS
-- **Pose Detection**: MediaPipe Pose (33 landmarks)
-- **Ball Tracking**: YOLOv8-nano + color fallback
-- **Phase Detection**: Motion-based analysis
-- **ML Prediction**: LightGBM ensemble
-- **Privacy**: Auto-deletion, metadata stripping
-
-## 📁 Project Structure
-
-```
-basketball-training-app/
-├── App.tsx                 # Entry point
-├── src/
-│   ├── screens/           # App screens
-│   ├── components/        # Reusable UI components
-│   ├── services/          # API and storage services
-│   ├── navigation/        # Navigation setup
-│   ├── constants/         # Theme, drills, landmarks
-│   └── utils/             # Helper functions
-├── backend/
-│   ├── app.py                         # Flask API server
-│   ├── video_processor.py             # Main processor (research-validated)
-│   ├── pose_detector.py               # MediaPipe wrapper
-│   ├── motion_based_phase_detector.py # Phase detection
-│   ├── precise_measurement_system.py  # Key-frame measurements
-│   ├── shooting_motion_validator.py   # Motion validation
-│   ├── ball_detector.py               # YOLO + color detection
-│   ├── trajectory_analyzer.py         # Ball trajectory
-│   ├── camera_analyzer.py             # Camera angle eval
-│   ├── ml_predictor.py                # ML predictions
-│   ├── angle_calculator.py            # Angle computations
-│   ├── tip_generator.py               # Feedback generation
-│   ├── privacy.py                     # Privacy management
-│   ├── evaluator.py                   # Performance tracking
-│   └── database/
-│       ├── progress_db.py             # SQLite database
-│       └── progress.db                # User progress data
-└── package.json
-```
-
-## 🔧 API Endpoints
-
-### Health Check
-```
-GET /health
-```
-
-### Analyze Video
-```
-POST /api/analyze
-Content-Type: multipart/form-data
-Body: { video: <file> }
-
-Returns: {
-  success: true,
-  metrics: { elbow_angle, knee_angle, release_angle, body_alignment },
-  scores: { elbow, balance, release, alignment, total },
-  tips: [...],
-  performance_level: "Excellent",
-  validation: {...},
-  phase_detection: {...},
-  camera_analysis: {...},
-  research_comparison: {...}
-}
-```
-
-### Get Annotated Video
-```
-GET /api/video/<video_id>
-```
-
-### Performance Metrics
-```
-GET /api/performance
-```
-
-### System Status
-```
-GET /api/status
-```
-
-## 🎯 Video Requirements
-
-- **Format**: MP4, MOV, AVI, MKV
-- **Duration**: 1-30 seconds
-- **File Size**: Max 100MB
-- **Frame Rate**: Min 15 fps
-- **Camera**: Side view recommended
-
-## 📈 Scoring System
-
-Each component scored 0-25 points (total 100):
-
-- **Elbow Alignment** (0-25): Ideal 90° ±5°
-- **Balance & Stability** (0-25): Ideal knee bend 120-140°
-- **Release Angle** (0-25): Ideal 45-50°
-- **Body Alignment** (0-25): Shoulders/hips alignment
-
-### Performance Levels
-- 90-100: Excellent ⭐⭐⭐⭐⭐
-- 80-89: Great ⭐⭐⭐⭐
-- 70-79: Good ⭐⭐⭐
-- 60-69: Fair ⭐⭐
-- 0-59: Needs Improvement ⭐
-
-## 🔐 Privacy & Security
-
-- Videos auto-delete after 7 days
-- Metadata stripped from uploads
-- Anonymous SHA-256 video IDs
-- No facial recognition
-- No personal data collection
-- Secure file handling
-
-## 🧪 Testing
-
-Backend includes comprehensive validation:
-```bash
-cd backend
-python app.py  # Starts server with auto-cleanup
-```
-
-Visit `http://localhost:5000/health` to verify.
-
-## 📦 Dependencies
-
-### Frontend
-- React Native / Expo
-- React Navigation
-- Firebase SDK
-- Axios for API calls
-- AsyncStorage for local data
-
-### Backend
-- Flask + Flask-CORS
-- MediaPipe (pose detection)
-- OpenCV (video processing)
-- Ultralytics (YOLOv8 ball tracking)
-- LightGBM (ML predictions)
-- FilterPy (Kalman filtering)
-- Scikit-learn (ML utilities)
-
-See `package.json` and `backend/requirements.txt` for full lists.
-
-## 🛠️ Development
-
-### Run Backend in Dev Mode
-```bash
-cd backend
-python app.py  # Debug mode enabled
-```
-
-### Run Frontend in Dev Mode
-```bash
-npm start
-# Press 'a' for Android, 'i' for iOS, 'w' for web
-```
-
-### Lint & Format
-```bash
-# Frontend (when configured)
-npm run lint
-npm run format
-npm run typecheck
-
-# Backend (when configured)
-black backend/
-ruff check backend/
-mypy backend/
-```
-
-## 📚 Documentation
-
-- **Backend API**: `backend/README.md`
-- **Architecture**: `backend/docs/ARCHITECTURE.md`
-- **Archived Docs**: `__graveyard__/pass-2/docs/` (historical reference)
-
-## 🐛 Troubleshooting
-
-### Backend Won't Start
-- Check Python version: `python --version` (need 3.8+)
-- Verify venv activated (command prompt shows `(venv)`)
-- Reinstall dependencies: `pip install -r requirements.txt`
-
-### Frontend Won't Load
-- Check Node version: `node --version` (need 18+)
-- Clear cache: `rm -rf node_modules && npm install`
-- Reset Expo: `expo start -c`
-
-### Video Processing Fails
-- Ensure video meets requirements (1-30s, MP4, <100MB)
-- Check backend logs for errors
-- Verify MediaPipe installed: `python -c "import mediapipe"`
-
-### Port Already in Use
-```bash
-# Find and kill process on port 5000 (backend)
-netstat -ano | findstr :5000
-taskkill /PID <PID> /F
-```
-
-## 🤝 Contributing
-
-This is a private project. Contact the team for contribution guidelines.
-
-## 📄 License
-
-Proprietary - SHOOTRZ Basketball Training App
-
-## 👥 Team
-
-Developed by the SHOOTRZ Team
-
-## 🎓 Research References
-
-Based on biomechanical research in basketball shooting form analysis. All measurement methods validated against professional standards.
+SHOOTRZ is a full-stack AI application that analyzes basketball shooting form using computer vision and large language models. Upload a short video clip — SHOOTRZ processes your joint angles, shot phases, release mechanics, and returns a scored breakdown with personalized AI coaching feedback.
 
 ---
 
-**Ready to improve your shot? Let's get started! 🏀**
+## Tech Stack
 
+| Layer | Technology |
+|-------|-----------|
+| Mobile | Expo 54 · React Native · TypeScript |
+| Backend | FastAPI · Python 3.12 · uvicorn |
+| Pose estimation | MediaPipe Pose (33 landmarks) |
+| Ball detection | YOLOv8n (opt-in, `SHOOTRZ_ENABLE_BALL=1`) |
+| Shot classification | LightGBM · custom phase detector |
+| AI coaching | Google Gemini 2.5 Flash |
+| Drill recommendations | FAISS nearest-neighbor + LinUCB bandit |
+| Auth & Database | Supabase (PostgreSQL + Auth + Storage) |
+| Job queue | asyncio + ProcessPoolExecutor + SQLite |
 
+---
 
+## Architecture Overview
 
+```
+Mobile App (Expo)
+  │
+  ├── POST /mvp/analyze  (upload video)
+  │     └── MVPJobService → DurableJobStore (SQLite) → ProcessPoolExecutor
+  │           └── MVPPipeline (6 phases, ~15–40 s)
+  │                 ├── VideoLoader → frame extraction
+  │                 ├── PoseEstimation → MediaPipe 33-landmark
+  │                 ├── ShotDetection → phase segmentation
+  │                 ├── AngleComputation → biomechanics
+  │                 ├── SignalSmoothing → Kalman filter
+  │                 └── Metrics → confidence-weighted scoring
+  │           └── GeminiEnrichment → personalized coaching text
+  │           └── SupabasePersist → sessions, metrics, summaries
+  │
+  └── GET /mvp/result/{job_id}  (poll until completed)
+        └── App renders score ring, metric cards, angle graphs
+```
 
+---
+
+## Quick Start
+
+### Prerequisites
+
+- Python 3.11+ with conda (`C:\...\miniconda3\python.exe` on Windows)
+- Node.js 18+ and npm
+- Expo Go app (iOS / Android) or an emulator
+- Supabase project (free tier works)
+- Google Gemini API key (free at [aistudio.google.com](https://aistudio.google.com/apikey))
+
+### 1. Clone
+
+```bash
+git clone https://github.com/badrwakid/SHOOTRZ.git
+cd SHOOTRZ
+```
+
+### 2. Backend setup
+
+```bash
+# Create and activate environment
+conda create -n shootrz python=3.12 -y
+conda activate shootrz
+pip install -r backend/requirements.txt
+
+# Configure environment
+cp backend/.env.example backend/.env
+# Edit backend/.env and fill in:
+#   SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_KEY, GEMINI_API_KEY
+```
+
+### 3. Frontend setup
+
+```bash
+cp .env.example .env
+# Edit .env and fill in:
+#   EXPO_PUBLIC_SUPABASE_URL, EXPO_PUBLIC_SUPABASE_ANON_KEY
+#   EXPO_PUBLIC_API_URL=http://<your-local-ip>:8000
+
+npm install
+```
+
+### 4. Run
+
+```bash
+# Terminal 1 — backend
+python -m uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
+
+# Terminal 2 — frontend
+npm start
+```
+
+Scan the QR code with Expo Go, or press `a` for Android emulator / `i` for iOS simulator.
+
+---
+
+## Environment Variables
+
+### Backend (`backend/.env`)
+
+| Variable | Description |
+|----------|-------------|
+| `SUPABASE_URL` | Your Supabase project URL |
+| `SUPABASE_ANON_KEY` | Supabase anon/public key |
+| `SUPABASE_SERVICE_KEY` | Supabase service role key (bypasses RLS) |
+| `GEMINI_API_KEY` | Google Gemini API key |
+| `GEMINI_MODEL` | Model name (default: `gemini-2.5-flash`) |
+| `SHOOTRZ_ENABLE_BALL` | Set to `1` to enable YOLOv8 ball detection |
+| `SHOOTRZ_MAX_UPLOAD_MB` | Max upload size in MB (default: 100) |
+
+### Frontend (`SHOOTRZ/.env`)
+
+| Variable | Description |
+|----------|-------------|
+| `EXPO_PUBLIC_SUPABASE_URL` | Your Supabase project URL |
+| `EXPO_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon/public key |
+| `EXPO_PUBLIC_API_URL` | Backend URL (e.g. `http://192.168.1.x:8000`) |
+
+---
+
+## Database
+
+Apply the complete schema to your Supabase project:
+
+1. Open your Supabase dashboard → SQL Editor
+2. Run `supabase/schema_complete.sql`
+3. Apply any additional policies in `supabase/storage_policies.sql`
+
+---
+
+## Testing
+
+```bash
+# Backend — fast unit tests (no MediaPipe required)
+python -m pytest backend/tests/test_api_contracts.py backend/tests/test_job_store.py -q
+
+# Backend — full suite
+python -m pytest backend/ -v --ignore=backend/__graveyard__
+
+# Frontend — unit tests
+npm test
+
+# Frontend — type check
+npx tsc --noEmit
+
+# Frontend — lint
+npx eslint src
+```
+
+---
+
+## Project Structure
+
+```
+SHOOTRZ/
+├── backend/              # FastAPI application
+│   ├── main.py           # App factory, CORS, router registration
+│   ├── routers/          # HTTP endpoints (mvp, chat, history, user, analysis, …)
+│   ├── mvp/core/         # 6-phase analysis pipeline
+│   ├── inference/        # Phase detector, pose keypoints, ball tracker
+│   ├── services/llm/     # Gemini client, prompt builders, output schemas
+│   ├── recommender/      # FAISS + LinUCB drill recommendation
+│   ├── metrics/          # Biomechanics scoring + normative ranges
+│   ├── storage/          # Supabase client factories
+│   └── utils/            # Config loader, auth dependency, validators
+├── src/                  # React Native / Expo app
+│   ├── screens/          # All app screens
+│   ├── components/       # Reusable UI components
+│   ├── context/          # AuthContext, HistoryContext
+│   ├── services/         # API client, Supabase client, chat/storage
+│   ├── theme/            # Design tokens, typography, motion
+│   └── types/contracts.ts # Canonical TypeScript ↔ backend type mirror
+├── supabase/             # SQL migrations and schema
+├── docs/                 # Architecture docs and dissertation
+├── models/               # Model download instructions (weights via pip)
+└── assets/               # App icons, fonts, design system
+```
+
+---
+
+## Key Features
+
+- **Shot phase detection** — automatically segments set position, loading, release, follow-through
+- **Biomechanics scoring** — 8 key angles (elbow, wrist, knee, hip) scored against normative ranges, weighted by confidence
+- **Skill-adaptive scoring** — thresholds adjust for beginner / intermediate / advanced profiles
+- **AI coaching** — Gemini 2.5 Flash generates personalized feedback grounded in your actual metrics
+- **Drill recommendations** — FAISS similarity + LinUCB exploration for personalized drill suggestions
+- **Persistent history** — all sessions, metrics, and summaries stored in Supabase
+- **Offline-capable chat** — coach chat with 3-phase context fallback (RPC → local cache → graceful degradation)
+
+---
+
+## License
+
+Academic project — All rights reserved.

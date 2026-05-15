@@ -1,15 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { AppNavigator } from './src/navigation/AppNavigator';
 import { SHOOTRZ_THEME } from './src/constants/theme';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
+import { HistoryProvider } from './src/context/HistoryContext';
 import { LoginScreen } from './src/screens/LoginScreen';
 import { OnboardingScreen } from './src/screens/OnboardingScreen';
 import { UsernameScreen } from './src/screens/UsernameScreen';
 import { SplashScreen } from './src/screens/SplashScreen';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { useFonts } from 'expo-font';
 import { useDeepLinks } from './src/hooks/useDeepLinks';
 import { supabase } from './src/services/supabase.client';
 
@@ -22,7 +23,6 @@ function AppContent() {
   // Handle deep links for OAuth, password reset, email confirmation
   useDeepLinks(() => {
     // Deep link handled - auth state will update automatically
-    console.log('✅ Deep link processed');
   });
 
   useEffect(() => {
@@ -48,13 +48,9 @@ function AppContent() {
           
           if (isNewUser) {
             if (!hasUsername) {
-              // New user without username - show username screen
-              console.log('📱 New user without username - showing username screen');
               setShowUsername(true);
               setShowOnboarding(false);
             } else if (!showOnboarding && !showUsername) {
-              // New user with username - show onboarding
-              console.log('📱 New user with username - showing onboarding cards');
               setShowOnboarding(true);
               setShowUsername(false);
             }
@@ -73,9 +69,7 @@ function AppContent() {
         }
       }
 
-      // Reset screens when user logs out
       if (!isAuthenticated) {
-        console.log('📱 User logged out - hiding screens');
         setShowUsername(false);
         setShowOnboarding(false);
       }
@@ -85,18 +79,15 @@ function AppContent() {
   }, [isAuthenticated, isNewUser, user?.id]);
 
   const handleLoginSuccess = () => {
-    console.log('✅ Login success callback triggered');
     // Login successful - flow will be handled by useEffect
   };
 
   const handleUsernameComplete = () => {
-    console.log('✅ Username set - proceeding to onboarding');
     setShowUsername(false);
     setShowOnboarding(true);
   };
 
   const handleOnboardingComplete = () => {
-    console.log('✅ Onboarding completed');
     markOnboardingComplete();
     setShowOnboarding(false);
     setShowUsername(false);
@@ -107,9 +98,7 @@ function AppContent() {
     return <SplashScreen onFinish={() => setShowSplash(false)} />;
   }
 
-  // Show loading during auth check (independent check)
   if (isLoading) {
-    console.log('⏳ Showing loading screen - isLoading is true');
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={SHOOTRZ_THEME.colors.primary} />
@@ -119,38 +108,44 @@ function AppContent() {
 
   // Show login if not authenticated (independent check)
   if (!isAuthenticated) {
-    console.log('🔒 Showing login screen - isAuthenticated is false');
-    console.log('📋 User state:', user ? `ID: ${user.id}` : 'null');
+    // BUG FIX: Removed console.log that printed user ID
     return <LoginScreen onLogin={handleLoginSuccess} />;
   }
 
-  // User is authenticated - log transition
-  console.log('✅ User authenticated - rendering app content');
-  console.log('📋 User:', user ? `ID: ${user.id}, Email: ${user.email}, Username: ${user.username || 'none'}` : 'null');
+  // BUG FIX: Removed console.log that printed user PII (email, ID)
 
-  // Show username screen for new users without username
   if (showUsername) {
-    console.log('📱 Showing username screen');
     return <UsernameScreen onComplete={handleUsernameComplete} />;
   }
 
-  // Show onboarding for new users only (after username is set)
   if (showOnboarding) {
-    console.log('📱 Showing onboarding screen');
     return <OnboardingScreen onComplete={handleOnboardingComplete} />;
   }
 
-  // Show main app
-  console.log('🚀 Rendering main app navigator');
   return <AppNavigator />;
 }
 
 export default function App() {
+  const [fontsLoaded] = useFonts({
+    BarlowCondensedBlack: require('./assets/shootrz-design-system/project/fonts/BarlowCondensed-Black.ttf'),
+    BarlowCondensedBold: require('./assets/shootrz-design-system/project/fonts/BarlowCondensed-Bold.ttf'),
+    DMSansRegular: require('./assets/shootrz-design-system/project/fonts/DMSans-Regular.ttf'),
+    DMSansMedium: require('./assets/shootrz-design-system/project/fonts/DMSans-Medium.ttf'),
+    DMSansSemiBold: require('./assets/shootrz-design-system/project/fonts/DMSans-SemiBold.ttf'),
+    DMSansBold: require('./assets/shootrz-design-system/project/fonts/DMSans-Bold.ttf'),
+  });
+
+  if (!fontsLoaded) {
+    return null;
+  }
+
   return (
     <SafeAreaProvider>
       <AuthProvider>
-        <StatusBar style="light" backgroundColor={SHOOTRZ_THEME.colors.background} />
-        <AppContent />
+        <HistoryProvider>
+          <StatusBar style="light" backgroundColor={SHOOTRZ_THEME.colors.background} />
+          <AppContent />
+        </HistoryProvider>
       </AuthProvider>
     </SafeAreaProvider>
   );

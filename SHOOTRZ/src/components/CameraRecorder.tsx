@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import {
 	View,
 	Text,
@@ -10,7 +10,7 @@ import {
 } from 'react-native'
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera'
 import { Ionicons } from '@expo/vector-icons'
-import { LinearGradient } from 'expo-linear-gradient'
+// BUG FIX: Removed unused LinearGradient import
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { SHOOTRZ_THEME } from '../constants/theme'
 import { hapticFeedback } from '../utils/hapticFeedback'
@@ -115,21 +115,14 @@ export function CameraRecorder({
 			setIsRecording(true)
 			setRecordingTime(0)
 
-			if (__DEV__) {
-				console.log('🎬 Starting video recording...')
-			}
-
-			// Start recording - recordAsync returns a promise that resolves when recording stops
+				// Start recording - recordAsync returns a promise that resolves when recording stops
 			const recordingPromise = cameraRef.current.recordAsync({
 				maxDuration: maxDuration,
 				mute: false,
 			})
 
 			// Wait for recording to complete (resolves when stopped or max duration reached)
-			recordingPromise.then((video) => {
-				if (__DEV__) {
-					console.log('✅ Recording completed:', video)
-				}
+			recordingPromise.then((video: any) => {
 				if (video && video.uri) {
 					hapticFeedback.success()
 					setIsRecording(false)
@@ -137,7 +130,7 @@ export function CameraRecorder({
 				} else {
 					throw new Error('No video URI returned')
 				}
-			}).catch((error) => {
+			}).catch((error: any) => {
 				console.error('❌ Recording error:', error)
 				Alert.alert('Recording Error', error.message || 'Failed to record video. Please try again.')
 				setIsRecording(false)
@@ -195,12 +188,9 @@ export function CameraRecorder({
 				mode="video"
 				onCameraReady={() => {
 					// Add small delay to ensure camera is fully initialized
-					setTimeout(() => {
-						setIsCameraReady(true)
-						if (__DEV__) {
-							console.log('📷 Camera is ready and initialized')
-						}
-					}, 300)
+				setTimeout(() => {
+					setIsCameraReady(true)
+				}, 300)
 				}}
 			/>
 			

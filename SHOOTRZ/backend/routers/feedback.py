@@ -3,7 +3,7 @@ Feedback endpoints for retrieving and managing feedback.
 """
 
 from fastapi import APIRouter, HTTPException
-from typing import List, Optional
+
 
 from ..storage.db import get_video_feedback, get_video_metrics
 from ..feedback.engine import generate_feedback
@@ -35,12 +35,13 @@ async def get_video_feedback_endpoint(video_id: str):
 
 
 @router.post("/feedback/generate")
-async def generate_feedback_endpoint(video_id: str):
+async def generate_feedback_endpoint(video_id: str, enrich: bool = False):
 	"""
 	Generate feedback from video metrics (if not already generated).
 	
 	Args:
 		video_id: Video ID
+		enrich: When True, rephrase rule-based feedback with Gemini LLM
 	
 	Returns:
 		Generated feedback list
@@ -50,7 +51,7 @@ async def generate_feedback_endpoint(video_id: str):
 		if not metrics:
 			raise HTTPException(status_code=404, detail="No metrics found for video")
 		
-		feedback = generate_feedback(metrics)
+		feedback = generate_feedback(metrics, enrich=enrich)
 		return {
 			"video_id": video_id,
 			"feedback": feedback,

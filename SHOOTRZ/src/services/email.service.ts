@@ -1,7 +1,8 @@
 // Email Service for Password Reset and Data Export
 // This uses a simple approach that works on mobile devices
 
-import { Linking, Alert, Platform } from 'react-native';
+// BUG FIX: Removed unused Platform import
+import { Linking, Alert } from 'react-native';
 import * as MailComposer from 'expo-mail-composer';
 
 class EmailService {
@@ -38,11 +39,12 @@ class EmailService {
         }
       }
 
-      // Use expo-mail-composer
+      // BUG FIX: Removed fake random "reset code" — it had no server validation and was misleading.
+      // Password resets should go through Supabase's built-in resetPasswordForEmail flow.
       const result = await MailComposer.composeAsync({
         recipients: [email],
         subject: 'SHOOTRZ - Password Reset Request',
-        body: `Hello,\n\nYou have requested to reset your password for your SHOOTRZ account.\n\nYour temporary reset code is: SHOOTRZ-${Math.random().toString(36).substring(7).toUpperCase()}\n\nPlease enter this code in the app to reset your password.\n\nIf you didn't request this, please ignore this email.\n\nStay strong,\nSHOOTRZ Team\n\n"PERFECT THE GAME"`,
+        body: `Hello,\n\nYou have requested to reset your password for your SHOOTRZ account.\n\nPlease use the password reset link sent to your email by SHOOTRZ to complete the process.\n\nIf you didn't request this, please ignore this email.\n\nStay strong,\nSHOOTRZ Team\n\n"PERFECT THE GAME"`,
       });
 
       if (result.status === 'sent') {

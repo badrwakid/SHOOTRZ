@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { View, StyleSheet, TouchableOpacity, Animated } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Animated, ColorValue } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SHOOTRZ_THEME } from '../constants/theme';
 
@@ -40,7 +40,7 @@ export const GradientCard: React.FC<GradientCardProps> = ({
 
   const CardContent = (
     <LinearGradient
-      colors={gradient}
+      colors={gradient as [ColorValue, ColorValue]}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
       style={[styles.gradient, style]}
@@ -80,6 +80,5 @@ const styles = StyleSheet.create({
     width: 150,
     height: 150,
     borderRadius: 75,
-    blur: 40,
   },
 });

@@ -1,843 +1,728 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect } from 'react'
 import {
-  View,
-  Text,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  ActivityIndicator,
-  ScrollView,
-  Animated,
-  Modal,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { SHOOTRZ_THEME, COMPONENT_STYLES } from '../constants/theme';
-import { ShootrzLogo } from '../components/ShootrzLogo';
-import { GoogleLogo } from '../components/GoogleLogo';
-import { AppleLogo } from '../components/AppleLogo';
-import { useAuth } from '../context/AuthContext';
+	View,
+	Text,
+	StyleSheet,
+	TextInput,
+	TouchableOpacity,
+	Alert,
+	KeyboardAvoidingView,
+	Platform,
+	ScrollView,
+	Animated,
+	Modal,
+} from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
+import { Ionicons } from '@expo/vector-icons'
+import { colors, typography, spacing, radius, glass, animation } from '../constants/theme'
+import { semanticTokens } from '../theme/tokens'
+import { PrimaryButton } from '../components/PrimaryButton'
+import { ShootrzLogo } from '../components/ShootrzLogo'
+import { GoogleLogo } from '../components/GoogleLogo'
+import { AppleLogo } from '../components/AppleLogo'
+import { useAuth } from '../context/AuthContext'
+import { hapticFeedback } from '../utils/hapticFeedback'
 
 interface LoginScreenProps {
-  onLogin: () => void;
+	onLogin: () => void
 }
 
 export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
-  const { login, signup, resetPassword, signInWithApple, signInWithGoogle, setUser, setIsNewUser, isAuthenticated, setNavigationCallback } = useAuth();
-  const [emailOrUsername, setEmailOrUsername] = useState('');
-  const [email, setEmail] = useState('');
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [name, setName] = useState('');
-  const [isSignUp, setIsSignUp] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const navigationAttemptedRef = useRef(false);
-  const [emailOrUsernameError, setEmailOrUsernameError] = useState('');
-  const [emailError, setEmailError] = useState('');
-  const [usernameError, setUsernameError] = useState('');
-  const [passwordError, setPasswordError] = useState('');
-  const [nameError, setNameError] = useState('');
-  const [showForgotPasswordModal, setShowForgotPasswordModal] = useState(false);
-  const [resetEmail, setResetEmail] = useState('');
-  const [resetEmailError, setResetEmailError] = useState('');
-  const [resetEmailSent, setResetEmailSent] = useState(false);
+	const {
+		login,
+		signup,
+		resetPassword,
+		signInWithApple,
+		signInWithGoogle,
+		setUser,
+		setIsNewUser,
+		isAuthenticated,
+		setNavigationCallback,
+	} = useAuth()
+	const [emailOrUsername, setEmailOrUsername] = useState('')
+	const [email, setEmail] = useState('')
+	const [username, setUsername] = useState('')
+	const [password, setPassword] = useState('')
+	const [name, setName] = useState('')
+	const [isSignUp, setIsSignUp] = useState(false)
+	const [loading, setLoading] = useState(false)
+	const navigationAttemptedRef = useRef(false)
+	const [emailOrUsernameError, setEmailOrUsernameError] = useState('')
+	const [emailError, setEmailError] = useState('')
+	const [usernameError, setUsernameError] = useState('')
+	const [passwordError, setPasswordError] = useState('')
+	const [nameError, setNameError] = useState('')
+	const [showForgotPasswordModal, setShowForgotPasswordModal] = useState(false)
+	const [resetEmail, setResetEmail] = useState('')
+	const [resetEmailError, setResetEmailError] = useState('')
+	const [resetEmailSent, setResetEmailSent] = useState(false)
+	const [inputFocus, setInputFocus] = useState<string | null>(null)
 
-  // Register navigation callback with auth context for direct navigation trigger
-  useEffect(() => {
-    const handleNavigation = () => {
-      if (!navigationAttemptedRef.current && isAuthenticated) {
-        navigationAttemptedRef.current = true;
-        console.log('✅ Navigation triggered - user authenticated');
-        setLoading(false);
-        onLogin();
-      }
-    };
-    
-    setNavigationCallback(handleNavigation);
-    
-    return () => {
-      setNavigationCallback(null);
-      navigationAttemptedRef.current = false;
-    };
-  }, [isAuthenticated, onLogin, setNavigationCallback]);
+	const canSubmitSignIn =
+		!!emailOrUsername.trim() && password.length > 0
+	const canSubmitSignUp =
+		!!name.trim() &&
+		!!username.trim() &&
+		!!email.trim() &&
+		password.length > 0
+	const canSubmit = isSignUp ? canSubmitSignUp : canSubmitSignIn
 
-  // Reset loading and navigate when user becomes authenticated (OAuth completed successfully)
-  useEffect(() => {
-    if (isAuthenticated && !navigationAttemptedRef.current) {
-      console.log('✅ isAuthenticated is true - navigating away from login screen');
-      navigationAttemptedRef.current = true;
-      setLoading(false);
-      // Navigate immediately - isAuthenticated means user is set
-      onLogin();
-    }
-  }, [isAuthenticated, onLogin]);
+	useEffect(() => {
+		const handleNavigation = () => {
+			if (!navigationAttemptedRef.current && isAuthenticated) {
+				navigationAttemptedRef.current = true
+				setLoading(false)
+				onLogin()
+			}
+		}
+		setNavigationCallback(handleNavigation)
+		return () => {
+			setNavigationCallback(null)
+			navigationAttemptedRef.current = false
+		}
+	}, [isAuthenticated, onLogin, setNavigationCallback])
 
-  // Animation refs
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(50)).current;
-  const logoScaleAnim = useRef(new Animated.Value(0.8)).current;
+	useEffect(() => {
+		if (isAuthenticated && !navigationAttemptedRef.current) {
+			navigationAttemptedRef.current = true
+			setLoading(false)
+			onLogin()
+		}
+	}, [isAuthenticated, onLogin])
 
-  // Animation effects
-  useEffect(() => {
-    const startAnimations = () => {
-      Animated.parallel([
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: 800,
-          useNativeDriver: true,
-        }),
-        Animated.timing(slideAnim, {
-          toValue: 0,
-          duration: 800,
-          useNativeDriver: true,
-        }),
-        Animated.spring(logoScaleAnim, {
-          toValue: 1,
-          tension: 100,
-          friction: 8,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    };
+	const fadeAnim = useRef(new Animated.Value(0)).current
+	const slideAnim = useRef(new Animated.Value(50)).current
+	const logoScaleAnim = useRef(new Animated.Value(0.85)).current
+	const shakeAnim = useRef(new Animated.Value(0)).current
 
-    startAnimations();
-  }, []);
+	useEffect(() => {
+		Animated.parallel([
+			Animated.timing(fadeAnim, {
+				toValue: 1,
+				duration: 600,
+				useNativeDriver: true,
+			}),
+			Animated.timing(slideAnim, {
+				toValue: 0,
+				duration: 600,
+				useNativeDriver: true,
+			}),
+			Animated.spring(logoScaleAnim, {
+				toValue: 1,
+				damping: animation.easing.spring.damping,
+				stiffness: animation.easing.spring.stiffness,
+				useNativeDriver: true,
+			}),
+		]).start()
+	}, [])
 
-  // Animate form transition when switching between login/signup
-  useEffect(() => {
-    Animated.sequence([
-      Animated.timing(fadeAnim, {
-        toValue: 0.7,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 300,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, [isSignUp]);
+	useEffect(() => {
+		Animated.sequence([
+			Animated.timing(fadeAnim, {
+				toValue: 0.7,
+				duration: 150,
+				useNativeDriver: true,
+			}),
+			Animated.timing(fadeAnim, {
+				toValue: 1,
+				duration: 250,
+				useNativeDriver: true,
+			}),
+		]).start()
+	}, [isSignUp])
 
-  // Supabase OAuth redirect is handled automatically by AuthContext
+	const triggerShake = () => {
+		hapticFeedback.warning()
+		Animated.sequence([
+			Animated.timing(shakeAnim, { toValue: 10, duration: 50, useNativeDriver: true }),
+			Animated.timing(shakeAnim, { toValue: -10, duration: 50, useNativeDriver: true }),
+			Animated.timing(shakeAnim, { toValue: 6, duration: 50, useNativeDriver: true }),
+			Animated.timing(shakeAnim, { toValue: -6, duration: 50, useNativeDriver: true }),
+			Animated.timing(shakeAnim, { toValue: 0, duration: 50, useNativeDriver: true }),
+		]).start()
+	}
 
-  const validateEmail = (email: string): boolean => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!email) {
-      setEmailError('Email is required');
-      return false;
-    }
-    if (!emailRegex.test(email)) {
-      setEmailError('Invalid email format');
-      return false;
-    }
-    setEmailError('');
-    return true;
-  };
+	const validateEmail = (val: string): boolean => {
+		const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+		if (!val) { setEmailError('Email is required'); return false }
+		if (!emailRegex.test(val)) { setEmailError('Invalid email format'); return false }
+		setEmailError('')
+		return true
+	}
+	const validatePassword = (val: string): boolean => {
+		if (!val) { setPasswordError('Password is required'); return false }
+		if (val.length < 6) { setPasswordError('Password must be at least 6 characters'); return false }
+		setPasswordError('')
+		return true
+	}
+	const validateName = (val: string): boolean => {
+		if (isSignUp && !val) { setNameError('Name is required'); return false }
+		setNameError('')
+		return true
+	}
+	const validateUsername = (val: string): boolean => {
+		if (isSignUp) {
+			if (!val) { setUsernameError('Username is required'); return false }
+			if (val.length < 3) { setUsernameError('Username must be at least 3 characters'); return false }
+			if (!/^[a-zA-Z0-9_]+$/.test(val)) { setUsernameError('Only letters, numbers, and underscores allowed'); return false }
+		}
+		setUsernameError('')
+		return true
+	}
+	const validateEmailOrUsername = (val: string): boolean => {
+		if (!val) { setEmailOrUsernameError('Email is required'); return false }
+		setEmailOrUsernameError('')
+		return true
+	}
 
-  const validatePassword = (password: string): boolean => {
-    if (!password) {
-      setPasswordError('Password is required');
-      return false;
-    }
-    if (password.length < 6) {
-      setPasswordError('Password must be at least 6 characters');
-      return false;
-    }
-    setPasswordError('');
-    return true;
-  };
+	const handleLogin = async () => {
+		if (!validateEmailOrUsername(emailOrUsername) || !validatePassword(password)) {
+			triggerShake()
+			return
+		}
+		setLoading(true)
+		hapticFeedback.medium()
+		const result = await login(emailOrUsername, password)
+		setLoading(false)
+		if (result.success) {
+			hapticFeedback.success()
+			onLogin()
+		} else {
+			triggerShake()
+			Alert.alert('Login Failed', result.error || 'Please try again')
+		}
+	}
 
-  const validateName = (name: string): boolean => {
-    if (isSignUp && !name) {
-      setNameError('Name is required');
-      return false;
-    }
-    setNameError('');
-    return true;
-  };
+	const handleSignUp = async () => {
+		if (
+			!validateEmail(email) ||
+			!validateUsername(username) ||
+			!validatePassword(password) ||
+			!validateName(name)
+		) {
+			triggerShake()
+			return
+		}
+		setLoading(true)
+		hapticFeedback.medium()
+		const result = await signup(email, password, name, username)
+		setLoading(false)
+		if (result.success) {
+			if (result.requiresEmailConfirmation) {
+				Alert.alert(
+					'Check Your Email',
+					'We\'ve sent a confirmation email to ' + email + '. Please click the link to verify your account, then sign in.',
+					[{ text: 'OK', onPress: () => setIsSignUp(false) }],
+				)
+			} else {
+				hapticFeedback.success()
+				onLogin()
+			}
+		} else {
+			triggerShake()
+			Alert.alert('Signup Failed', result.error || 'Please try again')
+		}
+	}
 
-  const validateUsername = (username: string): boolean => {
-    if (isSignUp) {
-      if (!username) {
-        setUsernameError('Username is required');
-        return false;
-      }
-      if (username.length < 3) {
-        setUsernameError('Username must be at least 3 characters');
-        return false;
-      }
-      if (!/^[a-zA-Z0-9_]+$/.test(username)) {
-        setUsernameError('Only letters, numbers, and underscores allowed');
-        return false;
-      }
-    }
-    setUsernameError('');
-    return true;
-  };
+	const handleGoogleSignIn = async () => {
+		try {
+			setLoading(true)
+			navigationAttemptedRef.current = false
+			const result = await signInWithGoogle()
+			if (!result.success) {
+				Alert.alert('Google Sign-In Failed', result.error || 'Please try again')
+				setLoading(false)
+			}
+		} catch (error: any) {
+			Alert.alert('Google Sign-In Failed', error.message || 'Please try again')
+			setLoading(false)
+		}
+	}
 
-  const validateEmailOrUsername = (value: string): boolean => {
-    if (!value) {
-      setEmailOrUsernameError('Email or username is required');
-      return false;
-    }
-    setEmailOrUsernameError('');
-    return true;
-  };
+	const handleAppleSignIn = async () => {
+		setLoading(true)
+		const result = await signInWithApple()
+		setLoading(false)
+		if (result.success) {
+			onLogin()
+		} else {
+			Alert.alert('Apple Sign-In Failed', result.error || 'Please try again')
+		}
+	}
 
-  const handleLogin = async () => {
-    if (!validateEmailOrUsername(emailOrUsername) || !validatePassword(password)) {
-      return;
-    }
+	const handleForgotPassword = () => {
+		setResetEmail(emailOrUsername || '')
+		setResetEmailError('')
+		setResetEmailSent(false)
+		setShowForgotPasswordModal(true)
+	}
 
-    setLoading(true);
-    const result = await login(emailOrUsername, password);
-    setLoading(false);
+	const handleSendResetEmail = async () => {
+		if (!resetEmail) { setResetEmailError('Email is required'); return }
+		if (!resetEmail.includes('@')) { setResetEmailError('Please enter a valid email address'); return }
+		setLoading(true)
+		setResetEmailError('')
+		const result = await resetPassword(resetEmail)
+		setLoading(false)
+		if (result.success) { setResetEmailSent(true) }
+		else { setResetEmailError(result.error || 'Failed to send reset email') }
+	}
 
-    if (result.success) {
-      onLogin();
-    } else {
-      Alert.alert('Login Failed', result.error || 'Please try again');
-    }
-  };
+	const closeForgotPasswordModal = () => {
+		setShowForgotPasswordModal(false)
+		setResetEmail('')
+		setResetEmailError('')
+		setResetEmailSent(false)
+	}
 
-  const handleSignUp = async () => {
-    if (
-      !validateEmail(email) ||
-      !validateUsername(username) ||
-      !validatePassword(password) ||
-      !validateName(name)
-    ) {
-      return;
-    }
+	const toggleMode = () => {
+		hapticFeedback.selection()
+		setIsSignUp(!isSignUp)
+		setEmailOrUsernameError('')
+		setEmailError('')
+		setUsernameError('')
+		setPasswordError('')
+		setNameError('')
+	}
 
-    setLoading(true);
-    const result = await signup(email, password, name, username);
-    setLoading(false);
+	const renderInput = (
+		label: string,
+		value: string,
+		onChange: (t: string) => void,
+		error: string,
+		opts: { placeholder: string; secure?: boolean; autoCapitalize?: 'none' | 'words'; keyboardType?: 'email-address' | 'default' },
+		fieldId: string,
+	) => (
+		<View style={styles.inputWrap}>
+			<Text style={styles.inputLabel}>{label}</Text>
+			<TextInput
+				style={[
+					styles.input,
+					error ? styles.inputError : null,
+					!error && inputFocus === fieldId ? styles.inputFocus : null,
+				]}
+				placeholder={opts.placeholder}
+				placeholderTextColor={colors.text.tertiary}
+				value={value}
+				onChangeText={onChange}
+				secureTextEntry={opts.secure}
+				autoCapitalize={opts.autoCapitalize ?? 'none'}
+				autoCorrect={false}
+				keyboardType={opts.keyboardType ?? 'default'}
+				editable={!loading}
+				onFocus={() => setInputFocus(fieldId)}
+				onBlur={() => {
+					setInputFocus(f => (f === fieldId ? null : f))
+				}}
+			/>
+			{error ? (
+				<View style={styles.errorRow}>
+					<Ionicons name="alert-circle" size={12} color={colors.error} />
+					<Text style={styles.errorText}>{error}</Text>
+				</View>
+			) : null}
+		</View>
+	)
 
-    if (result.success) {
-      if (result.requiresEmailConfirmation) {
-        // Show email confirmation message
-        Alert.alert(
-          'Check Your Email',
-          'We\'ve sent a confirmation email to ' + email + '. Please click the link in the email to verify your account, then you can sign in.',
-          [{ text: 'OK', onPress: () => {
-            // Stay on login screen - user needs to confirm email first
-            setIsSignUp(false);
-          }}]
-        );
-      } else {
-        // Signup complete, user has active session
-        onLogin();
-      }
-    } else {
-      Alert.alert('Signup Failed', result.error || 'Please try again');
-    }
-  };
+	return (
+		<SafeAreaView style={styles.container} edges={['top', 'left', 'right', 'bottom']}>
+			<KeyboardAvoidingView
+				style={styles.flex}
+				behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+			>
+				<ScrollView
+					style={styles.flex}
+					contentContainerStyle={styles.scrollContent}
+					showsVerticalScrollIndicator={false}
+					keyboardShouldPersistTaps="handled"
+				>
+					<Animated.View
+						style={[
+							styles.logoSection,
+							{
+								opacity: fadeAnim,
+								transform: [{ scale: logoScaleAnim }],
+							},
+						]}
+					>
+						<ShootrzLogo size="large" showTagline={false} />
+						<Text style={styles.tagline}>PERFECT THE GAME</Text>
+					</Animated.View>
 
-  const handleGoogleSignIn = async () => {
-    try {
-      setLoading(true);
-      navigationAttemptedRef.current = false; // Reset navigation attempt flag
-      console.log('🔐 Starting Google Sign-In...');
-      
-      const result = await signInWithGoogle();
-      
-      if (!result.success) {
-        console.error('❌ Google Sign-In failed:', result.error);
-        Alert.alert('Google Sign-In Failed', result.error || 'Please try again');
-        setLoading(false);
-        return;
-      }
-      // Successful sign-in: wait for AuthContext to update isAuthenticated,
-      // which triggers navigation and stops the loading spinner.
-    } catch (error: any) {
-      console.error('❌ Google Sign-In error:', error);
-      Alert.alert('Google Sign-In Failed', error.message || 'Please try again');
-      setLoading(false);
-    }
-  };
+					<Animated.View
+						style={[
+							styles.formCard,
+							{
+								opacity: fadeAnim,
+								transform: [
+									{ translateY: slideAnim },
+									{ translateX: shakeAnim },
+								],
+							},
+						]}
+					>
+						<Text style={styles.formTitle}>
+							{isSignUp ? 'Create Account' : 'Welcome Back'}
+						</Text>
+						<Text style={styles.formSubtitle}>
+							{isSignUp ? 'Start your basketball journey' : 'Sign in to continue training'}
+						</Text>
 
-  const handleAppleSignIn = async () => {
-    setLoading(true);
-    const result = await signInWithApple();
-    setLoading(false);
+						{isSignUp ? (
+							<>
+								{renderInput('Full Name', name, t => { setName(t); setNameError('') }, nameError, { placeholder: 'Your name', autoCapitalize: 'words' }, 'name')}
+								{renderInput('Username', username, t => { setUsername(t.toLowerCase()); setUsernameError('') }, usernameError, { placeholder: 'Choose a username' }, 'username')}
+								{renderInput('Email', email, t => { setEmail(t); setEmailError('') }, emailError, { placeholder: 'you@example.com', keyboardType: 'email-address' }, 'signupEmail')}
+							</>
+						) : (
+							renderInput('Email', emailOrUsername, t => { setEmailOrUsername(t); setEmailOrUsernameError('') }, emailOrUsernameError, { placeholder: 'you@example.com', keyboardType: 'email-address' }, 'emailOrUsername')
+						)}
 
-    if (result.success) {
-      onLogin();
-    } else {
-      Alert.alert('Apple Sign-In Failed', result.error || 'Please try again');
-    }
-  };
+						{renderInput('Password', password, t => { setPassword(t); setPasswordError('') }, passwordError, { placeholder: 'Min 6 characters', secure: true }, 'password')}
 
-  const handleForgotPassword = () => {
-    setResetEmail(emailOrUsername || '');
-    setResetEmailError('');
-    setResetEmailSent(false);
-    setShowForgotPasswordModal(true);
-  };
+						{!isSignUp ? (
+							<TouchableOpacity onPress={handleForgotPassword} style={styles.forgotBtn}>
+								<Text style={styles.forgotText}>Forgot Password?</Text>
+							</TouchableOpacity>
+						) : null}
 
-  const handleSendResetEmail = async () => {
-    // Validate email
-    if (!resetEmail) {
-      setResetEmailError('Email is required');
-      return;
-    }
+						<PrimaryButton
+							label={isSignUp ? 'Create Account' : 'Sign In'}
+							onPress={isSignUp ? handleSignUp : handleLogin}
+							loading={loading}
+							disabled={!canSubmit}
+							fullWidth
+							size="lg"
+							variant="orange"
+							style={{ marginBottom: spacing[3] }}
+						/>
 
-    if (!resetEmail.includes('@')) {
-      setResetEmailError('Please enter a valid email address');
-      return;
-    }
+						<TouchableOpacity onPress={toggleMode} style={styles.switchBtn}>
+							<Text style={styles.switchText}>
+								{isSignUp ? 'Already have an account? ' : "Don't have an account? "}
+								<Text style={styles.switchHighlight}>
+									{isSignUp ? 'Sign In' : 'Sign Up'}
+								</Text>
+							</Text>
+						</TouchableOpacity>
+					</Animated.View>
 
-    setLoading(true);
-    setResetEmailError('');
+					{!isSignUp ? (
+						<Animated.View style={[styles.socialSection, { opacity: fadeAnim }]}>
+							<View style={styles.divider}>
+								<View style={styles.dividerLine} />
+								<Text style={styles.dividerText}>OR</Text>
+								<View style={styles.dividerLine} />
+							</View>
+							<TouchableOpacity
+								style={styles.googleBtn}
+								onPress={handleGoogleSignIn}
+								disabled={loading}
+								activeOpacity={0.85}
+							>
+								<GoogleLogo size={20} />
+								<Text style={styles.googleText}>Sign in with Google</Text>
+							</TouchableOpacity>
+							<TouchableOpacity
+								style={styles.appleBtn}
+								onPress={handleAppleSignIn}
+								disabled={loading}
+								activeOpacity={0.85}
+							>
+								<AppleLogo size={20} />
+								<Text style={styles.appleText}>Sign in with Apple</Text>
+							</TouchableOpacity>
+						</Animated.View>
+					) : null}
+				</ScrollView>
+			</KeyboardAvoidingView>
 
-    const result = await resetPassword(resetEmail);
-    setLoading(false);
-
-    if (result.success) {
-      setResetEmailSent(true);
-    } else {
-      setResetEmailError(result.error || 'Failed to send reset email');
-    }
-  };
-
-  const closeForgotPasswordModal = () => {
-    setShowForgotPasswordModal(false);
-    setResetEmail('');
-    setResetEmailError('');
-    setResetEmailSent(false);
-  };
-
-  const toggleMode = () => {
-    setIsSignUp(!isSignUp);
-    setEmailOrUsernameError('');
-    setEmailError('');
-    setUsernameError('');
-    setPasswordError('');
-    setNameError('');
-  };
-
-  return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right', 'bottom']}>
-      <KeyboardAvoidingView
-        style={styles.keyboardAvoidingView}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
-        <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
-          <Animated.View
-            style={[
-              styles.content,
-              {
-                opacity: fadeAnim,
-                transform: [{ translateY: slideAnim }],
-              },
-            ]}
-          >
-            {/* Logo Section */}
-            <Animated.View
-              style={[
-                styles.logoSection,
-                {
-                  transform: [{ scale: logoScaleAnim }],
-                },
-              ]}
-            >
-              <View style={styles.logoContainer}>
-                <ShootrzLogo size="large" showTagline={false} />
-              </View>
-            </Animated.View>
-
-            {/* Form Section */}
-            <View style={styles.formSection}>
-              <Text style={styles.formTitle}>{isSignUp ? 'Create Account' : 'Welcome Back'}</Text>
-              <Text style={styles.formSubtitle}>
-                {isSignUp ? 'Start your basketball journey' : 'Sign in to continue training'}
-              </Text>
-
-              {isSignUp && (
-                <>
-                  <View style={styles.inputContainer}>
-                    <Text style={styles.inputLabel}>Full Name</Text>
-                    <TextInput
-                      style={[styles.input, nameError && styles.inputError]}
-                      placeholder="Enter your full name"
-                      placeholderTextColor={SHOOTRZ_THEME.colors.textMuted}
-                      value={name}
-                      onChangeText={(text) => {
-                        setName(text);
-                        setNameError('');
-                      }}
-                      autoCapitalize="words"
-                      autoCorrect={false}
-                    />
-                    {nameError ? <Text style={styles.errorText}>{nameError}</Text> : null}
-                  </View>
-
-                  <View style={styles.inputContainer}>
-                    <Text style={styles.inputLabel}>Username</Text>
-                    <TextInput
-                      style={[styles.input, usernameError && styles.inputError]}
-                      placeholder="Choose a unique username"
-                      placeholderTextColor={SHOOTRZ_THEME.colors.textMuted}
-                      value={username}
-                      onChangeText={(text) => {
-                        setUsername(text.toLowerCase());
-                        setUsernameError('');
-                      }}
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                    />
-                    {usernameError ? <Text style={styles.errorText}>{usernameError}</Text> : null}
-                  </View>
-                </>
-              )}
-
-              <View style={styles.inputContainer}>
-                <Text style={styles.inputLabel}>{isSignUp ? 'Email' : 'Email or Username'}</Text>
-                <TextInput
-                  style={[
-                    styles.input,
-                    (isSignUp ? emailError : emailOrUsernameError) && styles.inputError,
-                  ]}
-                  placeholder={isSignUp ? 'Enter your email' : 'Enter email or username'}
-                  placeholderTextColor={SHOOTRZ_THEME.colors.textMuted}
-                  value={isSignUp ? email : emailOrUsername}
-                  onChangeText={(text) => {
-                    if (isSignUp) {
-                      setEmail(text);
-                      setEmailError('');
-                    } else {
-                      setEmailOrUsername(text);
-                      setEmailOrUsernameError('');
-                    }
-                  }}
-                  keyboardType={isSignUp ? 'email-address' : 'default'}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                />
-                {isSignUp ? (
-                  emailError ? (
-                    <Text style={styles.errorText}>{emailError}</Text>
-                  ) : null
-                ) : emailOrUsernameError ? (
-                  <Text style={styles.errorText}>{emailOrUsernameError}</Text>
-                ) : null}
-              </View>
-
-              <View style={styles.inputContainer}>
-                <Text style={styles.inputLabel}>Password</Text>
-                <TextInput
-                  style={[styles.input, passwordError && styles.inputError]}
-                  placeholder="Enter your password"
-                  placeholderTextColor={SHOOTRZ_THEME.colors.textMuted}
-                  value={password}
-                  onChangeText={(text) => {
-                    setPassword(text);
-                    setPasswordError('');
-                  }}
-                  secureTextEntry
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                />
-                {passwordError ? <Text style={styles.errorText}>{passwordError}</Text> : null}
-              </View>
-
-              {!isSignUp && (
-                <TouchableOpacity style={styles.forgotButton} onPress={handleForgotPassword}>
-                  <Text style={styles.forgotButtonText}>Forgot Password?</Text>
-                </TouchableOpacity>
-              )}
-
-              <TouchableOpacity
-                style={[styles.submitButton, loading && styles.submitButtonDisabled]}
-                onPress={isSignUp ? handleSignUp : handleLogin}
-                disabled={loading}
-              >
-                {loading ? (
-                  <ActivityIndicator color={SHOOTRZ_THEME.colors.textPrimary} />
-                ) : (
-                  <Text style={styles.submitButtonText}>
-                    {isSignUp ? 'Create Account' : 'Sign In'}
-                  </Text>
-                )}
-              </TouchableOpacity>
-
-              <TouchableOpacity style={styles.switchButton} onPress={toggleMode}>
-                <Text style={styles.switchButtonText}>
-                  {isSignUp ? 'Already have an account? Sign In' : "Don't have an account? Sign Up"}
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Social Login */}
-            {!isSignUp && (
-              <>
-                <View style={styles.orDivider}>
-                  <View style={styles.dividerLine} />
-                  <Text style={styles.dividerText}>OR</Text>
-                  <View style={styles.dividerLine} />
-                </View>
-
-                <View style={styles.socialButtonsContainer}>
-                  <TouchableOpacity
-                    style={styles.googleButton}
-                    onPress={handleGoogleSignIn}
-                    disabled={loading}
-                  >
-                    <GoogleLogo size={20} />
-                    <Text style={[styles.socialButtonText, { color: '#1F1F1F' }]}>
-                      Sign in with Google
-                    </Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={styles.appleButton}
-                    onPress={handleAppleSignIn}
-                    disabled={loading}
-                  >
-                    <AppleLogo size={20} color="#FFFFFF" />
-                    <Text style={[styles.socialButtonText, { color: '#FFFFFF' }]}>
-                      Sign in with Apple
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </>
-            )}
-          </Animated.View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-
-      {/* Forgot Password Modal */}
-      <Modal
-        visible={showForgotPasswordModal}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={closeForgotPasswordModal}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            {!resetEmailSent ? (
-              <>
-                <Text style={styles.modalTitle}>Reset Password</Text>
-                <Text style={styles.modalDescription}>
-                  Enter your email address and we'll send you instructions to reset your password.
-                </Text>
-
-                <View style={styles.modalInputContainer}>
-                  <Text style={styles.modalInputLabel}>Email Address</Text>
-                  <TextInput
-                    style={[styles.modalInput, resetEmailError && styles.modalInputError]}
-                    placeholder="Enter your email"
-                    placeholderTextColor={SHOOTRZ_THEME.colors.textMuted}
-                    value={resetEmail}
-                    onChangeText={(text) => {
-                      setResetEmail(text);
-                      setResetEmailError('');
-                    }}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    autoFocus={true}
-                  />
-                  {resetEmailError ? (
-                    <Text style={styles.modalErrorText}>{resetEmailError}</Text>
-                  ) : null}
-                </View>
-
-                <TouchableOpacity
-                  style={[styles.modalButton, loading && styles.modalButtonDisabled]}
-                  onPress={handleSendResetEmail}
-                  disabled={loading}
-                >
-                  {loading ? (
-                    <ActivityIndicator color={SHOOTRZ_THEME.colors.textPrimary} />
-                  ) : (
-                    <Text style={styles.modalButtonText}>Send Reset Link</Text>
-                  )}
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.modalCancelButton}
-                  onPress={closeForgotPasswordModal}
-                  disabled={loading}
-                >
-                  <Text style={styles.modalCancelButtonText}>Cancel</Text>
-                </TouchableOpacity>
-              </>
-            ) : (
-              <>
-                <View style={styles.successIconContainer}>
-                  <Text style={styles.successIcon}>✓</Text>
-                </View>
-                <Text style={styles.modalTitle}>Check Your Email</Text>
-                <Text style={styles.modalDescription}>
-                  We've sent password reset instructions to:
-                </Text>
-                <Text style={styles.resetEmailText}>{resetEmail}</Text>
-                <Text style={styles.modalDescriptionSecondary}>
-                  Click the link in the email to create a new password. The link will expire in 1
-                  hour.
-                </Text>
-                <Text style={styles.modalDescriptionSecondary}>
-                  Didn't receive the email? Check your spam folder or try again.
-                </Text>
-
-                <TouchableOpacity style={styles.modalButton} onPress={closeForgotPasswordModal}>
-                  <Text style={styles.modalButtonText}>Done</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.modalCancelButton}
-                  onPress={() => {
-                    setResetEmailSent(false);
-                    setResetEmailError('');
-                  }}
-                >
-                  <Text style={styles.modalCancelButtonText}>Send Again</Text>
-                </TouchableOpacity>
-              </>
-            )}
-          </View>
-        </View>
-      </Modal>
-    </SafeAreaView>
-  );
-};
+			<Modal
+				visible={showForgotPasswordModal}
+				animationType="slide"
+				transparent
+				onRequestClose={closeForgotPasswordModal}
+			>
+				<View style={styles.modalOverlay}>
+					<View style={styles.modalCard}>
+						{!resetEmailSent ? (
+							<>
+								<Text style={styles.modalTitle}>Reset Password</Text>
+								<Text style={styles.modalDesc}>
+									{"Enter your email and we'll send reset instructions."}
+								</Text>
+								<View style={styles.inputWrap}>
+									<Text style={styles.inputLabel}>Email Address</Text>
+									<TextInput
+										style={[
+											styles.input,
+											resetEmailError && styles.inputError,
+											!resetEmailError && inputFocus === 'resetEmail' && styles.inputFocus,
+										]}
+										placeholder="you@example.com"
+										placeholderTextColor={colors.text.tertiary}
+										value={resetEmail}
+										onChangeText={t => { setResetEmail(t); setResetEmailError('') }}
+										keyboardType="email-address"
+										autoCapitalize="none"
+										autoFocus
+										editable={!loading}
+										onFocus={() => setInputFocus('resetEmail')}
+										onBlur={() => setInputFocus(f => (f === 'resetEmail' ? null : f))}
+									/>
+									{resetEmailError ? (
+										<View style={styles.errorRow}>
+											<Ionicons name="alert-circle" size={12} color={colors.error} />
+											<Text style={styles.errorText}>{resetEmailError}</Text>
+										</View>
+									) : null}
+								</View>
+								<PrimaryButton
+									label="Send Reset Link"
+									onPress={handleSendResetEmail}
+									loading={loading}
+									disabled={!resetEmail.trim()}
+									fullWidth
+									size="lg"
+									variant="orange"
+									style={{ marginBottom: spacing[3] }}
+								/>
+								<TouchableOpacity onPress={closeForgotPasswordModal} style={styles.switchBtn}>
+									<Text style={styles.forgotText}>Cancel</Text>
+								</TouchableOpacity>
+							</>
+						) : (
+							<>
+								<View style={styles.successIcon}>
+									<Ionicons name="checkmark-circle" size={48} color={colors.success} />
+								</View>
+								<Text style={styles.modalTitle}>Check Your Email</Text>
+								<Text style={styles.modalDesc}>
+									Reset instructions sent to:
+								</Text>
+								<Text style={styles.resetEmailHighlight}>{resetEmail}</Text>
+								<Text style={styles.modalDescDim}>
+									{
+										"The link expires in 1 hour. Check your spam folder if you don't see it."
+									}
+								</Text>
+								<PrimaryButton
+									label="Done"
+									onPress={closeForgotPasswordModal}
+									fullWidth
+									size="lg"
+									variant="cyan"
+									style={{ marginBottom: spacing[3] }}
+								/>
+								<TouchableOpacity
+									onPress={() => { setResetEmailSent(false); setResetEmailError('') }}
+									style={styles.switchBtn}
+								>
+									<Text style={styles.forgotText}>Send Again</Text>
+								</TouchableOpacity>
+							</>
+						)}
+					</View>
+				</View>
+			</Modal>
+		</SafeAreaView>
+	)
+}
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: SHOOTRZ_THEME.colors.background,
-  },
-  keyboardAvoidingView: {
-    flex: 1,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
-  },
-  content: {
-    padding: SHOOTRZ_THEME.spacing.lg,
-    minHeight: '100%',
-    justifyContent: 'center',
-  },
-  logoSection: {
-    alignItems: 'center',
-    marginBottom: SHOOTRZ_THEME.spacing.xxl,
-    width: '100%',
-  },
-  logoContainer: {
-    width: '100%',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-  },
-  formSection: {
-    marginBottom: SHOOTRZ_THEME.spacing.xxl,
-  },
-  formTitle: {
-    ...SHOOTRZ_THEME.typography.heading2,
-    textAlign: 'center',
-    marginBottom: SHOOTRZ_THEME.spacing.sm,
-  },
-  formSubtitle: {
-    ...SHOOTRZ_THEME.typography.body,
-    color: SHOOTRZ_THEME.colors.textSecondary,
-    textAlign: 'center',
-    marginBottom: SHOOTRZ_THEME.spacing.xl,
-  },
-  inputContainer: {
-    marginBottom: SHOOTRZ_THEME.spacing.lg,
-  },
-  inputLabel: {
-    ...SHOOTRZ_THEME.typography.bodySmall,
-    fontWeight: '600',
-    marginBottom: SHOOTRZ_THEME.spacing.sm,
-  },
-  input: {
-    ...COMPONENT_STYLES.input,
-    fontSize: 16,
-  },
-  inputError: {
-    borderColor: SHOOTRZ_THEME.colors.error,
-    borderWidth: 1,
-  },
-  errorText: {
-    ...SHOOTRZ_THEME.typography.caption,
-    color: SHOOTRZ_THEME.colors.error,
-    marginTop: SHOOTRZ_THEME.spacing.xs,
-  },
-  forgotButton: {
-    alignSelf: 'flex-end',
-    marginBottom: SHOOTRZ_THEME.spacing.md,
-  },
-  forgotButtonText: {
-    ...SHOOTRZ_THEME.typography.bodySmall,
-    color: SHOOTRZ_THEME.colors.secondary,
-  },
-  submitButton: {
-    ...COMPONENT_STYLES.button.primary,
-    marginBottom: SHOOTRZ_THEME.spacing.lg,
-  },
-  submitButtonDisabled: {
-    opacity: 0.6,
-  },
-  submitButtonText: {
-    ...SHOOTRZ_THEME.typography.button,
-    textAlign: 'center',
-  },
-  switchButton: {
-    alignItems: 'center',
-  },
-  switchButtonText: {
-    ...SHOOTRZ_THEME.typography.bodySmall,
-    color: SHOOTRZ_THEME.colors.secondary,
-  },
-  orDivider: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: SHOOTRZ_THEME.spacing.lg,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: SHOOTRZ_THEME.colors.surfaceElevated,
-  },
-  dividerText: {
-    ...SHOOTRZ_THEME.typography.bodySmall,
-    color: SHOOTRZ_THEME.colors.textMuted,
-    marginHorizontal: SHOOTRZ_THEME.spacing.md,
-  },
-  socialButtonsContainer: {
-    marginBottom: SHOOTRZ_THEME.spacing.lg,
-  },
-  googleButton: {
-    ...COMPONENT_STYLES.button.secondary,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: SHOOTRZ_THEME.spacing.sm,
-    marginBottom: SHOOTRZ_THEME.spacing.md,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#DADCE0',
-  },
-  appleButton: {
-    ...COMPONENT_STYLES.button.secondary,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: SHOOTRZ_THEME.spacing.sm,
-    backgroundColor: '#000000',
-  },
-  socialButtonText: {
-    ...SHOOTRZ_THEME.typography.button,
-    color: SHOOTRZ_THEME.colors.textPrimary,
-  },
-  // Forgot Password Modal Styles
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: SHOOTRZ_THEME.spacing.lg,
-  },
-  modalContent: {
-    backgroundColor: SHOOTRZ_THEME.colors.surface,
-    borderRadius: SHOOTRZ_THEME.borderRadius.xl,
-    padding: SHOOTRZ_THEME.spacing.xl,
-    width: '100%',
-    maxWidth: 400,
-    ...SHOOTRZ_THEME.shadows.large,
-  },
-  modalTitle: {
-    ...SHOOTRZ_THEME.typography.heading2,
-    marginBottom: SHOOTRZ_THEME.spacing.md,
-    textAlign: 'center',
-  },
-  modalDescription: {
-    ...SHOOTRZ_THEME.typography.body,
-    color: SHOOTRZ_THEME.colors.textSecondary,
-    textAlign: 'center',
-    marginBottom: SHOOTRZ_THEME.spacing.lg,
-    lineHeight: 22,
-  },
-  modalDescriptionSecondary: {
-    ...SHOOTRZ_THEME.typography.bodySmall,
-    color: SHOOTRZ_THEME.colors.textMuted,
-    textAlign: 'center',
-    marginBottom: SHOOTRZ_THEME.spacing.md,
-    lineHeight: 20,
-  },
-  modalInputContainer: {
-    marginBottom: SHOOTRZ_THEME.spacing.lg,
-  },
-  modalInputLabel: {
-    ...SHOOTRZ_THEME.typography.bodySmall,
-    fontWeight: '600',
-    marginBottom: SHOOTRZ_THEME.spacing.xs,
-  },
-  modalInput: {
-    ...COMPONENT_STYLES.input,
-    fontSize: 16,
-  },
-  modalInputError: {
-    borderColor: SHOOTRZ_THEME.colors.error,
-    borderWidth: 1,
-  },
-  modalErrorText: {
-    ...SHOOTRZ_THEME.typography.caption,
-    color: SHOOTRZ_THEME.colors.error,
-    marginTop: SHOOTRZ_THEME.spacing.xs,
-  },
-  modalButton: {
-    ...COMPONENT_STYLES.button.primary,
-    marginBottom: SHOOTRZ_THEME.spacing.md,
-  },
-  modalButtonDisabled: {
-    opacity: 0.6,
-  },
-  modalButtonText: {
-    ...SHOOTRZ_THEME.typography.button,
-    textAlign: 'center',
-  },
-  modalCancelButton: {
-    padding: SHOOTRZ_THEME.spacing.md,
-    alignItems: 'center',
-  },
-  modalCancelButtonText: {
-    ...SHOOTRZ_THEME.typography.body,
-    color: SHOOTRZ_THEME.colors.textSecondary,
-  },
-  successIconContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: SHOOTRZ_THEME.colors.secondary + '20',
-    alignItems: 'center',
-    justifyContent: 'center',
-    alignSelf: 'center',
-    marginBottom: SHOOTRZ_THEME.spacing.lg,
-  },
-  successIcon: {
-    fontSize: 48,
-    color: SHOOTRZ_THEME.colors.secondary,
-    fontWeight: 'bold',
-  },
-  resetEmailText: {
-    ...SHOOTRZ_THEME.typography.body,
-    fontWeight: '600',
-    color: SHOOTRZ_THEME.colors.primary,
-    textAlign: 'center',
-    marginBottom: SHOOTRZ_THEME.spacing.lg,
-  },
-});
+	container: {
+		flex: 1,
+		backgroundColor: colors.bg.primary,
+	},
+	flex: {
+		flex: 1,
+	},
+	scrollContent: {
+		flexGrow: 1,
+		justifyContent: 'center',
+		paddingHorizontal: spacing[5],
+		paddingVertical: spacing[8],
+	},
+	logoSection: {
+		alignItems: 'center',
+		marginBottom: spacing[10],
+	},
+	tagline: {
+		fontSize: typography.size.xs,
+		fontWeight: typography.weight.medium,
+		color: colors.brand.cyan,
+		letterSpacing: typography.tracking.widest,
+		marginTop: spacing[3],
+	},
+	formCard: {
+		backgroundColor: glass.card.bg,
+		borderWidth: 1,
+		borderColor: glass.card.border,
+		borderRadius: radius['2xl'],
+		padding: spacing[6],
+	},
+	formTitle: {
+		fontSize: typography.size.xl,
+		fontWeight: typography.weight.bold,
+		color: colors.text.primary,
+		textAlign: 'center',
+		marginBottom: spacing[1],
+	},
+	formSubtitle: {
+		fontSize: typography.size.sm,
+		color: colors.text.secondary,
+		textAlign: 'center',
+		marginBottom: spacing[6],
+	},
+	inputWrap: {
+		marginBottom: spacing[4],
+	},
+	inputLabel: {
+		fontSize: typography.size.sm,
+		fontWeight: typography.weight.semibold,
+		color: colors.text.secondary,
+		marginBottom: spacing[1],
+	},
+	input: {
+		backgroundColor: colors.bg.elevated,
+		borderWidth: 1,
+		borderColor: colors.border.default,
+		borderRadius: radius.md,
+		paddingHorizontal: spacing[4],
+		paddingVertical: spacing[3],
+		fontSize: typography.size.base,
+		color: colors.text.primary,
+		minHeight: 52,
+	},
+	inputError: {
+		borderColor: colors.error,
+	},
+	inputFocus: {
+		borderColor: semanticTokens.focus.ring,
+		borderWidth: 1,
+	},
+	errorRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: spacing[1],
+		marginTop: spacing[1],
+	},
+	errorText: {
+		fontSize: typography.size.xs,
+		color: colors.error,
+	},
+	forgotBtn: {
+		alignSelf: 'flex-end',
+		marginBottom: spacing[4],
+	},
+	forgotText: {
+		fontSize: typography.size.sm,
+		color: colors.brand.cyan,
+	},
+	switchBtn: {
+		alignItems: 'center',
+		paddingVertical: spacing[2],
+	},
+	switchText: {
+		fontSize: typography.size.sm,
+		color: colors.text.secondary,
+	},
+	switchHighlight: {
+		color: colors.brand.cyan,
+		fontWeight: typography.weight.semibold,
+	},
+	socialSection: {
+		marginTop: spacing[6],
+	},
+	divider: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		marginBottom: spacing[5],
+	},
+	dividerLine: {
+		flex: 1,
+		height: 1,
+		backgroundColor: colors.border.default,
+	},
+	dividerText: {
+		fontSize: typography.size.xs,
+		color: colors.text.tertiary,
+		marginHorizontal: spacing[4],
+	},
+	googleBtn: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'center',
+		gap: spacing[2],
+		height: 52,
+		borderRadius: radius.button,
+		backgroundColor: semanticTokens.oauth.google.surface,
+		marginBottom: spacing[3],
+	},
+	googleText: {
+		fontSize: typography.size.base,
+		fontWeight: typography.weight.semibold,
+		color: semanticTokens.oauth.google.label,
+	},
+	appleBtn: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'center',
+		gap: spacing[2],
+		height: 52,
+		borderRadius: radius.button,
+		backgroundColor: semanticTokens.oauth.apple.surface,
+		borderWidth: 1,
+		borderColor: colors.border.default,
+	},
+	appleText: {
+		fontSize: typography.size.base,
+		fontWeight: typography.weight.semibold,
+		color: semanticTokens.oauth.apple.label,
+	},
+	modalOverlay: {
+		flex: 1,
+		backgroundColor: 'rgba(8, 10, 14, 0.85)',
+		justifyContent: 'center',
+		padding: spacing[5],
+	},
+	modalCard: {
+		backgroundColor: colors.bg.elevated,
+		borderRadius: radius['2xl'],
+		padding: spacing[6],
+		borderWidth: 1,
+		borderColor: colors.border.default,
+	},
+	modalTitle: {
+		fontSize: typography.size.xl,
+		fontWeight: typography.weight.bold,
+		color: colors.text.primary,
+		textAlign: 'center',
+		marginBottom: spacing[2],
+	},
+	modalDesc: {
+		fontSize: typography.size.base,
+		color: colors.text.secondary,
+		textAlign: 'center',
+		marginBottom: spacing[5],
+		lineHeight: typography.size.base * typography.lineHeight.normal,
+	},
+	modalDescDim: {
+		fontSize: typography.size.sm,
+		color: colors.text.tertiary,
+		textAlign: 'center',
+		marginBottom: spacing[4],
+		lineHeight: typography.size.sm * typography.lineHeight.normal,
+	},
+	successIcon: {
+		alignSelf: 'center',
+		marginBottom: spacing[4],
+	},
+	resetEmailHighlight: {
+		fontSize: typography.size.base,
+		fontWeight: typography.weight.semibold,
+		color: colors.brand.orange,
+		textAlign: 'center',
+		marginBottom: spacing[4],
+	},
+})

@@ -15,10 +15,9 @@ if (!supabaseUrl || !supabaseAnonKey) {
 	
 	console.error('❌', errorMsg);
 	
-	// In development, show helpful error
-	if (__DEV__) {
-		throw new Error(errorMsg);
-	}
+	// BUG FIX: Always throw on missing env vars, not just in __DEV__
+	// In production, createClient with undefined args causes cryptic runtime failures
+	throw new Error(errorMsg);
 }
 
 // AsyncStorage adapter for Supabase session persistence in React Native

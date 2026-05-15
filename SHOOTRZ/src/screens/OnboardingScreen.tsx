@@ -1,375 +1,351 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions, ScrollView } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-import { SHOOTRZ_THEME, COMPONENT_STYLES } from '../constants/theme';
-import { ShootrzLogo } from '../components/ShootrzLogo';
-import { useAuth } from '../context/AuthContext';
-
-const { width } = Dimensions.get('window');
+import React, { useState } from 'react'
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
+import { Ionicons } from '@expo/vector-icons'
+import { colors, typography, spacing, radius } from '../constants/theme'
+import { PrimaryButton } from '../components/PrimaryButton'
+import { useAuth } from '../context/AuthContext'
+import { hapticFeedback } from '../utils/hapticFeedback'
 
 interface OnboardingScreenProps {
-  onComplete: () => void;
+	onComplete: () => void
 }
 
 export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
-  const { updateProfile } = useAuth();
-  const [currentStep, setCurrentStep] = useState(0);
-  const [selectedSkillLevel, setSelectedSkillLevel] = useState<
-    'beginner' | 'intermediate' | 'advanced'
-  >('beginner');
-  const [selectedPosition, setSelectedPosition] = useState('Guard');
-  const [selectedGoals, setSelectedGoals] = useState<string[]>([]);
+	const { updateProfile } = useAuth()
+	const [currentStep, setCurrentStep] = useState(0)
+	const [selectedSkillLevel, setSelectedSkillLevel] = useState<
+		'beginner' | 'intermediate' | 'advanced'
+	>('beginner')
+	const [selectedPosition, setSelectedPosition] = useState('Guard')
+	const [selectedGoals, setSelectedGoals] = useState<string[]>([])
 
-  const steps = [
-    {
-      title: 'Welcome to SHOOTRZ',
-      subtitle: 'Your AI-powered basketball training assistant',
-      icon: 'basketball',
-      description: 'Perfect your shooting form with AI analysis and personalized coaching',
-    },
-    {
-      title: 'Select Your Skill Level',
-      subtitle: 'This helps us personalize your training',
-      icon: 'stats-chart',
-      description: 'Choose the level that best describes your current basketball skills',
-    },
-    {
-      title: 'Choose Your Position',
-      subtitle: 'What position do you play?',
-      icon: 'people',
-      description: "We'll tailor drills and workouts to your position",
-    },
-    {
-      title: 'Set Your Goals',
-      subtitle: 'What do you want to improve?',
-      icon: 'trophy',
-      description: 'Select areas you want to focus on',
-    },
-  ];
+	const steps = [
+		{ title: 'Welcome to SHOOTRZ', subtitle: 'Your AI-powered basketball training assistant', icon: 'basketball' },
+		{ title: 'Your Skill Level', subtitle: 'This helps us personalize your training', icon: 'stats-chart' },
+		{ title: 'Your Position', subtitle: 'What position do you play?', icon: 'people' },
+		{ title: 'Your Goals', subtitle: 'What do you want to improve?', icon: 'trophy' },
+	]
 
-  const positions = ['Guard', 'Forward', 'Center', 'All-Around'];
-  const goalOptions = [
-    'Improve shooting accuracy',
-    'Perfect my form',
-    'Increase consistency',
-    'Better balance',
-    'Faster release',
-    'Stronger follow-through',
-  ];
+	const positions = ['Guard', 'Forward', 'Center', 'All-Around']
+	const goalOptions = [
+		'Improve shooting accuracy',
+		'Perfect my form',
+		'Increase consistency',
+		'Better balance',
+		'Faster release',
+		'Stronger follow-through',
+	]
 
-  const handleNext = async () => {
-    if (currentStep < steps.length - 1) {
-      setCurrentStep(currentStep + 1);
-    } else {
-      // Complete onboarding
-      await completeOnboarding();
-    }
-  };
+	const handleNext = async () => {
+		hapticFeedback.medium()
+		if (currentStep < steps.length - 1) {
+			setCurrentStep(currentStep + 1)
+		} else {
+			await completeOnboarding()
+		}
+	}
 
-  const handleSkip = () => {
-    onComplete();
-  };
+	const completeOnboarding = async () => {
+		try {
+			await updateProfile({ skillLevel: selectedSkillLevel, position: selectedPosition })
+			hapticFeedback.success()
+			onComplete()
+		} catch {
+			onComplete()
+		}
+	}
 
-  const completeOnboarding = async () => {
-    try {
-      await updateProfile({
-        skillLevel: selectedSkillLevel,
-        position: selectedPosition,
-      });
-      onComplete();
-    } catch (error) {
-      console.error('Error completing onboarding:', error);
-      onComplete(); // Continue anyway
-    }
-  };
+	const toggleGoal = (goal: string) => {
+		hapticFeedback.selection()
+		setSelectedGoals(prev =>
+			prev.includes(goal) ? prev.filter(g => g !== goal) : [...prev, goal],
+		)
+	}
 
-  const toggleGoal = (goal: string) => {
-    if (selectedGoals.includes(goal)) {
-      setSelectedGoals(selectedGoals.filter((g) => g !== goal));
-    } else {
-      setSelectedGoals([...selectedGoals, goal]);
-    }
-  };
+	const step = steps[currentStep]
 
-  const renderStep = () => {
-    const step = steps[currentStep];
+	return (
+		<SafeAreaView style={styles.container} edges={['top', 'left', 'right', 'bottom']}>
+			<View style={styles.dots}>
+				{steps.map((_, i) => (
+					<View
+						key={i}
+						style={[
+							styles.dot,
+							i <= currentStep && styles.dotActive,
+							i === currentStep && styles.dotCurrent,
+						]}
+					/>
+				))}
+			</View>
 
-    return (
-      <View style={styles.stepContainer}>
-        <Ionicons
-          name={step.icon as any}
-          size={64}
-          color={SHOOTRZ_THEME.colors.primary}
-          style={{ marginBottom: SHOOTRZ_THEME.spacing.lg }}
-        />
-        <Text style={styles.stepTitle}>{step.title}</Text>
-        <Text style={styles.stepSubtitle}>{step.subtitle}</Text>
-        <Text style={styles.stepDescription}>{step.description}</Text>
+			<ScrollView style={styles.content} contentContainerStyle={styles.contentInner}>
+				<Ionicons name={step.icon as any} size={56} color={colors.brand.orange} />
+				<Text style={styles.title}>{step.title}</Text>
+				<Text style={styles.subtitle}>{step.subtitle}</Text>
 
-        {currentStep === 1 && (
-          <View style={styles.optionsContainer}>
-            {(['beginner', 'intermediate', 'advanced'] as const).map((level) => (
-              <TouchableOpacity
-                key={level}
-                style={[
-                  styles.optionButton,
-                  selectedSkillLevel === level && styles.optionButtonActive,
-                ]}
-                onPress={() => setSelectedSkillLevel(level)}
-              >
-                <Text
-                  style={[
-                    styles.optionText,
-                    selectedSkillLevel === level && styles.optionTextActive,
-                  ]}
-                >
-                  {level.charAt(0).toUpperCase() + level.slice(1)}
-                </Text>
-                <Text style={styles.optionDescription}>
-                  {level === 'beginner'
-                    ? 'Learning fundamentals'
-                    : level === 'intermediate'
-                      ? 'Improving consistency'
-                      : 'Perfecting technique'}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
+				{currentStep === 0 ? (
+					<Text style={styles.desc}>
+						Perfect your shooting form with AI analysis and personalized coaching.
+					</Text>
+				) : null}
 
-        {currentStep === 2 && (
-          <View style={styles.optionsContainer}>
-            {positions.map((position) => (
-              <TouchableOpacity
-                key={position}
-                style={[
-                  styles.positionButton,
-                  selectedPosition === position && styles.positionButtonActive,
-                ]}
-                onPress={() => setSelectedPosition(position)}
-              >
-                <Text
-                  style={[
-                    styles.positionText,
-                    selectedPosition === position && styles.positionTextActive,
-                  ]}
-                >
-                  {position}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
+				{currentStep === 1 ? (
+					<View style={styles.options}>
+						{(['beginner', 'intermediate', 'advanced'] as const).map(level => {
+							const active = selectedSkillLevel === level
+							return (
+								<TouchableOpacity
+									key={level}
+									style={[styles.optionCard, active && styles.optionCardActive]}
+									onPress={() => { hapticFeedback.selection(); setSelectedSkillLevel(level) }}
+									activeOpacity={0.85}
+								>
+									{active ? (
+										<Ionicons name="checkmark-circle" size={20} color={colors.brand.orange} style={styles.checkIcon} />
+									) : null}
+									<Text style={[styles.optionTitle, active && styles.optionTitleActive]}>
+										{level.charAt(0).toUpperCase() + level.slice(1)}
+									</Text>
+									<Text style={styles.optionDesc}>
+										{level === 'beginner' ? 'Learning fundamentals' : level === 'intermediate' ? 'Improving consistency' : 'Perfecting technique'}
+									</Text>
+								</TouchableOpacity>
+							)
+						})}
+					</View>
+				) : null}
 
-        {currentStep === 3 && (
-          <View style={styles.optionsContainer}>
-            {goalOptions.map((goal, index) => (
-              <TouchableOpacity
-                key={index}
-                style={[styles.goalButton, selectedGoals.includes(goal) && styles.goalButtonActive]}
-                onPress={() => toggleGoal(goal)}
-              >
-                <Text
-                  style={[styles.goalText, selectedGoals.includes(goal) && styles.goalTextActive]}
-                >
-                  {selectedGoals.includes(goal) ? '✓ ' : ''}
-                  {goal}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
-      </View>
-    );
-  };
+				{currentStep === 2 ? (
+					<View style={styles.posGrid}>
+						{positions.map(pos => {
+							const active = selectedPosition === pos
+							return (
+								<TouchableOpacity
+									key={pos}
+									style={[styles.posCard, active && styles.posCardActive]}
+									onPress={() => { hapticFeedback.selection(); setSelectedPosition(pos) }}
+									activeOpacity={0.85}
+								>
+									{active ? <Ionicons name="checkmark-circle" size={18} color={colors.brand.orange} style={styles.checkIcon} /> : null}
+									<Text style={[styles.posText, active && styles.posTextActive]}>{pos}</Text>
+								</TouchableOpacity>
+							)
+						})}
+					</View>
+				) : null}
 
-  return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right', 'bottom']}>
-      {/* Logo */}
-      <View style={styles.logoContainer}>
-        <ShootrzLogo size="medium" showTagline={false} />
-      </View>
+				{currentStep === 3 ? (
+					<View style={styles.options}>
+						{goalOptions.map(goal => {
+							const active = selectedGoals.includes(goal)
+							return (
+								<TouchableOpacity
+									key={goal}
+									style={[styles.goalCard, active && styles.goalCardActive]}
+									onPress={() => toggleGoal(goal)}
+									activeOpacity={0.85}
+								>
+									<Ionicons
+										name={active ? 'checkmark-circle' : 'ellipse-outline'}
+										size={20}
+										color={active ? colors.brand.orange : colors.text.tertiary}
+									/>
+									<Text style={[styles.goalText, active && styles.goalTextActive]}>{goal}</Text>
+								</TouchableOpacity>
+							)
+						})}
+					</View>
+				) : null}
+			</ScrollView>
 
-      {/* Progress Indicator */}
-      <View style={styles.progressContainer}>
-        {steps.map((_, index) => (
-          <View
-            key={index}
-            style={[styles.progressDot, index <= currentStep && styles.progressDotActive]}
-          />
-        ))}
-      </View>
-
-      {/* Step Content */}
-      <ScrollView style={styles.contentContainer}>{renderStep()}</ScrollView>
-
-      {/* Navigation */}
-      <View style={styles.navigationContainer}>
-        {currentStep > 0 && (
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => setCurrentStep(currentStep - 1)}
-          >
-            <Text style={styles.backButtonText}>← Back</Text>
-          </TouchableOpacity>
-        )}
-
-        <TouchableOpacity style={styles.skipButton} onPress={handleSkip}>
-          <Text style={styles.skipButtonText}>Skip</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
-          <Text style={styles.nextButtonText}>
-            {currentStep === steps.length - 1 ? 'Get Started' : 'Next →'}
-          </Text>
-        </TouchableOpacity>
-      </View>
-    </SafeAreaView>
-  );
-};
+			<View style={styles.nav}>
+				{currentStep > 0 ? (
+					<TouchableOpacity
+						onPress={() => { hapticFeedback.light(); setCurrentStep(currentStep - 1) }}
+						style={styles.backBtn}
+						activeOpacity={0.75}
+					>
+						<Ionicons name="chevron-back" size={20} color={colors.text.secondary} />
+						<Text style={styles.backText}>Back</Text>
+					</TouchableOpacity>
+				) : (
+					<TouchableOpacity onPress={onComplete} style={styles.backBtn} activeOpacity={0.75}>
+						<Text style={styles.skipText}>Skip</Text>
+					</TouchableOpacity>
+				)}
+				<PrimaryButton
+					label={currentStep === steps.length - 1 ? 'Get Started' : 'Continue'}
+					onPress={handleNext}
+					size="md"
+				/>
+			</View>
+		</SafeAreaView>
+	)
+}
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: SHOOTRZ_THEME.colors.background,
-  },
-  logoContainer: {
-    alignItems: 'center',
-    paddingTop: SHOOTRZ_THEME.spacing.xxl,
-    paddingBottom: SHOOTRZ_THEME.spacing.lg,
-  },
-  progressContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    paddingVertical: SHOOTRZ_THEME.spacing.lg,
-  },
-  progressDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: SHOOTRZ_THEME.colors.surfaceElevated,
-    marginHorizontal: SHOOTRZ_THEME.spacing.xs,
-  },
-  progressDotActive: {
-    backgroundColor: SHOOTRZ_THEME.colors.primary,
-    width: 24,
-  },
-  contentContainer: {
-    flex: 1,
-  },
-  stepContainer: {
-    alignItems: 'center',
-    padding: SHOOTRZ_THEME.spacing.xl,
-  },
-  stepTitle: {
-    ...SHOOTRZ_THEME.typography.heading1,
-    textAlign: 'center',
-    marginBottom: SHOOTRZ_THEME.spacing.sm,
-  },
-  stepSubtitle: {
-    ...SHOOTRZ_THEME.typography.body,
-    color: SHOOTRZ_THEME.colors.textSecondary,
-    textAlign: 'center',
-    marginBottom: SHOOTRZ_THEME.spacing.md,
-  },
-  stepDescription: {
-    ...SHOOTRZ_THEME.typography.bodySmall,
-    color: SHOOTRZ_THEME.colors.textMuted,
-    textAlign: 'center',
-    marginBottom: SHOOTRZ_THEME.spacing.xl,
-  },
-  optionsContainer: {
-    width: '100%',
-    paddingHorizontal: SHOOTRZ_THEME.spacing.lg,
-  },
-  optionButton: {
-    ...COMPONENT_STYLES.card,
-    marginBottom: SHOOTRZ_THEME.spacing.md,
-    paddingVertical: SHOOTRZ_THEME.spacing.lg,
-    alignItems: 'center',
-  },
-  optionButtonActive: {
-    borderWidth: 2,
-    borderColor: SHOOTRZ_THEME.colors.primary,
-    backgroundColor: SHOOTRZ_THEME.colors.surfaceElevated,
-  },
-  optionText: {
-    ...SHOOTRZ_THEME.typography.heading3,
-    marginBottom: SHOOTRZ_THEME.spacing.xs,
-  },
-  optionTextActive: {
-    color: SHOOTRZ_THEME.colors.primary,
-  },
-  optionDescription: {
-    ...SHOOTRZ_THEME.typography.caption,
-    color: SHOOTRZ_THEME.colors.textMuted,
-  },
-  positionButton: {
-    ...COMPONENT_STYLES.card,
-    marginBottom: SHOOTRZ_THEME.spacing.md,
-    paddingVertical: SHOOTRZ_THEME.spacing.lg,
-    alignItems: 'center',
-  },
-  positionButtonActive: {
-    borderWidth: 2,
-    borderColor: SHOOTRZ_THEME.colors.secondary,
-    backgroundColor: SHOOTRZ_THEME.colors.surfaceElevated,
-  },
-  positionText: {
-    ...SHOOTRZ_THEME.typography.body,
-    fontWeight: '600',
-  },
-  positionTextActive: {
-    color: SHOOTRZ_THEME.colors.secondary,
-  },
-  goalButton: {
-    ...COMPONENT_STYLES.card,
-    marginBottom: SHOOTRZ_THEME.spacing.sm,
-    paddingVertical: SHOOTRZ_THEME.spacing.md,
-  },
-  goalButtonActive: {
-    backgroundColor: SHOOTRZ_THEME.colors.surfaceElevated,
-    borderWidth: 1,
-    borderColor: SHOOTRZ_THEME.colors.accent,
-  },
-  goalText: {
-    ...SHOOTRZ_THEME.typography.body,
-  },
-  goalTextActive: {
-    color: SHOOTRZ_THEME.colors.accent,
-    fontWeight: '600',
-  },
-  navigationContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: SHOOTRZ_THEME.spacing.lg,
-    backgroundColor: SHOOTRZ_THEME.colors.surface,
-    borderTopWidth: 1,
-    borderTopColor: SHOOTRZ_THEME.colors.surfaceElevated,
-  },
-  backButton: {
-    paddingVertical: SHOOTRZ_THEME.spacing.sm,
-    paddingHorizontal: SHOOTRZ_THEME.spacing.md,
-  },
-  backButtonText: {
-    ...SHOOTRZ_THEME.typography.body,
-    color: SHOOTRZ_THEME.colors.textSecondary,
-  },
-  skipButton: {
-    paddingVertical: SHOOTRZ_THEME.spacing.sm,
-    paddingHorizontal: SHOOTRZ_THEME.spacing.md,
-  },
-  skipButtonText: {
-    ...SHOOTRZ_THEME.typography.body,
-    color: SHOOTRZ_THEME.colors.textMuted,
-  },
-  nextButton: {
-    ...COMPONENT_STYLES.button.primary,
-    paddingHorizontal: SHOOTRZ_THEME.spacing.xl,
-  },
-  nextButtonText: {
-    ...SHOOTRZ_THEME.typography.button,
-  },
-});
+	container: {
+		flex: 1,
+		backgroundColor: colors.bg.primary,
+	},
+	dots: {
+		flexDirection: 'row',
+		justifyContent: 'center',
+		paddingVertical: spacing[4],
+		gap: spacing[2],
+	},
+	dot: {
+		width: 8,
+		height: 8,
+		borderRadius: 4,
+		backgroundColor: colors.bg.elevated,
+	},
+	dotActive: {
+		backgroundColor: colors.brand.orange,
+	},
+	dotCurrent: {
+		width: 24,
+	},
+	content: {
+		flex: 1,
+	},
+	contentInner: {
+		alignItems: 'center',
+		paddingHorizontal: spacing.screenPadding,
+		paddingTop: spacing[8],
+	},
+	title: {
+		...typography.roles.headingLg,
+		color: colors.text.primary,
+		textAlign: 'center',
+		marginTop: spacing[5],
+	},
+	subtitle: {
+		...typography.roles.body,
+		color: colors.text.secondary,
+		textAlign: 'center',
+		marginTop: spacing[2],
+		marginBottom: spacing[6],
+	},
+	desc: {
+		...typography.roles.caption,
+		fontSize: typography.size.sm,
+		color: colors.text.tertiary,
+		textAlign: 'center',
+		maxWidth: 280,
+		lineHeight: typography.size.sm * typography.lineHeight.relaxed,
+	},
+	options: {
+		width: '100%',
+		gap: spacing[3],
+	},
+	optionCard: {
+		backgroundColor: colors.bg.secondary,
+		borderRadius: radius.card,
+		borderWidth: 1,
+		borderColor: colors.border.default,
+		padding: spacing[4],
+		alignItems: 'center',
+	},
+	optionCardActive: {
+		backgroundColor: colors.brand.orangeDim,
+		borderColor: colors.brand.orange,
+	},
+	checkIcon: {
+		position: 'absolute',
+		top: spacing[3],
+		right: spacing[3],
+	},
+	optionTitle: {
+		fontSize: typography.size.md,
+		fontWeight: typography.weight.semibold,
+		color: colors.text.primary,
+		marginBottom: spacing[1],
+	},
+	optionTitleActive: {
+		color: colors.brand.orangeLight,
+	},
+	optionDesc: {
+		fontSize: typography.size.xs,
+		color: colors.text.tertiary,
+	},
+	posGrid: {
+		width: '100%',
+		flexDirection: 'row',
+		flexWrap: 'wrap',
+		gap: spacing[3],
+	},
+	posCard: {
+		width: '47%',
+		backgroundColor: colors.bg.secondary,
+		borderRadius: radius.card,
+		borderWidth: 1,
+		borderColor: colors.border.default,
+		padding: spacing[4],
+		alignItems: 'center',
+	},
+	posCardActive: {
+		backgroundColor: colors.brand.orangeDim,
+		borderColor: colors.brand.orange,
+	},
+	posText: {
+		fontSize: typography.size.base,
+		fontWeight: typography.weight.semibold,
+		color: colors.text.primary,
+	},
+	posTextActive: {
+		color: colors.brand.orangeLight,
+	},
+	goalCard: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: spacing[3],
+		backgroundColor: colors.bg.secondary,
+		borderRadius: radius.card,
+		borderWidth: 1,
+		borderColor: colors.border.default,
+		padding: spacing[4],
+	},
+	goalCardActive: {
+		backgroundColor: colors.brand.orangeDim,
+		borderColor: colors.brand.orange,
+	},
+	goalText: {
+		fontSize: typography.size.base,
+		color: colors.text.primary,
+		flex: 1,
+	},
+	goalTextActive: {
+		color: colors.brand.orangeLight,
+		fontWeight: typography.weight.semibold,
+	},
+	nav: {
+		flexDirection: 'row',
+		justifyContent: 'space-between',
+		alignItems: 'center',
+		paddingHorizontal: spacing.screenPadding,
+		paddingVertical: spacing[4],
+		borderTopWidth: 1,
+		borderTopColor: colors.border.subtle,
+		backgroundColor: colors.bg.secondary,
+	},
+	backBtn: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: spacing[1],
+		paddingVertical: spacing[2],
+		paddingHorizontal: spacing[3],
+	},
+	backText: {
+		...typography.roles.caption,
+		fontSize: typography.size.sm,
+		color: colors.text.secondary,
+	},
+	skipText: {
+		...typography.roles.caption,
+		fontSize: typography.size.sm,
+		color: colors.text.tertiary,
+	},
+})

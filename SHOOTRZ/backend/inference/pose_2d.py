@@ -4,11 +4,27 @@ MediaPipe Pose 2D landmark extraction for basketball shooting analysis.
 Provides 33 landmarks per frame for body pose estimation.
 """
 
+import logging
+import os
+
 import cv2
 import numpy as np
-import mediapipe as mp
-from typing import Dict, List, Optional, Tuple
-from pathlib import Path
+# BUG FIX: Import Any from typing (was using builtin `any` in type annotations)
+from typing import Any, Dict, List, Optional, Tuple
+
+
+logger = logging.getLogger(__name__)
+
+
+def _fallback_is_allowed() -> bool:
+    """Tests opt-in with ``SHOOTRZ_POSE_FALLBACK=1`` so synthetic clips still run.
+
+    In production the fallback is NEVER acceptable: it previously returned
+    (0.5, 0.5) landmarks for every frame, which silently produced 0 degree
+    angles and a garbage "0 POOR" shot score.
+    """
+    return os.getenv("SHOOTRZ_POSE_FALLBACK", "").lower() in {"1", "true", "yes"}
+
 
 
 # Basketball-specific keypoint mapping from MediaPipe landmarks
@@ -56,31 +72,75 @@ class MediaPipePoseDetector:
 			min_detection_confidence: Minimum confidence for detection
 			min_tracking_confidence: Minimum confidence for tracking
 		"""
-		self.mp_pose = mp.solutions.pose
-		self.pose = self.mp_pose.Pose(
-			static_image_mode=static_image_mode,
-			model_complexity=model_complexity,
-			smooth_landmarks=smooth_landmarks,
-			min_detection_confidence=min_detection_confidence,
-			min_tracking_confidence=min_tracking_confidence,
-		)
+		self.pose = None
+		self._fallback_mode = False
+		try:
+			import mediapipe as mp
+			try:
+				self.mp_pose = mp.solutions.pose
+			except AttributeError as exc:
+				raise RuntimeError(
+					"mediapipe.solutions.pose unavailable. "
+					"Pin mediapipe==0.10.14 or migrate to mp.tasks.vision.PoseLandmarker."
+				) from exc
+			self.pose = self.mp_pose.Pose(
+				static_image_mode=static_image_mode,
+				model_complexity=model_complexity,
+				smooth_landmarks=smooth_landmarks,
+				min_detection_confidence=min_detection_confidence,
+				min_tracking_confidence=min_tracking_confidence,
+			)
+		except (ImportError, AttributeError, RuntimeError, OSError, ValueError) as exc:
+			logger.error(
+				"MediaPipe Pose failed to initialise (%s: %s). "
+				"This is catastrophic in production because pose results drive every "
+				"downstream metric. Set SHOOTRZ_POSE_FALLBACK=1 to opt in to the "
+				"synthetic-landmark mode used by unit tests.",
+				type(exc).__name__,
+				exc,
+			)
+			if not _fallback_is_allowed():
+				raise
+			self._fallback_mode = True
 		self.keypoints_map = BASKETBALL_KEYPOINTS
 
-	def process_frame(self, frame: np.ndarray) -> Optional[Dict[str, np.ndarray]]:
+	def process_frame(
+		self,
+		frame: np.ndarray,
+		*,
+		input_is_rgb: bool = True,
+	) -> Optional[Dict[str, np.ndarray]]:
 		"""
 		Process a single frame to extract pose landmarks.
-		
+
 		Args:
-			frame: RGB image frame [H, W, 3]
-		
+			frame: Image frame [H, W, 3]. When input_is_rgb is True (MVP pipeline:
+				frames from VideoLoader are already RGB), pass through. When False
+				(opencv VideoCapture BGR), convert to RGB once.
+			input_is_rgb: If True, MediaPipe receives ``frame`` as RGB unchanged.
+
 		Returns:
 			Dict with 'landmarks' [33, 3], 'confidence' [33], or None if no detection
 		"""
-		# MediaPipe expects RGB
-		if frame.shape[2] == 3:
-			frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+		if frame.ndim != 3 or frame.shape[2] != 3:
+			return None
+		if input_is_rgb:
+			frame_rgb = np.ascontiguousarray(frame)
 		else:
-			frame_rgb = frame
+			frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+		if self._fallback_mode or self.pose is None:
+			# Fallback is gated by SHOOTRZ_POSE_FALLBACK (tests only). In production
+			# the ``__init__`` path re-raises, so we never reach here with real data.
+			# We still emit SOMETHING so synthetic-video tests continue to exercise
+			# the pipeline, but we mark confidence=0.0 so the visibility gate in
+			# ``MVPPoseEstimator.process_frame_stream`` drops every frame unless a
+			# test explicitly asserts on the fallback shape.
+			landmarks = np.zeros((33, 3), dtype=np.float32)
+			landmarks[:, 0] = 0.5
+			landmarks[:, 1] = 0.5
+			confidences = np.zeros((33,), dtype=np.float32)
+			return {"landmarks": landmarks, "confidence": confidences}
 
 		pose_results = self.pose.process(frame_rgb)
 
@@ -106,7 +166,7 @@ class MediaPipePoseDetector:
 		video_path: str,
 		frame_skip: int = 1,
 		max_frames: Optional[int] = None,
-	) -> List[Dict[str, any]]:
+	) -> List[Dict[str, Any]]:
 		"""
 		Process entire video to extract pose landmarks for each frame.
 		
@@ -143,8 +203,8 @@ class MediaPipePoseDetector:
 				frame_idx += 1
 				continue
 
-			# Process frame
-			result = self.process_frame(frame)
+			# OpenCV yields BGR
+			result = self.process_frame(frame, input_is_rgb=False)
 			if result is not None:
 				timestamp_ms = (frame_idx / fps) * 1000.0 if fps > 0 else frame_idx * 33.33
 
@@ -217,10 +277,11 @@ class MediaPipePoseDetector:
 
 	def close(self):
 		"""Release MediaPipe resources."""
-		self.pose.close()
+		if self.pose is not None:
+			self.pose.close()
 
 
-def run_pose_2d_on_frames(frames: List[np.ndarray]) -> Dict[str, any]:
+def run_pose_2d_on_frames(frames: List[np.ndarray]) -> Dict[str, Any]:
 	"""
 	Process list of frames with MediaPipe Pose.
 	
@@ -236,7 +297,7 @@ def run_pose_2d_on_frames(frames: List[np.ndarray]) -> Dict[str, any]:
 	results = []
 
 	for idx, frame in enumerate(frames):
-		result = detector.process_frame(frame)
+		result = detector.process_frame(frame, input_is_rgb=True)
 		if result is not None:
 			results.append({
 				"frame_idx": idx,
