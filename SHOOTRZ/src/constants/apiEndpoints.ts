@@ -7,6 +7,8 @@ export const API_PATHS = {
 	analysisComplete: '/api/analysis/complete',
 	userAccount: '/api/user/account',
 	userProfile: '/api/user/profile',
+	userPreferences: '/api/user/preferences',
+	userExport: '/api/user/export',
 	userStats: '/api/user/stats',
 	userStreak: '/api/user/streak',
 	sessions: '/api/sessions',

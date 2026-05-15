@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
+from ..contracts.history import HISTORY_API_SOURCE, HistoryResponse, session_from_db_row
 from ..services.llm import llm_service
 from ..storage.db import db
 from ..storage.supabase_client import get_service_client
@@ -16,12 +17,44 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["user"])
 
+USERS_CORE_FIELDS = {
+    "name",
+    "username",
+    "skill_level",
+    "position",
+    "has_completed_onboarding",
+}
+
+USER_PROFILE_FIELDS = {
+    "bio",
+    "avatar_url",
+    "primary_goal",
+    "training_frequency",
+    "preferred_drill_duration",
+    "age",
+    "height_cm",
+    "weight_kg",
+    "dominant_hand",
+    "years_playing",
+    "notifications_enabled",
+    "dark_mode_enabled",
+    "analytics_enabled",
+    "coaching_style",
+}
+
 
 # ---------------------------------------------------------------------------
 # Request / Response models
 # ---------------------------------------------------------------------------
 
 class ProfileUpdateRequest(BaseModel):
+    name: Optional[str] = None
+    username: Optional[str] = None
+    skill_level: Optional[str] = None
+    position: Optional[str] = None
+    has_completed_onboarding: Optional[bool] = None
+    bio: Optional[str] = None
+    avatar_url: Optional[str] = None
     primary_goal: Optional[str] = None
     training_frequency: Optional[str] = None
     preferred_drill_duration: Optional[int] = None
@@ -31,7 +64,15 @@ class ProfileUpdateRequest(BaseModel):
     dominant_hand: Optional[str] = None
     years_playing: Optional[int] = None
     notifications_enabled: Optional[bool] = None
+    dark_mode_enabled: Optional[bool] = None
+    analytics_enabled: Optional[bool] = None
     coaching_style: Optional[str] = None
+
+
+class UserPreferencesRequest(BaseModel):
+    notifications_enabled: Optional[bool] = None
+    dark_mode_enabled: Optional[bool] = None
+    analytics_enabled: Optional[bool] = None
 
 
 class DrillCompleteRequest(BaseModel):
@@ -73,9 +114,56 @@ async def update_user_profile(
     data = body.model_dump(exclude_none=True)
     if not data:
         raise HTTPException(status_code=422, detail="No fields to update")
+
+    core_fields = {k: v for k, v in data.items() if k in USERS_CORE_FIELDS}
+    profile_fields = {k: v for k, v in data.items() if k in USER_PROFILE_FIELDS}
+
+    result = db.update_user_full_atomic(
+        user_id=user.user_id,
+        core_fields=core_fields,
+        profile_fields=profile_fields,
+    )
+    if result is None:
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to update profile atomically",
+        )
+    # Keep PUT shape coherent with GET /api/user/profile.
+    base = db.get_user(user.user_id)
+    profile = db.get_user_profile(user.user_id)
+    if not base:
+        raise HTTPException(status_code=404, detail="User not found")
+    return {**(base or {}), "profile": profile}
+
+
+@router.put("/user/preferences")
+async def update_user_preferences(
+    body: UserPreferencesRequest,
+    user: AuthenticatedUser = Depends(get_authenticated_user),
+):
+    data = body.model_dump(exclude_none=True)
+    if not data:
+        raise HTTPException(status_code=422, detail="No preference fields to update")
     result = db.upsert_user_profile(user.user_id, data)
     if result is None:
-        raise HTTPException(status_code=500, detail="Failed to update profile")
+        raise HTTPException(status_code=500, detail="Failed to update preferences")
+    base = db.get_user(user.user_id)
+    if not base:
+        raise HTTPException(status_code=404, detail="User not found")
+    return {**(base or {}), "profile": result}
+
+
+@router.get("/user/export")
+async def export_user_data(
+    user: AuthenticatedUser = Depends(get_authenticated_user),
+):
+    result = db.build_user_export_payload(
+        user_id=user.user_id,
+        sessions_limit=100,
+        chat_messages_limit=200,
+    )
+    if result is None:
+        raise HTTPException(status_code=500, detail="Failed to export user data")
     return result
 
 
@@ -148,7 +236,7 @@ async def get_sessions(
     return {"sessions": sessions, "count": len(sessions)}
 
 
-@router.get("/user/analysis-history")
+@router.get("/user/analysis-history", response_model=HistoryResponse)
 async def get_analysis_history(
     user: AuthenticatedUser = Depends(get_authenticated_user),
     limit: int = Query(default=20, ge=1, le=100),
@@ -156,20 +244,27 @@ async def get_analysis_history(
 ):
     """MVP shot history: sessions + analysis_summaries + metrics (authenticated)."""
     try:
-        sessions = db.get_user_analysis_history(
+        raw = db.get_user_analysis_history(
             user.user_id, limit=limit, offset=offset,
         )
         logger.info(
-            "analysis_history fetched",
-            extra={"user_id": user.user_id, "count": len(sessions)},
+            "history_query",
+            extra={
+                "user_id": user.user_id,
+                "history_source": HISTORY_API_SOURCE,
+                "limit": limit,
+                "offset": offset,
+                "history_rows": len(raw),
+            },
         )
-        return {
-            "user_id": user.user_id,
-            "sessions": sessions,
-            "total": len(sessions),
-            "limit": limit,
-            "offset": offset,
-        }
+        return HistoryResponse(
+            user_id=user.user_id,
+            sessions=[session_from_db_row(s) for s in raw],
+            total=len(raw),
+            limit=limit,
+            offset=offset,
+            source=HISTORY_API_SOURCE,
+        )
     except Exception as exc:
         logger.exception("get_analysis_history failed", extra={"user_id": user.user_id})
         raise HTTPException(status_code=500, detail=str(exc)) from exc

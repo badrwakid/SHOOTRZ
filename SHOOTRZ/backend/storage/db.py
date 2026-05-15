@@ -7,6 +7,23 @@ from .supabase_client import get_service_client
 
 logger = logging.getLogger(__name__)
 
+USER_PROFILE_ALLOWED_FIELDS = {
+    "bio",
+    "avatar_url",
+    "primary_goal",
+    "coaching_style",
+    "training_frequency",
+    "preferred_drill_duration",
+    "age",
+    "height_cm",
+    "weight_kg",
+    "dominant_hand",
+    "years_playing",
+    "notifications_enabled",
+    "dark_mode_enabled",
+    "analytics_enabled",
+}
+
 
 class SupabaseDB:
     """Centralized database access layer.
@@ -48,6 +65,22 @@ class SupabaseDB:
             logger.exception("upsert_user failed", extra={"user_id": user_data.get("id")})
             return None
 
+    def update_user(self, user_id: str, fields: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Update only allowed core columns on ``users``."""
+        allowed = {"name", "username", "skill_level", "position", "has_completed_onboarding"}
+        payload = {
+            key: value for key, value in fields.items() if key in allowed and value is not None
+        }
+        if not payload:
+            return self.get_user(user_id)
+        try:
+            sb = get_service_client()
+            sb.table("users").update(payload).eq("id", user_id).execute()
+            return self.get_user(user_id)
+        except Exception:
+            logger.exception("update_user failed", extra={"user_id": user_id})
+            return None
+
     def get_user_profile(self, user_id: str) -> Optional[Dict[str, Any]]:
         try:
             sb = get_service_client()
@@ -66,16 +99,222 @@ class SupabaseDB:
     def upsert_user_profile(self, user_id: str, profile_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         try:
             sb = get_service_client()
-            profile_data["user_id"] = user_id
+            payload = {
+                key: value
+                for key, value in profile_data.items()
+                if key in USER_PROFILE_ALLOWED_FIELDS and value is not None
+            }
+            if not payload:
+                return self.get_user_profile(user_id)
+            payload["user_id"] = user_id
             resp = (
                 sb.table("user_profiles")
-                .upsert(profile_data, on_conflict="user_id")
+                .upsert(payload, on_conflict="user_id")
                 .execute()
             )
             return resp.data[0] if resp.data else None
-        except Exception:
+        except Exception as exc:
+            missing_col = self._extract_missing_column_name(exc)
+            if missing_col and missing_col in payload:
+                payload.pop(missing_col, None)
+                try:
+                    if not payload:
+                        return self.get_user_profile(user_id)
+                    payload["user_id"] = user_id
+                    resp = (
+                        sb.table("user_profiles")
+                        .upsert(payload, on_conflict="user_id")
+                        .execute()
+                    )
+                    return resp.data[0] if resp.data else None
+                except Exception:
+                    logger.exception("upsert_user_profile retry failed", extra={"user_id": user_id})
             logger.exception("upsert_user_profile failed", extra={"user_id": user_id})
             return None
+
+    def update_user_full_atomic(
+        self,
+        user_id: str,
+        core_fields: Dict[str, Any],
+        profile_fields: Dict[str, Any],
+    ) -> Optional[Dict[str, Any]]:
+        """Atomic update across ``users`` and ``user_profiles`` via RPC."""
+        try:
+            if not core_fields and not profile_fields:
+                return None
+
+            sb = get_service_client()
+            resp = sb.rpc(
+                "update_user_full_atomic",
+                {
+                    "p_user_id": user_id,
+                    "p_core": core_fields or {},
+                    "p_profile": profile_fields or {},
+                },
+            ).execute()
+            if not resp.data:
+                logger.error(
+                    "update_user_full_atomic rpc returned empty",
+                    extra={"user_id": user_id},
+                )
+                return None
+            return resp.data
+        except Exception as exc:
+            # Compatibility fallback for environments where the RPC migration
+            # or schema columns have not yet been applied.
+            msg = str(exc)
+            should_fallback = (
+                ("PGRST202" in msg and "update_user_full_atomic" in msg)
+                or ("PGRST204" in msg)
+                or ("42703" in msg and "does not exist" in msg)
+                or ("23502" in msg and "user_profiles" in msg)
+            )
+            if should_fallback:
+                logger.warning(
+                    "update_user_full_atomic compatibility fallback to split update",
+                    extra={"user_id": user_id, "reason": msg[:240]},
+                )
+                user_row = self.update_user(user_id, core_fields)
+                profile_row = self.upsert_user_profile(user_id, profile_fields)
+                if user_row is None:
+                    return None
+                return {"user": user_row, "profile": profile_row}
+            logger.exception("update_user_full_atomic failed", extra={"user_id": user_id})
+            return None
+
+    @staticmethod
+    def _extract_missing_column_name(error_or_text: Any) -> Optional[str]:
+        text = str(error_or_text)
+        marker = "Could not find the '"
+        start = text.find(marker)
+        if start == -1:
+            return None
+        start += len(marker)
+        end = text.find("' column", start)
+        if end == -1:
+            return None
+        return text[start:end]
+
+    def update_user_full(
+        self,
+        user_id: str,
+        core_fields: Dict[str, Any],
+        profile_fields: Dict[str, Any],
+    ) -> Optional[Dict[str, Any]]:
+        """Backward-compatible alias to the atomic RPC-backed method."""
+        return self.update_user_full_atomic(
+            user_id=user_id,
+            core_fields=core_fields,
+            profile_fields=profile_fields,
+        )
+
+    def build_user_export_payload(
+        self,
+        user_id: str,
+        sessions_limit: int = 100,
+        chat_messages_limit: int = 200,
+        analysis_summaries_limit: int = 100,
+        metrics_limit: int = 500,
+    ) -> Optional[Dict[str, Any]]:
+        try:
+            sb = get_service_client()
+            sessions_raw = (
+                sb.table("sessions")
+                .select("*")
+                .eq("user_id", user_id)
+                .order("timestamp", desc=True)
+                .limit(sessions_limit + 1)
+                .execute()
+            ).data or []
+            chats_raw = (
+                sb.table("chat_history")
+                .select("id, role, content, session_id, model_used, created_at")
+                .eq("user_id", user_id)
+                .order("created_at", desc=True)
+                .limit(chat_messages_limit + 1)
+                .execute()
+            ).data or []
+            summaries_raw = (
+                sb.table("analysis_summaries")
+                .select("*")
+                .eq("user_id", user_id)
+                .order("created_at", desc=True)
+                .limit(analysis_summaries_limit + 1)
+                .execute()
+            ).data or []
+            # Reuse existing read-model helper and cap final export cardinality.
+            history_rows = self.get_user_analysis_history(
+                user_id=user_id,
+                limit=sessions_limit,
+                offset=0,
+            )
+            metrics_raw: List[Dict[str, Any]] = []
+            for row in history_rows:
+                row_metrics = row.get("metrics")
+                if isinstance(row_metrics, list):
+                    metrics_raw.extend(row_metrics)
+
+            sessions_truncated = len(sessions_raw) > sessions_limit
+            chats_truncated = len(chats_raw) > chat_messages_limit
+            summaries_truncated = len(summaries_raw) > analysis_summaries_limit
+            metrics_truncated = len(metrics_raw) > metrics_limit
+            sessions = sessions_raw[:sessions_limit]
+            chat_messages = chats_raw[:chat_messages_limit]
+            analysis_summaries = summaries_raw[:analysis_summaries_limit]
+            metrics = metrics_raw[:metrics_limit]
+
+            return {
+                "user": self.get_user(user_id),
+                "profile": self.get_user_profile(user_id),
+                "sessions": sessions,
+                "chat_history": chat_messages,
+                "analysis_summaries": analysis_summaries,
+                "metrics": metrics,
+                "metadata": {
+                    "truncated": (
+                        sessions_truncated
+                        or chats_truncated
+                        or summaries_truncated
+                        or metrics_truncated
+                    ),
+                    "limits": {
+                        "sessions": sessions_limit,
+                        "chat_messages": chat_messages_limit,
+                        "analysis_summaries": analysis_summaries_limit,
+                        "metrics": metrics_limit,
+                    },
+                    "counts": {
+                        "sessions_returned": len(sessions),
+                        "chat_messages_returned": len(chat_messages),
+                        "analysis_summaries_returned": len(analysis_summaries),
+                        "metrics_returned": len(metrics),
+                        "sessions_fetched_before_limit": len(sessions_raw),
+                        "chat_messages_fetched_before_limit": len(chats_raw),
+                        "analysis_summaries_fetched_before_limit": len(summaries_raw),
+                        "metrics_fetched_before_limit": len(metrics_raw),
+                    },
+                },
+            }
+        except Exception:
+            logger.exception("build_user_export_payload failed", extra={"user_id": user_id})
+            return None
+
+    def get_user_export_data(
+        self,
+        user_id: str,
+        sessions_limit: int = 100,
+        chat_messages_limit: int = 200,
+        analysis_summaries_limit: int = 100,
+        metrics_limit: int = 500,
+    ) -> Optional[Dict[str, Any]]:
+        """Backward-compatible alias for legacy call sites."""
+        return self.build_user_export_payload(
+            user_id=user_id,
+            sessions_limit=sessions_limit,
+            chat_messages_limit=chat_messages_limit,
+            analysis_summaries_limit=analysis_summaries_limit,
+            metrics_limit=metrics_limit,
+        )
 
     def get_user_stats(self, user_id: str) -> Dict[str, Any]:
         try:
@@ -316,6 +555,32 @@ class SupabaseDB:
             logger.exception("save_analysis_summary failed", extra={"session_id": session_id})
             return None
 
+    def persist_analysis_summary(
+        self, session_id: str, user_id: str, summary_data: Dict[str, Any],
+    ) -> bool:
+        """Best-effort boolean contract for summary persistence visibility checks.
+
+        Some Supabase deployments return empty ``resp.data`` on successful upsert.
+        This helper treats "no exception" as success and is safer for strict
+        completion gating paths.
+        """
+        try:
+            sb = get_service_client()
+            row = {
+                "session_id": session_id,
+                "user_id": user_id,
+                **summary_data,
+            }
+            (
+                sb.table("analysis_summaries")
+                .upsert(row, on_conflict="session_id")
+                .execute()
+            )
+            return True
+        except Exception:
+            logger.exception("persist_analysis_summary failed", extra={"session_id": session_id})
+            return False
+
     def get_recent_summaries(self, user_id: str, limit: int = 5) -> List[Dict[str, Any]]:
         try:
             sb = get_service_client()
@@ -492,6 +757,40 @@ class SupabaseDB:
         except Exception:
             logger.exception("add_video_to_session failed",
                              extra={"session_id": session_id, "video_id": video_id})
+            return False
+
+    def session_video_exists(self, session_id: str, video_id: str) -> bool:
+        try:
+            sb = get_service_client()
+            resp = (
+                sb.table("session_videos")
+                .select("session_id")
+                .eq("session_id", session_id)
+                .eq("video_id", video_id)
+                .limit(1)
+                .execute()
+            )
+            return bool(resp.data)
+        except Exception:
+            logger.exception(
+                "session_video_exists failed",
+                extra={"session_id": session_id, "video_id": video_id},
+            )
+            return False
+
+    def video_metrics_exist(self, video_id: str) -> bool:
+        try:
+            sb = get_service_client()
+            resp = (
+                sb.table("metrics")
+                .select("id")
+                .eq("video_id", video_id)
+                .limit(1)
+                .execute()
+            )
+            return bool(resp.data)
+        except Exception:
+            logger.exception("video_metrics_exist failed", extra={"video_id": video_id})
             return False
 
     def get_session_videos(self, session_id: str) -> List[Dict[str, Any]]:

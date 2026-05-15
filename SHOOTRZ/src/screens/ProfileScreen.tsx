@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react'
 import {
 	View,
 	Text,
@@ -12,6 +12,7 @@ import {
 	ActivityIndicator,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { useFocusEffect } from '@react-navigation/native'
 import { Ionicons } from '@expo/vector-icons'
 import { colors, typography, spacing, radius, glass } from '../constants/theme'
 import { StatCard } from '../components/StatCard'
@@ -23,115 +24,176 @@ import { apiService } from '../services/api.service'
 import { storageService } from '../services/storage.service'
 import { emailService } from '../services/email.service'
 import { hapticFeedback } from '../utils/hapticFeedback'
+import { useProfile } from '../context/ProfileContext'
 
 export const ProfileScreen: React.FC = () => {
-	const { user, logout, updateProfile } = useAuth()
-	const [notifications, setNotifications] = useState(true)
-	const [darkMode, setDarkMode] = useState(true)
-	const [analytics, setAnalytics] = useState(true)
+	const { user, logout } = useAuth()
+	const {
+		profile,
+		stats,
+		preferences,
+		profileLoading,
+		statsLoading,
+		profileError,
+		statsError,
+		refresh,
+		refreshStats,
+		updateProfile,
+		updatePreferences,
+	} = useProfile()
 	const [showEditModal, setShowEditModal] = useState(false)
 	const [editName, setEditName] = useState('')
 	const [editPosition, setEditPosition] = useState('')
 	const [editSkillLevel, setEditSkillLevel] = useState<'beginner' | 'intermediate' | 'advanced'>('beginner')
-	const [loading, setLoading] = useState(false)
-	const [stats, setStats] = useState({ totalSessions: 0, bestScore: 0, currentStreak: 0, goalsCompleted: 0, totalGoals: 0 })
+	const [actionLoading, setActionLoading] = useState(false)
+	const [preferenceError, setPreferenceError] = useState<string | null>(null)
+	const [preferenceUpdating, setPreferenceUpdating] = useState(false)
+	const [actionError, setActionError] = useState<string | null>(null)
+	const [networkToastMessage, setNetworkToastMessage] = useState<string | null>(null)
+	const preferenceUpdateInFlightRef = useRef(false)
+	const toastDismissTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-	useEffect(() => { loadUserStats(); loadPreferences() }, [user?.id])
+	const isOfflineOrTimeoutError = useCallback((message: string | null): boolean => {
+		if (!message) {
+			return false
+		}
+		const normalized = message.toLowerCase()
+		return normalized.includes('no internet')
+			|| normalized.includes('network')
+			|| normalized.includes('timeout')
+			|| normalized.includes('timed out')
+			|| normalized.includes('failed to fetch')
+	}, [])
 
-	const loadUserStats = async () => {
+	const firstNetworkErrorMessage = useMemo(() => (
+		[profileError, statsError, preferenceError, actionError].find(message =>
+			isOfflineOrTimeoutError(message || null),
+		) || null
+	), [actionError, isOfflineOrTimeoutError, preferenceError, profileError, statsError])
+
+	const blockingErrorMessage = useMemo(() => (
+		[profileError, statsError, preferenceError, actionError].find(message =>
+			Boolean(message) && !isOfflineOrTimeoutError(message || null),
+		) || null
+	), [actionError, isOfflineOrTimeoutError, preferenceError, profileError, statsError])
+
+	useEffect(() => {
+		if (!firstNetworkErrorMessage) {
+			return
+		}
+		setNetworkToastMessage(firstNetworkErrorMessage)
+		if (toastDismissTimeoutRef.current) {
+			clearTimeout(toastDismissTimeoutRef.current)
+		}
+		toastDismissTimeoutRef.current = setTimeout(() => {
+			setNetworkToastMessage(null)
+			toastDismissTimeoutRef.current = null
+		}, 3200)
+	}, [firstNetworkErrorMessage])
+
+	useEffect(() => () => {
+		if (toastDismissTimeoutRef.current) {
+			clearTimeout(toastDismissTimeoutRef.current)
+		}
+	}, [])
+
+	useFocusEffect(
+		useCallback(() => {
+			void refreshStats()
+		}, [refreshStats]),
+	)
+
+	const updatePreference = async (
+		key: 'notifications_enabled' | 'dark_mode_enabled' | 'analytics_enabled',
+		value: boolean,
+	) => {
+		if (preferenceUpdateInFlightRef.current) {
+			return
+		}
+
+		preferenceUpdateInFlightRef.current = true
+		setPreferenceUpdating(true)
+		setPreferenceError(null)
+
 		try {
-			let serverStats: any = null
-			let serverStreak: any = null
-			if (user?.id) {
-				try {
-					;[serverStats, serverStreak] = await Promise.all([
-						apiService.getUserStats(),
-						apiService.getUserStreak(),
-					])
-				} catch {
-					/* offline — fall back to local below */
-				}
-			}
-
-			const goals = await storageService.getGoals()
-			const completed = goals.filter((g: any) => g.completed).length
-
-			if (user?.id && serverStats) {
-				setStats({
-					totalSessions: serverStats.totalSessions ?? 0,
-					bestScore: Math.round(serverStats.bestScore ?? 0),
-					currentStreak: serverStreak?.currentStreak ?? 0,
-					goalsCompleted: completed,
-					totalGoals: goals.length,
-				})
-			} else {
-				const analysisHistory = await storageService.getAnalysisHistory(user?.id)
-				const best = analysisHistory.length > 0
-					? Math.max(...analysisHistory.map(a => a.scores.total))
-					: 0
-				setStats({
-					totalSessions: analysisHistory.length,
-					bestScore: best,
-					currentStreak: 0,
-					goalsCompleted: completed,
-					totalGoals: goals.length,
-				})
-			}
-
-			storageService.migrateToSupabase(apiService).catch(() => {})
-		} catch (e) { console.error('Error loading stats:', e) }
+			await updatePreferences({ [key]: value })
+		} catch (e: any) {
+			setPreferenceError(e?.message || 'Failed to save preference.')
+			await refresh()
+		} finally {
+			preferenceUpdateInFlightRef.current = false
+			setPreferenceUpdating(false)
+		}
 	}
 
-	const loadPreferences = async () => {
-		try {
-			const prefs = await storageService.getPreferences()
-			if (prefs) {
-				setNotifications(prefs.notifications ?? true)
-				setDarkMode(prefs.darkMode ?? true)
-				setAnalytics(prefs.analytics ?? true)
-			}
-		} catch {}
+	const handleNotificationToggle = (v: boolean) => {
+		hapticFeedback.selection()
+		void updatePreference('notifications_enabled', v)
 	}
-
-	const savePref = async (key: string, value: boolean) => {
-		try {
-			const prefs = await storageService.getPreferences() || {}
-			await storageService.savePreferences({ ...prefs, [key]: value })
-		} catch {}
+	const handleDarkModeToggle = (v: boolean) => {
+		hapticFeedback.selection()
+		void updatePreference('dark_mode_enabled', v)
 	}
-
-	const handleNotificationToggle = (v: boolean) => { hapticFeedback.selection(); setNotifications(v); savePref('notifications', v) }
-	const handleDarkModeToggle = (v: boolean) => { hapticFeedback.selection(); setDarkMode(v); savePref('darkMode', v); Alert.alert('Theme', 'Dark mode is always on in SHOOTRZ.') }
-	const handleAnalyticsToggle = (v: boolean) => { hapticFeedback.selection(); setAnalytics(v); savePref('analytics', v) }
+	const handleAnalyticsToggle = (v: boolean) => {
+		hapticFeedback.selection()
+		void updatePreference('analytics_enabled', v)
+	}
 
 	const handleEditProfile = () => {
-		setEditName(user?.name || '')
-		setEditPosition(user?.position || '')
-		setEditSkillLevel(user?.skillLevel || 'beginner')
+		if (!profile) {
+			Alert.alert(
+				'Profile unavailable',
+				profileLoading ? 'Profile is still loading.' : 'Could not load profile data.',
+			)
+			return
+		}
+		setEditName((profile.name as string) || '')
+		setEditPosition((profile.position as string) || '')
+		const serverSkill = ((profile.skill_level as string) || 'beginner') as
+			| 'beginner'
+			| 'intermediate'
+			| 'advanced'
+		setEditSkillLevel(serverSkill)
 		setShowEditModal(true)
 	}
 
 	const handleSaveProfile = async () => {
 		if (!editName.trim()) { Alert.alert('Error', 'Name is required.'); return }
-		setLoading(true)
+		setActionLoading(true)
+		setActionError(null)
 		try {
-			await updateProfile({ name: editName.trim(), position: editPosition, skillLevel: editSkillLevel })
+			await updateProfile({
+				name: editName.trim(),
+				position: editPosition,
+				skillLevel: editSkillLevel,
+			} as any)
+			await refresh()
 			setShowEditModal(false)
 			hapticFeedback.success()
 			Alert.alert('Profile Updated', 'Your profile has been saved.')
-		} catch { Alert.alert('Error', 'Failed to save profile.') }
-		finally { setLoading(false) }
+		} catch (e: any) {
+			const message = e?.message || 'Failed to save profile.'
+			setActionError(message)
+			Alert.alert('Error', message)
+		}
+		finally { setActionLoading(false) }
 	}
 
 	const handleExportData = async () => {
 		if (!user?.email) { Alert.alert('Error', 'Email is required to export data.'); return }
-		setLoading(true)
+		setActionLoading(true)
+		setActionError(null)
 		try {
-			const data = await storageService.exportData()
+			const exportPayload = await apiService.exportUserData()
+			const data = JSON.stringify(exportPayload, null, 2)
 			await emailService.sendDataExportEmail(user.email, data)
 			Alert.alert('Export Sent', 'Check your email for the data export.')
-		} catch { Alert.alert('Error', 'Failed to export data.') }
-		finally { setLoading(false) }
+		} catch (e: any) {
+			const message = e?.message || 'Failed to export data.'
+			setActionError(message)
+			Alert.alert('Error', message)
+		}
+		finally { setActionLoading(false) }
 	}
 
 	const handleDeleteAccount = () => {
@@ -144,7 +206,8 @@ export const ProfileScreen: React.FC = () => {
 					text: 'Delete',
 					style: 'destructive',
 					onPress: async () => {
-						setLoading(true)
+						setActionLoading(true)
+						setActionError(null)
 						try {
 							await apiService.deleteAccount()
 							try {
@@ -154,12 +217,13 @@ export const ProfileScreen: React.FC = () => {
 							}
 							Alert.alert('Account Deleted', 'Your account has been removed.')
 						} catch (e: any) {
+							setActionError(e?.message || 'Failed to delete account.')
 							Alert.alert(
 								'Error',
 								e?.message || 'Failed to delete account.',
 							)
 						} finally {
-							setLoading(false)
+							setActionLoading(false)
 						}
 					},
 				},
@@ -173,38 +237,71 @@ export const ProfileScreen: React.FC = () => {
 			{
 				text: 'Sign Out',
 				onPress: async () => {
-					setLoading(true)
+					setActionLoading(true)
+					setActionError(null)
 					try { await logout() }
-					catch { Alert.alert('Error', 'Failed to sign out.') }
-					finally { setLoading(false) }
+					catch (e: any) {
+						const message = e?.message || 'Failed to sign out.'
+						setActionError(message)
+						Alert.alert('Error', message)
+					}
+					finally { setActionLoading(false) }
 				},
 			},
 		])
 	}
 
 	const initials = useMemo(() => {
-		const n = user?.name || 'P'
+		const n = (profile?.name as string) || (profileLoading ? '...' : 'P')
 		const parts = n.split(' ')
 		return parts.length >= 2 ? `${parts[0][0]}${parts[1][0]}`.toUpperCase() : n[0].toUpperCase()
-	}, [user?.name])
+	}, [profile?.name, profileLoading])
 
 	return (
 		<SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-			{loading ? (
+			{actionLoading ? (
 				<View style={styles.loadingOverlay}>
 					<ActivityIndicator size="large" color={colors.brand.orange} />
 					<Text style={styles.loadingText}>Processing...</Text>
 				</View>
 			) : null}
 
+			{networkToastMessage ? (
+				<View style={styles.toastContainer} pointerEvents="none" testID="profile-network-toast">
+					<Text style={styles.toastText}>{networkToastMessage}</Text>
+				</View>
+			) : null}
+
 			<ScrollView showsVerticalScrollIndicator={false}>
+				{blockingErrorMessage ? (
+					<View style={styles.errorBanner}>
+						<Text style={styles.errorText}>
+							{blockingErrorMessage}
+						</Text>
+						<TouchableOpacity
+							onPress={() => {
+								setActionError(null)
+								void refresh()
+							}}
+							activeOpacity={0.75}
+						>
+							<Text style={styles.retryText}>Retry</Text>
+						</TouchableOpacity>
+					</View>
+				) : null}
+
 				{/* Profile Hero */}
 				<View style={styles.heroCard}>
 					<View style={styles.avatarCircle}>
 						<Text style={styles.avatarInitials}>{initials}</Text>
 					</View>
-					<Text style={styles.userName}>{user?.name || 'Player'}</Text>
-					{user?.username ? <Text style={styles.userHandle}>@{user.username}</Text> : null}
+					<Text style={styles.userName}>
+						{(profile?.name as string) || (profileLoading ? 'Loading profile...' : 'Profile unavailable')}
+					</Text>
+					{profile?.username ? (
+						<Text style={styles.userHandle}>@{String(profile.username)}</Text>
+					) : null}
+					{profileLoading ? <Text style={styles.syncText}>Syncing profile...</Text> : null}
 					<TouchableOpacity onPress={handleEditProfile} style={styles.editBtn} activeOpacity={0.75}>
 						<Ionicons name="create-outline" size={16} color={colors.brand.orange} />
 						<Text style={styles.editText}>Edit Profile</Text>
@@ -217,6 +314,7 @@ export const ProfileScreen: React.FC = () => {
 					<StatCard icon="trophy" label="Best" value={stats.bestScore} color="default" />
 					<StatCard icon="flame" label="Streak" value={stats.currentStreak} color="cyan" />
 				</View>
+				{statsLoading ? <Text style={styles.syncText}>Syncing stats...</Text> : null}
 
 				{/* Preferences */}
 				<View style={styles.section}>
@@ -227,10 +325,11 @@ export const ProfileScreen: React.FC = () => {
 							<Text style={styles.prefLabel}>Notifications</Text>
 						</View>
 						<Switch
-							value={notifications}
+							value={preferences.notifications_enabled}
 							onValueChange={handleNotificationToggle}
+							disabled={preferenceUpdating}
 							trackColor={{ false: colors.bg.elevated, true: colors.brand.orangeDim }}
-							thumbColor={notifications ? colors.brand.orange : colors.text.tertiary}
+							thumbColor={preferences.notifications_enabled ? colors.brand.orange : colors.text.tertiary}
 							accessibilityLabel="Notifications"
 							accessibilityHint="When on, you can receive training reminders and app updates"
 						/>
@@ -241,10 +340,11 @@ export const ProfileScreen: React.FC = () => {
 							<Text style={styles.prefLabel}>Dark Mode</Text>
 						</View>
 						<Switch
-							value={darkMode}
+							value={preferences.dark_mode_enabled}
 							onValueChange={handleDarkModeToggle}
+							disabled={preferenceUpdating}
 							trackColor={{ false: colors.bg.elevated, true: colors.brand.orangeDim }}
-							thumbColor={darkMode ? colors.brand.orange : colors.text.tertiary}
+							thumbColor={preferences.dark_mode_enabled ? colors.brand.orange : colors.text.tertiary}
 							accessibilityLabel="Dark mode"
 							accessibilityHint="SHOOTRZ currently uses a dark interface only; this toggle is for future theming"
 						/>
@@ -255,14 +355,18 @@ export const ProfileScreen: React.FC = () => {
 							<Text style={styles.prefLabel}>Analytics</Text>
 						</View>
 						<Switch
-							value={analytics}
+							value={preferences.analytics_enabled}
 							onValueChange={handleAnalyticsToggle}
+							disabled={preferenceUpdating}
 							trackColor={{ false: colors.bg.elevated, true: colors.brand.orangeDim }}
-							thumbColor={analytics ? colors.brand.orange : colors.text.tertiary}
+							thumbColor={preferences.analytics_enabled ? colors.brand.orange : colors.text.tertiary}
 							accessibilityLabel="Product analytics"
 							accessibilityHint="When on, uses anonymous data to help improve the app"
 						/>
 					</View>
+					{preferenceUpdating ? (
+						<Text style={styles.syncText}>Saving preferences...</Text>
+					) : null}
 				</View>
 
 				{/* Account Actions */}
@@ -334,7 +438,7 @@ export const ProfileScreen: React.FC = () => {
 								))}
 							</View>
 						</View>
-						<PrimaryButton label="Save" onPress={handleSaveProfile} loading={loading} fullWidth />
+						<PrimaryButton label="Save" onPress={handleSaveProfile} loading={actionLoading} fullWidth />
 						<TouchableOpacity onPress={() => setShowEditModal(false)} style={styles.modalCancel} activeOpacity={0.75}>
 							<Text style={styles.modalCancelText}>Cancel</Text>
 						</TouchableOpacity>
@@ -355,6 +459,46 @@ const styles = StyleSheet.create({
 		zIndex: 10,
 	},
 	loadingText: { ...typography.roles.body, color: colors.text.secondary, marginTop: spacing[3] },
+	toastContainer: {
+		position: 'absolute',
+		top: spacing[4],
+		left: spacing.screenPadding,
+		right: spacing.screenPadding,
+		zIndex: 12,
+		borderRadius: radius.lg,
+		paddingHorizontal: spacing[3],
+		paddingVertical: spacing[3],
+		backgroundColor: colors.bg.secondary,
+		borderWidth: 1,
+		borderColor: colors.brand.orange,
+	},
+	toastText: {
+		...typography.roles.caption,
+		color: colors.text.primary,
+	},
+	errorBanner: {
+		marginHorizontal: spacing.screenPadding,
+		marginTop: spacing[4],
+		padding: spacing[3],
+		borderRadius: radius.lg,
+		borderWidth: 1,
+		borderColor: colors.error,
+		backgroundColor: colors.bg.secondary,
+	},
+	errorText: { ...typography.roles.caption, color: colors.error },
+	retryText: {
+		...typography.roles.caption,
+		color: colors.brand.orange,
+		marginTop: spacing[2],
+		fontWeight: typography.weight.semibold,
+		fontFamily: 'DMSansSemiBold',
+	},
+	syncText: {
+		...typography.roles.caption,
+		color: colors.text.tertiary,
+		textAlign: 'center' as const,
+		marginTop: spacing[2],
+	},
 	heroCard: {
 		alignItems: 'center',
 		paddingVertical: spacing[8],

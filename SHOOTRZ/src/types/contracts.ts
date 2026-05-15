@@ -154,6 +154,8 @@ export interface HistoryResponse {
 	total: number
 	limit?: number
 	offset?: number
+	/** Set on authenticated MVP history: stable read-model id. */
+	source?: 'analysis_summaries_v1'
 }
 
 export interface HistoryStatsResponse {
@@ -219,6 +221,8 @@ export interface UserProfile {
 	dominantHand?: 'left' | 'right'
 	yearsPlaying?: number
 	notificationsEnabled?: boolean
+	darkModeEnabled?: boolean
+	analyticsEnabled?: boolean
 	coachingStyle?: 'encouraging' | 'direct' | 'analytical' | 'balanced'
 	createdAt: string
 	updatedAt: string
@@ -292,4 +296,50 @@ export interface UserStats {
 	currentStreak: number
 	longestStreak: number
 	lastSessionDate?: string
+}
+
+export interface UserPreferencesPayload {
+	notifications_enabled?: boolean
+	dark_mode_enabled?: boolean
+	analytics_enabled?: boolean
+}
+
+export interface UserProfileResponse {
+	id: string
+	name?: string
+	username?: string
+	skill_level?: string
+	position?: string
+	has_completed_onboarding?: boolean
+	profile?: {
+		notifications_enabled?: boolean
+		dark_mode_enabled?: boolean
+		analytics_enabled?: boolean
+		[key: string]: unknown
+	} | null
+	[key: string]: unknown
+}
+
+export interface UserExportMetadata {
+	truncated: boolean
+	limits: {
+		sessions: number
+		chat_messages: number
+	}
+	counts: {
+		sessions_returned: number
+		chat_messages_returned: number
+		sessions_fetched_before_limit: number
+		chat_messages_fetched_before_limit: number
+	}
+}
+
+export interface UserExportResponse {
+	user: Record<string, unknown> | null
+	profile: Record<string, unknown> | null
+	sessions: Array<Record<string, unknown>>
+	chat_history: Array<Record<string, unknown>>
+	analysis_summaries: Array<Record<string, unknown>>
+	metrics: Array<Record<string, unknown>>
+	metadata: UserExportMetadata
 }

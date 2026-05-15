@@ -15,6 +15,9 @@ import type {
 	DrillCompletion,
 	WorkoutProgress,
 	ChatHistoryMessage,
+	UserExportResponse,
+	UserPreferencesPayload,
+	UserProfileResponse,
 } from '../types/contracts';
 import { API_PATHS } from '../constants/apiEndpoints';
 
@@ -467,6 +470,12 @@ class ApiService {
 
   /**
    * Authenticated analysis history (MVP summaries + metrics). Preferred.
+   *
+   * If the app points at a server that has not been updated with the
+   * authenticated history route, the client may get HTTP 404. We then fall back
+   * to the legacy unauthenticated path for the current Supabase user id so
+   * development does not go blank. Production should expose the primary route;
+   * the fallback is a best-effort read of video rows, not a full analysis summary.
    */
   async getAnalysisHistory(
     limit: number = 100,
@@ -644,17 +653,23 @@ class ApiService {
   // New Supabase-backed endpoints (authenticated)
   // ---------------------------------------------------------------------------
 
-  async getUserProfile(): Promise<any> {
+  async getUserProfile(): Promise<UserProfileResponse> {
     const headers = await this.getAuthHeaders()
     const response = await axios.get(`${this.baseURL}${API_PATHS.userProfile}`, {
       headers, timeout: 15000,
     })
-    return response.data
+    return response.data as UserProfileResponse
   }
 
   async updateUserProfile(data: Partial<UserProfile>): Promise<any> {
-    const headers = await this.getAuthHeaders()
     const snaked: Record<string, any> = {}
+    if ((data as any).name !== undefined) snaked.name = (data as any).name
+    if ((data as any).username !== undefined) snaked.username = (data as any).username
+    if ((data as any).skillLevel !== undefined) snaked.skill_level = (data as any).skillLevel
+    if ((data as any).position !== undefined) snaked.position = (data as any).position
+    if ((data as any).hasCompletedOnboarding !== undefined) {
+      snaked.has_completed_onboarding = (data as any).hasCompletedOnboarding
+    }
     if (data.primaryGoal !== undefined) snaked.primary_goal = data.primaryGoal
     if (data.trainingFrequency !== undefined) snaked.training_frequency = data.trainingFrequency
     if (data.preferredDrillDuration !== undefined) snaked.preferred_drill_duration = data.preferredDrillDuration
@@ -664,11 +679,42 @@ class ApiService {
     if (data.dominantHand !== undefined) snaked.dominant_hand = data.dominantHand
     if (data.yearsPlaying !== undefined) snaked.years_playing = data.yearsPlaying
     if (data.notificationsEnabled !== undefined) snaked.notifications_enabled = data.notificationsEnabled
+    if (data.darkModeEnabled !== undefined) snaked.dark_mode_enabled = data.darkModeEnabled
+    if (data.analyticsEnabled !== undefined) snaked.analytics_enabled = data.analyticsEnabled
     if (data.coachingStyle !== undefined) snaked.coaching_style = data.coachingStyle
-    const response = await axios.put(`${this.baseURL}${API_PATHS.userProfile}`, snaked, {
+    const request = async () => {
+      const headers = await this.getAuthHeaders()
+      return axios.put(`${this.baseURL}${API_PATHS.userProfile}`, snaked, {
+        headers, timeout: 15000,
+      })
+    }
+    try {
+      const response = await request()
+      return response.data
+    } catch (err: any) {
+      if (err?.response?.status === 401) {
+        await supabase.auth.refreshSession()
+        const retry = await request()
+        return retry.data
+      }
+      throw err
+    }
+  }
+
+  async exportUserData(): Promise<UserExportResponse> {
+    const headers = await this.getAuthHeaders()
+    const response = await axios.get(`${this.baseURL}${API_PATHS.userExport}`, {
+      headers, timeout: 120000,
+    })
+    return response.data as UserExportResponse
+  }
+
+  async updateUserPreferences(payload: UserPreferencesPayload): Promise<UserProfileResponse> {
+    const headers = await this.getAuthHeaders()
+    const response = await axios.put(`${this.baseURL}${API_PATHS.userPreferences}`, payload, {
       headers, timeout: 15000,
     })
-    return response.data
+    return response.data as UserProfileResponse
   }
 
   async getUserStats(): Promise<UserStats> {

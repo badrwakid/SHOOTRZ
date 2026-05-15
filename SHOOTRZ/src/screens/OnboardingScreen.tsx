@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native'
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { colors, typography, spacing, radius } from '../constants/theme'
@@ -14,17 +14,33 @@ interface OnboardingScreenProps {
 export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
 	const { updateProfile } = useAuth()
 	const [currentStep, setCurrentStep] = useState(0)
+	const [isSaving, setIsSaving] = useState(false)
+	const [saveError, setSaveError] = useState<string | null>(null)
 	const [selectedSkillLevel, setSelectedSkillLevel] = useState<
 		'beginner' | 'intermediate' | 'advanced'
 	>('beginner')
 	const [selectedPosition, setSelectedPosition] = useState('Guard')
-	const [selectedGoals, setSelectedGoals] = useState<string[]>([])
+	const [selectedPrimaryGoal, setSelectedPrimaryGoal] = useState('Improve shooting accuracy')
+	const [selectedTrainingFrequency, setSelectedTrainingFrequency] = useState('3-4 times per week')
+	const [preferredDrillDuration, setPreferredDrillDuration] = useState('30')
+	const [selectedDominantHand, setSelectedDominantHand] = useState('right')
+	const [yearsPlaying, setYearsPlaying] = useState('1')
+	const [selectedCoachingStyle, setSelectedCoachingStyle] = useState('balanced')
+	const [age, setAge] = useState('')
+	const [heightCm, setHeightCm] = useState('')
+	const [weightKg, setWeightKg] = useState('')
 
 	const steps = [
 		{ title: 'Welcome to SHOOTRZ', subtitle: 'Your AI-powered basketball training assistant', icon: 'basketball' },
 		{ title: 'Your Skill Level', subtitle: 'This helps us personalize your training', icon: 'stats-chart' },
 		{ title: 'Your Position', subtitle: 'What position do you play?', icon: 'people' },
-		{ title: 'Your Goals', subtitle: 'What do you want to improve?', icon: 'trophy' },
+		{ title: 'Primary Goal', subtitle: 'What should we focus on first?', icon: 'trophy' },
+		{ title: 'Training Frequency', subtitle: 'How often do you train?', icon: 'calendar' },
+		{ title: 'Drill Duration', subtitle: 'Preferred drill session duration', icon: 'time' },
+		{ title: 'Dominant Hand', subtitle: 'Which hand do you shoot with?', icon: 'hand-left' },
+		{ title: 'Experience', subtitle: 'How many years have you played?', icon: 'school' },
+		{ title: 'Coaching Style', subtitle: 'How should feedback be delivered?', icon: 'chatbubble-ellipses' },
+		{ title: 'Body Metrics', subtitle: 'Optional values improve coaching precision', icon: 'body' },
 	]
 
 	const positions = ['Guard', 'Forward', 'Center', 'All-Around']
@@ -36,31 +52,120 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }
 		'Faster release',
 		'Stronger follow-through',
 	]
+	const trainingFrequencyOptions = ['1-2 times per week', '3-4 times per week', '5+ times per week']
+	const dominantHandOptions = [
+		{ value: 'right', label: 'Right' },
+		{ value: 'left', label: 'Left' },
+		{ value: 'ambidextrous', label: 'Ambidextrous' },
+	]
+	const coachingStyleOptions = [
+		{ value: 'encouraging', label: 'Encouraging' },
+		{ value: 'balanced', label: 'Balanced' },
+		{ value: 'direct', label: 'Direct' },
+	]
+
+	const parsePositiveInt = (raw: string): number | undefined => {
+		if (!raw.trim()) {
+			return undefined
+		}
+		const parsed = Number.parseInt(raw, 10)
+		return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined
+	}
+
+	const parsePositiveNumber = (raw: string): number | undefined => {
+		if (!raw.trim()) {
+			return undefined
+		}
+		const parsed = Number.parseFloat(raw)
+		return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined
+	}
+
+	const validateStep = (): string | null => {
+		if (currentStep === 5 && preferredDrillDuration.trim() && !parsePositiveInt(preferredDrillDuration)) {
+			return 'Please enter a valid drill duration in minutes.'
+		}
+		if (currentStep === 7 && yearsPlaying.trim() && !parsePositiveInt(yearsPlaying)) {
+			return 'Please enter valid years playing.'
+		}
+		if (currentStep === 9) {
+			if (age.trim() && !parsePositiveInt(age)) return 'Please enter a valid age.'
+			if (heightCm.trim() && !parsePositiveNumber(heightCm)) return 'Please enter a valid height in cm.'
+			if (weightKg.trim() && !parsePositiveNumber(weightKg)) return 'Please enter a valid weight in kg.'
+		}
+		return null
+	}
+
+	const getStepPayload = (): Record<string, unknown> => {
+		switch (currentStep) {
+			case 1:
+				return { skillLevel: selectedSkillLevel }
+			case 2:
+				return { position: selectedPosition }
+			case 3:
+				return { primaryGoal: selectedPrimaryGoal }
+			case 4:
+				return { trainingFrequency: selectedTrainingFrequency }
+			case 5: {
+				const duration = parsePositiveInt(preferredDrillDuration)
+				return duration ? { preferredDrillDuration: duration } : {}
+			}
+			case 6:
+				return { dominantHand: selectedDominantHand }
+			case 7: {
+				const years = parsePositiveInt(yearsPlaying)
+				return years ? { yearsPlaying: years } : {}
+			}
+			case 8:
+				return { coachingStyle: selectedCoachingStyle }
+			case 9: {
+				const payload: Record<string, unknown> = {}
+				const parsedAge = parsePositiveInt(age)
+				const parsedHeight = parsePositiveNumber(heightCm)
+				const parsedWeight = parsePositiveNumber(weightKg)
+				if (parsedAge !== undefined) payload.age = parsedAge
+				if (parsedHeight !== undefined) payload.heightCm = parsedHeight
+				if (parsedWeight !== undefined) payload.weightKg = parsedWeight
+				return payload
+			}
+			default:
+				return {}
+		}
+	}
 
 	const handleNext = async () => {
 		hapticFeedback.medium()
+		const validationError = validateStep()
+		if (validationError) {
+			setSaveError(validationError)
+			return
+		}
+		const payload = getStepPayload()
+		if (Object.keys(payload).length > 0) {
+			try {
+				setIsSaving(true)
+				setSaveError(null)
+				await updateProfile(payload as any)
+			} catch {
+				setSaveError('Failed to save this step. Please try again.')
+				setIsSaving(false)
+				return
+			}
+		}
 		if (currentStep < steps.length - 1) {
 			setCurrentStep(currentStep + 1)
 		} else {
 			await completeOnboarding()
 		}
+		setIsSaving(false)
 	}
 
 	const completeOnboarding = async () => {
 		try {
-			await updateProfile({ skillLevel: selectedSkillLevel, position: selectedPosition })
 			hapticFeedback.success()
 			onComplete()
 		} catch {
 			onComplete()
 		}
-	}
-
-	const toggleGoal = (goal: string) => {
-		hapticFeedback.selection()
-		setSelectedGoals(prev =>
-			prev.includes(goal) ? prev.filter(g => g !== goal) : [...prev, goal],
-		)
 	}
 
 	const step = steps[currentStep]
@@ -139,12 +244,12 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }
 				{currentStep === 3 ? (
 					<View style={styles.options}>
 						{goalOptions.map(goal => {
-							const active = selectedGoals.includes(goal)
+							const active = selectedPrimaryGoal === goal
 							return (
 								<TouchableOpacity
 									key={goal}
 									style={[styles.goalCard, active && styles.goalCardActive]}
-									onPress={() => toggleGoal(goal)}
+									onPress={() => { hapticFeedback.selection(); setSelectedPrimaryGoal(goal) }}
 									activeOpacity={0.85}
 								>
 									<Ionicons
@@ -158,6 +263,137 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }
 						})}
 					</View>
 				) : null}
+
+				{currentStep === 4 ? (
+					<View style={styles.options}>
+						{trainingFrequencyOptions.map(option => {
+							const active = selectedTrainingFrequency === option
+							return (
+								<TouchableOpacity
+									key={option}
+									style={[styles.goalCard, active && styles.goalCardActive]}
+									onPress={() => { hapticFeedback.selection(); setSelectedTrainingFrequency(option) }}
+									activeOpacity={0.85}
+								>
+									<Ionicons
+										name={active ? 'checkmark-circle' : 'ellipse-outline'}
+										size={20}
+										color={active ? colors.brand.orange : colors.text.tertiary}
+									/>
+									<Text style={[styles.goalText, active && styles.goalTextActive]}>{option}</Text>
+								</TouchableOpacity>
+							)
+						})}
+					</View>
+				) : null}
+
+				{currentStep === 5 ? (
+					<View style={styles.inputGroup}>
+						<Text style={styles.inputLabel}>Minutes per drill session</Text>
+						<TextInput
+							style={styles.input}
+							value={preferredDrillDuration}
+							onChangeText={setPreferredDrillDuration}
+							keyboardType="number-pad"
+							placeholder="e.g. 30"
+							placeholderTextColor={colors.text.tertiary}
+						/>
+					</View>
+				) : null}
+
+				{currentStep === 6 ? (
+					<View style={styles.options}>
+						{dominantHandOptions.map(option => {
+							const active = selectedDominantHand === option.value
+							return (
+								<TouchableOpacity
+									key={option.value}
+									style={[styles.goalCard, active && styles.goalCardActive]}
+									onPress={() => { hapticFeedback.selection(); setSelectedDominantHand(option.value) }}
+									activeOpacity={0.85}
+								>
+									<Ionicons
+										name={active ? 'checkmark-circle' : 'ellipse-outline'}
+										size={20}
+										color={active ? colors.brand.orange : colors.text.tertiary}
+									/>
+									<Text style={[styles.goalText, active && styles.goalTextActive]}>{option.label}</Text>
+								</TouchableOpacity>
+							)
+						})}
+					</View>
+				) : null}
+
+				{currentStep === 7 ? (
+					<View style={styles.inputGroup}>
+						<Text style={styles.inputLabel}>Years playing basketball</Text>
+						<TextInput
+							style={styles.input}
+							value={yearsPlaying}
+							onChangeText={setYearsPlaying}
+							keyboardType="number-pad"
+							placeholder="e.g. 3"
+							placeholderTextColor={colors.text.tertiary}
+						/>
+					</View>
+				) : null}
+
+				{currentStep === 8 ? (
+					<View style={styles.options}>
+						{coachingStyleOptions.map(option => {
+							const active = selectedCoachingStyle === option.value
+							return (
+								<TouchableOpacity
+									key={option.value}
+									style={[styles.goalCard, active && styles.goalCardActive]}
+									onPress={() => { hapticFeedback.selection(); setSelectedCoachingStyle(option.value) }}
+									activeOpacity={0.85}
+								>
+									<Ionicons
+										name={active ? 'checkmark-circle' : 'ellipse-outline'}
+										size={20}
+										color={active ? colors.brand.orange : colors.text.tertiary}
+									/>
+									<Text style={[styles.goalText, active && styles.goalTextActive]}>{option.label}</Text>
+								</TouchableOpacity>
+							)
+						})}
+					</View>
+				) : null}
+
+				{currentStep === 9 ? (
+					<View style={styles.inputGroup}>
+						<Text style={styles.inputLabel}>Age (optional)</Text>
+						<TextInput
+							style={styles.input}
+							value={age}
+							onChangeText={setAge}
+							keyboardType="number-pad"
+							placeholder="e.g. 18"
+							placeholderTextColor={colors.text.tertiary}
+						/>
+						<Text style={styles.inputLabel}>Height in cm (optional)</Text>
+						<TextInput
+							style={styles.input}
+							value={heightCm}
+							onChangeText={setHeightCm}
+							keyboardType="decimal-pad"
+							placeholder="e.g. 182"
+							placeholderTextColor={colors.text.tertiary}
+						/>
+						<Text style={styles.inputLabel}>Weight in kg (optional)</Text>
+						<TextInput
+							style={styles.input}
+							value={weightKg}
+							onChangeText={setWeightKg}
+							keyboardType="decimal-pad"
+							placeholder="e.g. 78"
+							placeholderTextColor={colors.text.tertiary}
+						/>
+					</View>
+				) : null}
+
+				{saveError ? <Text style={styles.errorText}>{saveError}</Text> : null}
 			</ScrollView>
 
 			<View style={styles.nav}>
@@ -179,6 +415,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }
 					label={currentStep === steps.length - 1 ? 'Get Started' : 'Continue'}
 					onPress={handleNext}
 					size="md"
+					loading={isSaving}
 				/>
 			</View>
 		</SafeAreaView>
@@ -320,6 +557,30 @@ const styles = StyleSheet.create({
 	goalTextActive: {
 		color: colors.brand.orangeLight,
 		fontWeight: typography.weight.semibold,
+	},
+	inputGroup: {
+		width: '100%',
+		gap: spacing[2],
+	},
+	inputLabel: {
+		...typography.roles.caption,
+		color: colors.text.secondary,
+		marginTop: spacing[2],
+	},
+	input: {
+		backgroundColor: colors.bg.secondary,
+		borderWidth: 1,
+		borderColor: colors.border.default,
+		borderRadius: radius.card,
+		paddingHorizontal: spacing[3],
+		paddingVertical: spacing[3],
+		color: colors.text.primary,
+	},
+	errorText: {
+		...typography.roles.caption,
+		color: colors.error,
+		marginTop: spacing[3],
+		textAlign: 'center',
 	},
 	nav: {
 		flexDirection: 'row',

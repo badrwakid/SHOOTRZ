@@ -8,6 +8,15 @@ export interface UserData {
   name: string;
   skillLevel: 'beginner' | 'intermediate' | 'advanced';
   position: string;
+  primaryGoal?: string;
+  trainingFrequency?: string;
+  preferredDrillDuration?: number;
+  dominantHand?: string;
+  yearsPlaying?: number;
+  coachingStyle?: string;
+  age?: number;
+  heightCm?: number;
+  weightKg?: number;
   goals: Goal[];
   preferences: UserPreferences;
   createdAt: string;
