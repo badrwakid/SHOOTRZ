@@ -13,10 +13,13 @@ Concurrency model:
 import asyncio
 import hashlib
 import json
+import logging
 import os
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import Dict, Optional, Tuple
+
+logger = logging.getLogger(__name__)
 
 import cv2
 import numpy as np
@@ -181,8 +184,13 @@ async def analyze_video(
             from ..utils.supabase_auth import get_authenticated_user
             auth_user = get_authenticated_user(authorization)
             user_id = auth_user.user_id
+        except HTTPException:
+            # Invalid / expired token — treat upload as anonymous
+            logger.warning("MVP upload: invalid auth token, continuing as anonymous")
         except Exception:
-            pass  # Continue as anonymous
+            # Unexpected auth failure (e.g. Supabase unreachable) — log so it
+            # shows up in server logs rather than being silently swallowed
+            logger.exception("MVP upload: unexpected auth error, continuing as anonymous")
 
     try:
         # Feed the service an object that quacks like UploadFile so it can

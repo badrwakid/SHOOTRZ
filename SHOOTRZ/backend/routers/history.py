@@ -24,9 +24,10 @@ async def history(
 	"""
 	Get user's analysis history with sessions and aggregated metrics.
 
-	Deprecated for clients: prefer ``GET /api/user/analysis-history`` with a
-	Bearer token (user-scoped, correct MVP scores from analysis_summaries).
-	This endpoint is unauthenticated and uses legacy video rows only.
+	Deprecated: prefer ``GET /api/user/analysis-history`` which returns
+	correct MVP scores from analysis_summaries.  This endpoint is
+	authenticated (Bearer token required) and reads legacy video rows only,
+	so ``session_id`` values are video IDs, not sessions table IDs.
 	"""
 	if user.user_id != user_id:
 		raise HTTPException(status_code=403, detail="Cannot access another user's history")
@@ -64,7 +65,8 @@ async def history(
 					avg_score = sum(values) / len(values)
 			
 			sessions.append({
-				"session_id": video_id,
+				"session_id": video_id,   # video ID — this is a legacy endpoint
+				"video_id": video_id,
 				"timestamp": video["created_at"],
 				"title": None,
 				"date": video["created_at"][:10],

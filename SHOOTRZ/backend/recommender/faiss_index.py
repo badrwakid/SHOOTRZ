@@ -1,16 +1,14 @@
 # recommender/faiss_index.py
+import logging
 from pathlib import Path
-from .dummy_data import generate_dummy_storage
+from .drill_clustering import FAISS_PATH, load_drill_metadata, _ensure_artifacts_exist
 
-_BASE_DIR = Path(__file__).parent.parent
-STORAGE_DIR = _BASE_DIR / "storage"
-FAISS_PATH = STORAGE_DIR / "faiss_index.bin"
+logger = logging.getLogger(__name__)
+
 
 def load_faiss_index():
     import faiss
 
-    if not FAISS_PATH.exists():
-        # generate dummy data (includes FAISS index)
-        generate_dummy_storage(STORAGE_DIR)
-
+    drills = load_drill_metadata()
+    _ensure_artifacts_exist(drills)
     return faiss.read_index(str(FAISS_PATH))

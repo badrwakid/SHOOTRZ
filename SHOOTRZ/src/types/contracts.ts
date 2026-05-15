@@ -239,11 +239,6 @@ export interface AnalysisSummary {
 	releaseAngleScore?: number
 	followThroughScore?: number
 	balanceScore?: number
-	elbowAngleValue?: number
-	kneeBendValue?: number
-	releaseAngleValue?: number
-	phasesDetected?: string[]
-	dominantPhaseIssue?: string
 	topStrengths?: string[]
 	topImprovements?: string[]
 	scoreTier?: 'elite' | 'great' | 'good' | 'fair' | 'poor'

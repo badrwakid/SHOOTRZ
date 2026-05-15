@@ -975,11 +975,6 @@ class SupabaseDB:
 db = SupabaseDB()
 
 
-# Backward-compatible function aliases so existing imports keep working
-def get_user_profile(user_id: str) -> Optional[Dict[str, Any]]:
-    return db.get_user(user_id)
-
-
 def record_video(user_id: str, file_url: str, camera_angle: Optional[str] = None,
                  fps: Optional[int] = None, device_info: Optional[str] = None) -> str:
     data: Dict[str, Any] = {"file_url": file_url}
