@@ -31,6 +31,7 @@
     "expo-blur": "~55.0.14",
     "expo-camera": "~55.0.18",
     "expo-crypto": "~55.0.15",
+    "expo-dev-client": "~55.0.34",
     "expo-file-system": "~55.0.20",
     "expo-haptics": "~55.0.14",
     "expo-image-picker": "~55.0.20",
@@ -40,12 +41,14 @@
     "expo-video": "~55.0.17",
     "expo-web-browser": "~55.0.16",
     "react": "19.2.0",
+    "react-dom": "19.2.0",
     "react-native": "0.83.6",
     "react-native-chart-kit": "^6.12.0",
     "react-native-reanimated": "4.2.1",
     "react-native-safe-area-context": "~5.6.2",
     "react-native-screens": "~4.23.0",
-    "react-native-svg": "15.15.3"
+    "react-native-svg": "15.15.3",
+    "react-native-web": "^0.21.0"
   },
   "devDependencies": {
     "@testing-library/react-native": "^13.3.3",
