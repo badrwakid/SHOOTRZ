@@ -6,6 +6,7 @@ import { HistoryProvider, useHistory } from '../HistoryContext'
 import { apiService } from '../../services/api.service'
 import { storageService } from '../../services/storage.service'
 import { eventBus } from '../../utils/eventBus'
+import type { HistorySession } from '../../types/contracts'
 
 let mockUserId = 'user-1'
 
@@ -84,7 +85,7 @@ describe('HistoryContext refresh regression', () => {
 			expect(apiService.getAnalysisHistory).toHaveBeenCalledTimes(1)
 		})
 
-		let refreshPromise!: Promise<Array<{ id: string }>>
+		let refreshPromise!: Promise<HistorySession[]>
 		await act(async () => {
 			refreshPromise = getHistory().refresh()
 			first.resolve({ sessions: [{ id: 'stale-session' }] })

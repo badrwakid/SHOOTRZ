@@ -87,7 +87,8 @@ export const HistoryProvider: React.FC<{ children: React.ReactNode }> = ({ child
 		inFlightCountRef.current += 1
 		setLoading(true)
 		const reqId = ++requestSeqRef.current
-		const p = (async () => {
+		let p!: Promise<HistorySession[]>
+		p = (async () => {
 			try {
 				const resp: HistoryResponse = await apiService.getAnalysisHistory(100, 0)
 				const list = resp?.sessions ?? []
