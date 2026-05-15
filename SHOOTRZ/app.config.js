@@ -11,7 +11,7 @@ module.exports = {
   ...config,
   expo: {
     ...config.expo,
-    plugins: [...(config.expo.plugins || []), 'expo-video', 'expo-mail-composer', 'expo-web-browser'],
+    plugins: [...(config.expo.plugins || []), 'expo-video'],
     extra: {
       apiUrl: process.env.EXPO_PUBLIC_API_URL || 'http://127.0.0.1:8000',
       eas: {
