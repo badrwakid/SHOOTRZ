@@ -23,7 +23,7 @@ except RuntimeError:
     # Context already set (e.g. during hot reload in dev) — harmless.
     pass
 
-from .routers import history, feedback, db_test, db_integration_test, sessions, mvp, user
+from .routers import history, feedback, sessions, mvp, user
 from .routers import analysis
 from .routers import chat
 from .routers.recommendation_routes import router as recommendation_router
@@ -95,8 +95,6 @@ def create_app() -> FastAPI:
     app.include_router(history.router)
     app.include_router(feedback.router)
     app.include_router(sessions.router)
-    app.include_router(db_test.router)  # Database test endpoint
-    app.include_router(db_integration_test.router)  # Integration test endpoint
     app.include_router(user.router)
     app.include_router(analysis.router)
     app.include_router(recommendation_router, prefix="/api")
